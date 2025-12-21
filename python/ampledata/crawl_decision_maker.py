@@ -34,7 +34,7 @@ class GroqDecisionMaker(ICrawlDecisionMaker):
     ):
         self.columns_metadata = columns_metadata
         self.client = groq_client or Groq()
-        self.model = "openai/gpt-oss-120b"
+        self.model = "openai/gpt-oss-20b"  # maybe 120b ?
 
     def make_decision(
         self,
@@ -139,7 +139,10 @@ Snippet: {r.get("snippet", "")}
             )
         except json.JSONDecodeError:
             organic = serp_results.get("organic", [])[:3]
-            fallback_urls = [r.get("link") for r in organic if r.get("link")]
+            fallback_urls = []
+            for r in organic:
+                if r.get("link") is not None:
+                    fallback_urls.append(r.get("link"))
 
             return CrawlDecision(
                 urls_to_crawl=fallback_urls,

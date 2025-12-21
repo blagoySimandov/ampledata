@@ -30,6 +30,7 @@ def main():
         groq_client=groq_client,
     )
     web_searcher = SerperWebSearcher()
+
     enricher = Enricher(
         builder, crawl_decision_maker=crawl_decision_maker, web_searcher=web_searcher
     )
