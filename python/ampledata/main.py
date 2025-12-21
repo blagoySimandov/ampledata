@@ -5,19 +5,28 @@ from crawl_decision_maker import GroqDecisionMaker
 from query_builder import QueryBuilder
 from groq import Groq
 import os
+from models import ColumnMetadata, ColumnType
 
 
 def main():
-    columns_to_search_for = ["revenue", "employees"]
+    columns_metadata = [
+        ColumnMetadata(
+            name="revenue", type=ColumnType.NUMBER, description="annual revenue in USD"
+        ),
+        ColumnMetadata(
+            name="employees", type=ColumnType.NUMBER, description="employee count"
+        ),
+    ]
+
+    columns_to_search_for = [col.name for col in columns_metadata]
+    # notes_for_columns = [col.description or col.name for col in columns_metadata]
+
     builder = QueryBuilder(
         columns_to_search_for=columns_to_search_for,
-        notes_for_columns=["annual revenue", "employee count"],
     )
-    groq_client = Groq(
-        api_key=os.environ.get("GROQ_GEMINI")
-    )  # TODO: change to GROQ_API_KEY
+    groq_client = Groq(api_key=os.environ.get("GROQ_GEMINI"))
     crawl_decision_maker = GroqDecisionMaker(
-        columns_to_enrich=columns_to_search_for,
+        columns_metadata=columns_metadata,
         groq_client=groq_client,
     )
     web_searcher = SerperWebSearcher()
