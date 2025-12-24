@@ -5,13 +5,13 @@ import os
 from abc import ABC, abstractmethod
 
 
-class WebSearcher(ABC):
+class IWebSearcher(ABC):
     @abstractmethod
     def search(self, query: str) -> GoogleSearchResults:
         pass
 
 
-class SerperWebSearcher(WebSearcher):
+class SerperWebSearcher(IWebSearcher):
     def search(self, query: str) -> GoogleSearchResults:
         url = "https://google.serper.dev/search"
         payload = json.dumps({"q": query})

@@ -1,7 +1,9 @@
 from google_search_results_model import GoogleSearchResults
-from web_search import WebSearcher, SerperWebSearcher
+from web_search import IWebSearcher, SerperWebSearcher
 from query_builder import IQueryBuilder
-from crawl_decision_maker import ICrawlDecisionMaker, CrawlDecision
+from crawl_decision_maker import ICrawlDecisionMaker
+from web_crawler import IWebCrawler
+from content_extractor import IContentExtractor
 from dataclasses import asdict
 
 
@@ -10,12 +12,15 @@ class Enricher:
         self,
         query_builder: IQueryBuilder,
         crawl_decision_maker: ICrawlDecisionMaker,
-        web_searcher: WebSearcher = SerperWebSearcher(),
+        web_searcher: IWebSearcher = SerperWebSearcher(),
+        web_crawler: IWebCrawler | None = None,
+        content_extractor: IContentExtractor | None = None,
     ):
         self.web_searcher = web_searcher
         self.query_builder = query_builder
         self.crawl_decision_maker = crawl_decision_maker
-        pass
+        self.web_crawler = web_crawler
+        self.content_extractor = content_extractor
 
     def _search_query(self, query) -> GoogleSearchResults:
         return self.web_searcher.search(query)
@@ -23,12 +28,53 @@ class Enricher:
     def _build_query(self, entity: str) -> str:
         return self.query_builder.build(entity)
 
-    def _enrich_keys(self, row_keys: list[str]) -> list[CrawlDecision]:
+    async def _enrich_keys(self, row_keys: list[str]) -> list[dict]:
         results = []
         for key in row_keys:
             query = self._build_query(key)
             serp: GoogleSearchResults = self._search_query(query)
             decision = self.crawl_decision_maker.make_decision(serp, key)
-            results.append(asdict(decision))
+
+            missing_columns = decision.get_missing_columns(
+                self.crawl_decision_maker.columns_metadata
+            )
+
+            sources = []
+            if (
+                decision.urls_to_crawl
+                and missing_columns
+                and self.web_crawler
+                and self.content_extractor
+            ):
+                missing_columns_metadata = [
+                    col
+                    for col in self.crawl_decision_maker.columns_metadata
+                    if col.name in missing_columns
+                ]
+
+                markdown_content = await self.web_crawler.async_crawl(
+                    decision.urls_to_crawl
+                )
+
+                if markdown_content:
+                    sources = decision.urls_to_crawl
+                    extracted_data = self.content_extractor.extract(
+                        markdown_content,
+                        missing_columns_metadata,
+                        key,
+                    )
+
+                    if decision.extracted_data:
+                        decision.extracted_data.update(extracted_data)
+                    else:
+                        decision.extracted_data = extracted_data
+
+            result = asdict(decision)
+            result["sources"] = sources
+            results.append(result)
 
         return results
+
+    async def close(self):
+        if self.web_crawler:
+            await self.web_crawler.close()
