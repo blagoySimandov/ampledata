@@ -14,6 +14,14 @@ class CrawlDecision:
     extracted_data: dict[str, Any] | None
     reasoning: str
 
+    def get_missing_columns(self, columns_metadata: list[ColumnMetadata]) -> list[str]:
+        if self.extracted_data is None:
+            return [col.name for col in columns_metadata]
+
+        return [
+            col.name for col in columns_metadata if col.name not in self.extracted_data
+        ]
+
 
 class ICrawlDecisionMaker(ABC):
     columns_metadata: list[ColumnMetadata]

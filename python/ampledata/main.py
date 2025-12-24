@@ -1,43 +1,47 @@
-from enricher import Enricher
+from enricher_factory import EnricherFactory
 import json
-from web_search import SerperWebSearcher
-from crawl_decision_maker import GroqDecisionMaker
-from query_builder import QueryBuilder
-from groq import Groq
-import os
+import asyncio
 from models import ColumnMetadata, ColumnType
 
 
-def main():
+async def main():
     columns_metadata = [
         ColumnMetadata(
-            name="revenue", type=ColumnType.NUMBER, description="annual revenue in USD"
+            name="founded_year",
+            type=ColumnType.NUMBER,
+            description="year the company was founded",
         ),
         ColumnMetadata(
-            name="employees", type=ColumnType.NUMBER, description="employee count"
+            name="headquarters_city",
+            type=ColumnType.STRING,
+            description="city where company headquarters is located",
+        ),
+        ColumnMetadata(
+            name="ceo_name",
+            type=ColumnType.STRING,
+            description="current CEO full name",
+        ),
+        ColumnMetadata(
+            name="num_products",
+            type=ColumnType.NUMBER,
+            description="number of major products or product lines",
         ),
     ]
 
-    columns_to_search_for = [col.name for col in columns_metadata]
-    # notes_for_columns = [col.description or col.name for col in columns_metadata]
-
-    builder = QueryBuilder(
-        columns_to_search_for=columns_to_search_for,
-    )
-    groq_client = Groq(api_key=os.environ.get("GROQ_GEMINI"))
-    crawl_decision_maker = GroqDecisionMaker(
+    enricher = EnricherFactory.create_with_defaults(
         columns_metadata=columns_metadata,
-        groq_client=groq_client,
-    )
-    web_searcher = SerperWebSearcher()
-
-    enricher = Enricher(
-        builder, crawl_decision_maker=crawl_decision_maker, web_searcher=web_searcher
     )
 
-    print(json.dumps(enricher._enrich_keys(["apple", "stripe"]), indent=2))
-    pass
+    try:
+        print(
+            json.dumps(
+                await enricher._enrich_keys(["databricks", "snowflake", "confluent"]),
+                indent=2,
+            )
+        )
+    finally:
+        await enricher.close()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
