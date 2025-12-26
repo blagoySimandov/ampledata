@@ -1,9 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import Any
+from dataclasses import dataclass
 import json
 from groq import Groq
 from models import ColumnMetadata
 from utils import clean_json_md
+
+
+@dataclass
+class ContentExtractionResult:
+    extracted_data: dict[str, Any]
+    reasoning: str
 
 
 class IContentExtractor(ABC):
@@ -13,7 +20,7 @@ class IContentExtractor(ABC):
         markdown_content: str,
         columns_metadata: list[ColumnMetadata],
         entity: str,
-    ) -> dict[str, Any]:
+    ) -> ContentExtractionResult:
         pass
 
 
@@ -30,7 +37,7 @@ class GroqContentExtractor(IContentExtractor):
         markdown_content: str,
         columns_metadata: list[ColumnMetadata],
         entity: str,
-    ) -> dict[str, Any]:
+    ) -> ContentExtractionResult:
         prompt = self._build_extraction_prompt(
             markdown_content, columns_metadata, entity
         )
@@ -86,13 +93,20 @@ If a field cannot be found in the content, omit it from the response.
 
 ## Response Format (JSON only, no markdown)
 {{
-    "extracted_data": {{"field_name": value_with_correct_type}}
+    "extracted_data": {{"field_name": value_with_correct_type}},
+    "reasoning": "Explanation of what was extracted from the content and how you found each field"
 }}"""
 
-    def _parse_response(self, content: str) -> dict[str, Any]:
+    def _parse_response(self, content: str) -> ContentExtractionResult:
         content = clean_json_md(content)
         try:
             data = json.loads(content)
-            return data.get("extracted_data", {})
+            return ContentExtractionResult(
+                extracted_data=data.get("extracted_data", {}),
+                reasoning=data.get("reasoning", ""),
+            )
         except json.JSONDecodeError:
-            return {}
+            return ContentExtractionResult(
+                extracted_data={},
+                reasoning=f"Failed to parse LLM response: {content[:100]}",
+            )

@@ -33,12 +33,15 @@ async def main():
     )
 
     try:
-        print(
-            json.dumps(
-                await enricher._enrich_keys(["databricks", "snowflake", "confluent"]),
-                indent=2,
+        with open("results.json", "w") as f:
+            f.write(
+                json.dumps(
+                    await enricher._enrich_keys(
+                        ["databricks", "snowflake", "confluent"]
+                    ),
+                    indent=2,
+                )
             )
-        )
     finally:
         await enricher.close()
 

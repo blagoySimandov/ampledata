@@ -19,7 +19,10 @@ class CrawlDecision:
             return [col.name for col in columns_metadata]
 
         return [
-            col.name for col in columns_metadata if col.name not in self.extracted_data
+            col.name
+            for col in columns_metadata
+            if col.name not in self.extracted_data
+            or self.extracted_data[col.name] is None
         ]
 
 
@@ -114,24 +117,25 @@ Snippet: {r.get("snippet", "")}
 
 ## Your Task
 
-1. First, check if the answer box and snippets already contain enough information to fill ALL the columns we need.
-2. If YES: Extract the data directly and return empty urls_to_crawl array
+1. Extract ALL data you can see in the answer box and snippets, even if partial
    - IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata
    - For number types: use numeric values without quotes (e.g., 1000)
    - For string types: use quoted strings
    - For boolean types: use true/false without quotes
    - For date types: use ISO 8601 format (YYYY-MM-DD)
 
-3. If NO: Select up to {max_urls} URLs to crawl, prioritizing:
-   - Wikipedia
-   - Reliable data sources (SEC filings, financial sites)
-   - Avoid SEO aggregator sites when primary sources are available
+2. Check if you extracted ALL the columns we need:
+   - If YES: Return empty urls_to_crawl array
+   - If NO: Select up to {max_urls} URLs to crawl for missing data, prioritizing:
+     * Wikipedia
+     * Reliable data sources (SEC filings, financial sites)
+     * Avoid SEO aggregator sites when primary sources are available
 
 ## Response Format (JSON only, no markdown)
 {{
     "urls_to_crawl": ["url1", "url2"] or [],
     "extracted_data": {{"column_name": value_with_correct_type}} or null,
-    "reasoning": "Explanation of decision"
+    "reasoning": "Explanation of what was extracted and what needs crawling"
 }}"""
 
     def _parse_response(

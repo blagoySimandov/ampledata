@@ -3,7 +3,7 @@ from web_search import IWebSearcher, SerperWebSearcher
 from query_builder import IQueryBuilder
 from crawl_decision_maker import ICrawlDecisionMaker
 from web_crawler import IWebCrawler
-from content_extractor import IContentExtractor
+from content_extractor import IContentExtractor, ContentExtractionResult
 from dataclasses import asdict
 
 
@@ -40,6 +40,9 @@ class Enricher:
             )
 
             sources = []
+            content_extraction_reasoning = None
+            content_extracted_data = None
+
             if (
                 decision.urls_to_crawl
                 and missing_columns
@@ -51,26 +54,33 @@ class Enricher:
                     for col in self.crawl_decision_maker.columns_metadata
                     if col.name in missing_columns
                 ]
-
                 markdown_content = await self.web_crawler.async_crawl(
-                    decision.urls_to_crawl
+                    decision.urls_to_crawl, query=query
                 )
 
                 if markdown_content:
                     sources = decision.urls_to_crawl
-                    extracted_data = self.content_extractor.extract(
-                        markdown_content,
-                        missing_columns_metadata,
-                        key,
+                    extraction_result: ContentExtractionResult = (
+                        self.content_extractor.extract(
+                            markdown_content,
+                            missing_columns_metadata,
+                            key,
+                        )
                     )
+                    content_extracted_data = extraction_result.extracted_data
+                    content_extraction_reasoning = extraction_result.reasoning
 
                     if decision.extracted_data:
-                        decision.extracted_data.update(extracted_data)
+                        decision.extracted_data.update(content_extracted_data)
                     else:
-                        decision.extracted_data = extracted_data
+                        decision.extracted_data = content_extracted_data
 
-            result = asdict(decision)
+            result = {}
+            result["extracted_data"] = decision.extracted_data
+            result["reasoning"] = decision.reasoning
             result["sources"] = sources
+            result["content_extracted_data"] = content_extracted_data
+            result["content_extraction_reasoning"] = content_extraction_reasoning
             results.append(result)
 
         return results
