@@ -5,9 +5,7 @@ from crawl_decision_maker import ICrawlDecisionMaker
 from web_crawler import IWebCrawler
 from content_extractor import IContentExtractor, ContentExtractionResult
 from abc import ABC, abstractmethod
-from state_manager import IStateManager, RowState, RowStage, CancelledException
-
-# from datetime import datetime
+from state_manager import IStateManager, RowState, RowStage, JobStoppedException, JobStatus
 from typing import Awaitable, Callable
 import asyncio
 
@@ -121,10 +119,21 @@ class AsyncEnricher(IEnricher):
         self.concurrency = concurrency
 
     async def enrich_keys(
-        self, row_keys: list[str], job_id: str | None = None
+        self, row_keys: list[str] | None = None, job_id: str | None = None
     ) -> list[dict]:
-        job_id = job_id or self.state_manager.generate_job_id()
-        await self.state_manager.initialize_job(job_id, row_keys)
+        if job_id is None:
+            if row_keys is None:
+                raise ValueError("Either job_id or row_keys must be provided")
+            job_id = self.state_manager.generate_job_id()
+            await self.state_manager.initialize_job(job_id, row_keys)
+        else:
+            if row_keys is not None:
+                raise ValueError(
+                    "Cannot provide both job_id and row_keys; job_id implies resume"
+                )
+
+            await self.state_manager.resume(job_id)
+
         try:
             # Stage 1: Fetch SERPs
             await self._run_stage(job_id, RowStage.SERP_FETCHED, self._fetch_serp)
@@ -141,8 +150,10 @@ class AsyncEnricher(IEnricher):
             # Mark complete
             await self._run_stage(job_id, RowStage.COMPLETED, self._finalize)
 
-        except CancelledException:
-            pass  # Graceful exit on cancellation
+            await self.state_manager.complete(job_id)
+
+        except JobStoppedException:
+            pass  # Graceful exit on stop (pause/cancel)
 
         # Collect results
         return await self._collect_results(job_id)
@@ -163,7 +174,7 @@ class AsyncEnricher(IEnricher):
                     await self.state_manager.transition(
                         job_id, state.key, target_stage, data_update
                     )
-                except CancelledException:
+                except JobStoppedException:
                     raise
                 except Exception as e:
                     await self.state_manager.transition(
@@ -236,8 +247,14 @@ class AsyncEnricher(IEnricher):
     async def _finalize(self, job_id: str, state: RowState) -> dict:
         return {}  # Just mark as complete
 
-    async def _collect_results(self, job_id: str, start: int, limit: int) -> list[dict]:
+    async def _collect_results(
+        self, job_id: str, start: int = 0, limit: int = 100
+    ) -> list[dict]:
         progress = await self.state_manager.get_progress(job_id)
         # You'd fetch all rows and format them here
         # This is a simplified version
         return []
+
+    async def close(self):
+        if self.web_crawler:
+            await self.web_crawler.close()

@@ -1,6 +1,8 @@
 from enricher_factory import EnricherFactory
+from postgres_state_store import PostgresStateStore
 import json
 import asyncio
+import os
 from models import ColumnMetadata, ColumnType
 
 
@@ -28,22 +30,33 @@ async def main():
         ),
     ]
 
-    enricher = EnricherFactory.create_with_defaults(
-        columns_metadata=columns_metadata,
+    db_url = os.getenv(
+        "DATABASE_URL_ENRICHMENT",
+        "postgresql+asyncpg://enrichment:enrichment@localhost:5432/enrichment",
     )
 
+    state_store = PostgresStateStore(connection_string=db_url, pool_size=10, echo=False)
+
     try:
-        with open("results.json", "w") as f:
-            f.write(
-                json.dumps(
-                    await enricher.enrich_keys(
-                        ["databricks", "snowflake", "confluent"]
-                    ),
-                    indent=2,
-                )
+        await state_store.initialize_database()
+
+        enricher = EnricherFactory.create_async_with_defaults(
+            columns_metadata=columns_metadata,
+            state_store=state_store,
+            concurrency=5,
+        )
+
+        try:
+            results = await enricher.enrich_keys(
+                ["databricks", "snowflake", "confluent"]
             )
+
+            with open("results.json", "w") as f:
+                f.write(json.dumps(results, indent=2))
+        finally:
+            await enricher.close()
     finally:
-        await enricher.close()
+        await state_store.close()
 
 
 if __name__ == "__main__":

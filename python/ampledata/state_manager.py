@@ -28,6 +28,13 @@ class RowStage(Enum):
     CANCELLED = auto()
 
 
+class JobStatus(Enum):
+    RUNNING = "RUNNING"
+    PAUSED = "PAUSED"
+    CANCELLED = "CANCELLED"
+    COMPLETED = "COMPLETED"
+
+
 @dataclass
 class RowState:
     key: str
@@ -60,7 +67,7 @@ class JobProgress:
     total_rows: int
     rows_by_stage: dict[RowStage, int] = field(default_factory=dict)
     started_at: datetime = field(default_factory=datetime.utcnow)
-    is_cancelled: bool = False
+    status: JobStatus = JobStatus.RUNNING
 
 
 class IStateStore(ABC):
@@ -83,11 +90,21 @@ class IStateStore(ABC):
         pass
 
     @abstractmethod
-    async def set_job_cancelled(self, job_id: str) -> None:
+    async def create_job(
+        self, job_id: str, total_rows: int, status: JobStatus = JobStatus.RUNNING
+    ) -> None:
         pass
 
     @abstractmethod
-    async def is_job_cancelled(self, job_id: str) -> bool:
+    async def bulk_create_rows(self, job_id: str, row_keys: list[str]) -> None:
+        pass
+
+    @abstractmethod
+    async def set_job_status(self, job_id: str, status: JobStatus) -> None:
+        pass
+
+    @abstractmethod
+    async def get_job_status(self, job_id: str) -> JobStatus:
         pass
 
 
@@ -134,9 +151,8 @@ class StateManager(IStateManager):
 
     async def initialize_job(self, job_id: str, row_keys: list[str]) -> None:
         self._cancel_events[job_id] = asyncio.Event()
-        for key in row_keys:
-            state = RowState(key=key)
-            await self.store.save_row_state(job_id, state)
+        await self.store.create_job(job_id, len(row_keys), JobStatus.RUNNING)
+        await self.store.bulk_create_rows(job_id, row_keys)
 
     def generate_job_id(self) -> str:
         return f"job_{datetime.utcnow().timestamp()}"
@@ -144,14 +160,13 @@ class StateManager(IStateManager):
     async def transition(
         self, job_id: str, key: str, to_stage: RowStage, data_update: dict | None = None
     ) -> RowState:
-        # Check cancellation before any transition
         if await self.check_cancelled(job_id):
             state = await self.store.get_row_state(job_id, key)
             if state and state.stage not in (RowStage.COMPLETED, RowStage.FAILED):
                 state.stage = RowStage.CANCELLED
                 state.updated_at = datetime.utcnow()
                 await self.store.save_row_state(job_id, state)
-            raise CancelledException(job_id)
+            raise JobStoppedException(job_id)
 
         state = await self.store.get_row_state(job_id, key)
         if not state:
@@ -190,23 +205,47 @@ class StateManager(IStateManager):
         required_stage = prerequisite.get(stage, RowStage.PENDING)
         return await self.store.get_rows_at_stage(job_id, required_stage)
 
+    async def set_status(self, job_id: str, status: JobStatus) -> None:
+        await self.store.set_job_status(job_id, status)
+
+        if status in (JobStatus.PAUSED, JobStatus.CANCELLED, JobStatus.COMPLETED):
+            if job_id in self._cancel_events:
+                self._cancel_events[job_id].set()
+        else:
+            if job_id in self._cancel_events:
+                self._cancel_events[job_id].clear()
+
+    async def pause(self, job_id: str) -> None:
+        await self.set_status(job_id, JobStatus.PAUSED)
+
+    async def resume(self, job_id: str) -> None:
+        await self.set_status(job_id, JobStatus.RUNNING)
+
     async def cancel(self, job_id: str) -> None:
-        await self.store.set_job_cancelled(job_id)
-        if job_id in self._cancel_events:
-            self._cancel_events[job_id].set()
+        await self.set_status(job_id, JobStatus.CANCELLED)
+
+    async def complete(self, job_id: str) -> None:
+        await self.set_status(job_id, JobStatus.COMPLETED)
 
     async def check_cancelled(self, job_id: str) -> bool:
-        # Fast path: check in-memory event
         if job_id in self._cancel_events and self._cancel_events[job_id].is_set():
             return True
-        # Slow path: check DB (for multi-process scenarios)
-        return await self.store.is_job_cancelled(job_id)
+
+        status = await self.store.get_job_status(job_id)
+        return status in (JobStatus.PAUSED, JobStatus.CANCELLED, JobStatus.COMPLETED)
 
     async def get_progress(self, job_id: str) -> JobProgress:
         return await self.store.get_job_progress(job_id)
 
 
-class CancelledException(Exception):
-    def __init__(self, job_id: str):
+class JobStoppedException(Exception):
+    def __init__(self, job_id: str, status: JobStatus | None = None):
         self.job_id = job_id
-        super().__init__(f"Job {job_id} was cancelled")
+        self.status = status
+        if status:
+            super().__init__(f"Job {job_id} was stopped with status {status.value}")
+        else:
+            super().__init__(f"Job {job_id} was stopped")
+
+
+CancelledException = JobStoppedException
