@@ -4,10 +4,16 @@ from query_builder import IQueryBuilder
 from crawl_decision_maker import ICrawlDecisionMaker
 from web_crawler import IWebCrawler
 from content_extractor import IContentExtractor, ContentExtractionResult
-from dataclasses import asdict
+from abc import ABC, abstractmethod
 
 
-class Enricher:
+class IEnricher(ABC):
+    @abstractmethod
+    async def enrich_keys(self, row_keys: list[str]) -> list[dict]:
+        pass
+
+
+class Enricher(IEnricher):
     def __init__(
         self,
         query_builder: IQueryBuilder,
@@ -28,7 +34,7 @@ class Enricher:
     def _build_query(self, entity: str) -> str:
         return self.query_builder.build(entity)
 
-    async def _enrich_keys(self, row_keys: list[str]) -> list[dict]:
+    async def enrich_keys(self, row_keys: list[str]) -> list[dict]:
         results = []
         for key in row_keys:
             query = self._build_query(key)
@@ -88,3 +94,8 @@ class Enricher:
     async def close(self):
         if self.web_crawler:
             await self.web_crawler.close()
+
+
+class AsyncEnricher(IEnricher):
+    def __init__(self):
+        pass
