@@ -67,66 +67,66 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
-				continue
-			}
-
-			hasContent := msg.State.CrawlResults.Content != nil && *msg.State.CrawlResults.Content != ""
-			var content string
-			if hasContent {
-				content = *msg.State.CrawlResults.Content
-			}
-			if !hasContent || content == "" {
-				msg.State.ExtractedData = msg.State.Decision.ExtractedData
 			} else {
-				missingColumns := msg.State.Decision.MissingColumns
-				missingColsMetadata := []*models.ColumnMetadata{}
+				hasContent := msg.State.CrawlResults.Content != nil && *msg.State.CrawlResults.Content != ""
+				var content string
+				if hasContent {
+					content = *msg.State.CrawlResults.Content
+				}
+				if !hasContent || content == "" {
+					msg.State.ExtractedData = msg.State.Decision.ExtractedData
+				} else {
+					missingColumns := msg.State.Decision.MissingColumns
+					missingColsMetadata := []*models.ColumnMetadata{}
 
-				for _, colName := range missingColumns {
-					for _, col := range msg.ColumnsMetadata {
-						if col.Name == colName {
-							missingColsMetadata = append(missingColsMetadata, col)
-							break
+					for _, colName := range missingColumns {
+						for _, col := range msg.ColumnsMetadata {
+							if col.Name == colName {
+								missingColsMetadata = append(missingColsMetadata, col)
+								break
+							}
 						}
 					}
+
+					if len(missingColsMetadata) > 0 {
+						result, err := s.extractor.Extract(ctx, content, msg.RowKey, missingColsMetadata)
+						if err != nil {
+							errStr := err.Error()
+							msg.Error = err
+							s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
+								"error": errStr,
+							})
+						} else {
+							extractedFromDecision := msg.State.Decision.ExtractedData
+							if extractedFromDecision == nil {
+								extractedFromDecision = make(map[string]interface{})
+							}
+
+							merged := make(map[string]interface{})
+							for k, v := range extractedFromDecision {
+								merged[k] = v
+							}
+							for k, v := range result.ExtractedData {
+								merged[k] = v
+							}
+
+							msg.State.ExtractedData = merged
+						}
+					} else {
+						extractedFromDecision := msg.State.Decision.ExtractedData
+						msg.State.ExtractedData = extractedFromDecision
+					}
 				}
 
-				if len(missingColsMetadata) > 0 {
-					result, err := s.extractor.Extract(ctx, content, msg.RowKey, missingColsMetadata)
-					if err != nil {
-						errStr := err.Error()
-						msg.Error = err
-						s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
-							"error": errStr,
-						})
-						continue
-					}
+				if msg.Error == nil {
+					msg.State.Stage = models.StageEnriched
+					msg.State.UpdatedAt = time.Now()
 
-					extractedFromDecision := msg.State.Decision.ExtractedData
-					if extractedFromDecision == nil {
-						extractedFromDecision = make(map[string]interface{})
-					}
-
-					merged := make(map[string]interface{})
-					for k, v := range extractedFromDecision {
-						merged[k] = v
-					}
-					for k, v := range result.ExtractedData {
-						merged[k] = v
-					}
-
-					msg.State.ExtractedData = merged
-				} else {
-					extractedFromDecision := msg.State.Decision.ExtractedData
-					msg.State.ExtractedData = extractedFromDecision
+					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageEnriched, map[string]interface{}{
+						"extracted_data": msg.State.ExtractedData,
+					})
 				}
 			}
-
-			msg.State.Stage = models.StageEnriched
-			msg.State.UpdatedAt = time.Now()
-
-			s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageEnriched, map[string]interface{}{
-				"extracted_data": msg.State.ExtractedData,
-			})
 
 			select {
 			case out <- msg:

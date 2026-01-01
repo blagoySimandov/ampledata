@@ -67,52 +67,43 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
-				continue
-			}
+			} else {
+				urlsToCrawl := msg.State.Decision.URLsToCrawl
+				if len(urlsToCrawl) == 0 {
+					msg.State.CrawlResults = &models.CrawlResults{
+						Content: nil,
+						Sources: []string{},
+					}
+					msg.State.Stage = models.StageCrawled
+					msg.State.UpdatedAt = time.Now()
 
-			urlsToCrawl := msg.State.Decision.URLsToCrawl
-			if len(urlsToCrawl) == 0 {
-				msg.State.CrawlResults = &models.CrawlResults{
-					Content: nil,
-					Sources: []string{},
+					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCrawled, map[string]interface{}{
+						"crawl_results": msg.State.CrawlResults,
+					})
+				} else {
+					query := msg.State.SerpData.Query
+
+					content, err := s.crawler.Crawl(ctx, urlsToCrawl, query)
+					if err != nil {
+						errStr := err.Error()
+						msg.Error = err
+						s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
+							"error": errStr,
+						})
+					} else {
+						msg.State.CrawlResults = &models.CrawlResults{
+							Content: &content,
+							Sources: urlsToCrawl,
+						}
+						msg.State.Stage = models.StageCrawled
+						msg.State.UpdatedAt = time.Now()
+
+						s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCrawled, map[string]interface{}{
+							"crawl_results": msg.State.CrawlResults,
+						})
+					}
 				}
-				msg.State.Stage = models.StageCrawled
-				msg.State.UpdatedAt = time.Now()
-
-				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCrawled, map[string]interface{}{
-					"crawl_results": msg.State.CrawlResults,
-				})
-
-				select {
-				case out <- msg:
-				case <-ctx.Done():
-					return
-				}
-				continue
 			}
-
-			query := msg.State.SerpData.Query
-
-			content, err := s.crawler.Crawl(ctx, urlsToCrawl, query)
-			if err != nil {
-				errStr := err.Error()
-				msg.Error = err
-				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
-					"error": errStr,
-				})
-				continue
-			}
-
-			msg.State.CrawlResults = &models.CrawlResults{
-				Content: &content,
-				Sources: urlsToCrawl,
-			}
-			msg.State.Stage = models.StageCrawled
-			msg.State.UpdatedAt = time.Now()
-
-			s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCrawled, map[string]interface{}{
-				"crawl_results": msg.State.CrawlResults,
-			})
 
 			select {
 			case out <- msg:

@@ -62,8 +62,6 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, colu
 }
 
 func (p *Pipeline) feedInitialMessages(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, outChan chan<- Message) {
-	defer close(outChan)
-
 	for _, key := range rowKeys {
 		select {
 		case <-ctx.Done():

@@ -71,19 +71,18 @@ func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Me
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
-				continue
-			}
+			} else {
+				msg.State.SerpData = &models.SerpData{
+					Query:   query,
+					Results: serp,
+				}
+				msg.State.Stage = models.StageSerpFetched
+				msg.State.UpdatedAt = time.Now()
 
-			msg.State.SerpData = &models.SerpData{
-				Query:   query,
-				Results: serp,
+				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageSerpFetched, map[string]interface{}{
+					"serp_data": msg.State.SerpData,
+				})
 			}
-			msg.State.Stage = models.StageSerpFetched
-			msg.State.UpdatedAt = time.Now()
-
-			s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageSerpFetched, map[string]interface{}{
-				"serp_data": msg.State.SerpData,
-			})
 
 			select {
 			case out <- msg:

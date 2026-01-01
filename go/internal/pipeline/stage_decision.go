@@ -67,40 +67,35 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
-				continue
-			}
-
-			if msg.State.SerpData.Results == nil {
+			} else if msg.State.SerpData.Results == nil {
 				errStr := "SERP results not found in data"
 				msg.Error = fmt.Errorf(errStr)
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
-				continue
-			}
+			} else {
+				decision, err := s.decisionMaker.MakeDecision(ctx, msg.State.SerpData.Results, msg.RowKey, 3, msg.ColumnsMetadata)
+				if err != nil {
+					errStr := err.Error()
+					msg.Error = err
+					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
+						"error": errStr,
+					})
+				} else {
+					msg.State.Decision = &models.Decision{
+						URLsToCrawl:    decision.URLsToCrawl,
+						ExtractedData:  decision.ExtractedData,
+						Reasoning:      decision.Reasoning,
+						MissingColumns: decision.MissingColumns,
+					}
+					msg.State.Stage = models.StageDecisionMade
+					msg.State.UpdatedAt = time.Now()
 
-			decision, err := s.decisionMaker.MakeDecision(ctx, msg.State.SerpData.Results, msg.RowKey, 3, msg.ColumnsMetadata)
-			if err != nil {
-				errStr := err.Error()
-				msg.Error = err
-				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
-					"error": errStr,
-				})
-				continue
+					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageDecisionMade, map[string]interface{}{
+						"decision": msg.State.Decision,
+					})
+				}
 			}
-
-			msg.State.Decision = &models.Decision{
-				URLsToCrawl:    decision.URLsToCrawl,
-				ExtractedData:  decision.ExtractedData,
-				Reasoning:      decision.Reasoning,
-				MissingColumns: decision.MissingColumns,
-			}
-			msg.State.Stage = models.StageDecisionMade
-			msg.State.UpdatedAt = time.Now()
-
-			s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageDecisionMade, map[string]interface{}{
-				"decision": msg.State.Decision,
-			})
 
 			select {
 			case out <- msg:
