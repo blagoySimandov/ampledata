@@ -1,0 +1,19 @@
+package api
+
+import (
+	"github.com/gorilla/mux"
+)
+
+func SetupRoutes(enrHandler *EnrichHandler) *mux.Router {
+	r := mux.NewRouter()
+
+	r.Use(LoggingMiddleware)
+	r.Use(RecoveryMiddleware)
+
+	r.HandleFunc("/api/v1/enrich", enrHandler.EnrichKeys).Methods("POST")
+	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET")
+	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST")
+	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET")
+
+	return r
+}
