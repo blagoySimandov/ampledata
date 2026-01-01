@@ -30,7 +30,7 @@ func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
 
 	jobID := uuid.New().String()
 
-	go h.enricher.EnrichWithMetadata(context.Background(), jobID, req.RowKeys, req.ColumnsMetadata)
+	go h.enricher.Enrich(context.Background(), jobID, req.RowKeys, req.ColumnsMetadata)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.EnrichmentResponse{

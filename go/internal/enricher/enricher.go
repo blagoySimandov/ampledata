@@ -20,17 +20,13 @@ func NewEnricher(p *pipeline.Pipeline, stateManager *state.StateManager) *Enrich
 	}
 }
 
-func (e *Enricher) Enrich(ctx context.Context, jobID string, rowKeys []string) error {
-	return e.EnrichWithMetadata(ctx, jobID, rowKeys, nil)
-}
-
-func (e *Enricher) EnrichWithMetadata(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
+func (e *Enricher) Enrich(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
 	jobCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	e.stateManager.RegisterCancelFunc(jobID, cancel)
 
-	return e.pipeline.RunWithMetadata(jobCtx, jobID, rowKeys, columnsMetadata)
+	return e.pipeline.Run(jobCtx, jobID, rowKeys, columnsMetadata)
 }
 
 func (e *Enricher) GetProgress(ctx context.Context, jobID string) (*models.JobProgress, error) {

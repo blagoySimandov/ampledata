@@ -10,11 +10,9 @@ import (
 )
 
 type Pipeline struct {
-	stateManager    *state.StateManager
-	stages          []Stage
-	config          *PipelineConfig
-	columnsMetadata map[string][]*models.ColumnMetadata
-	mu              sync.RWMutex
+	stateManager *state.StateManager
+	stages       []Stage
+	config       *PipelineConfig
 }
 
 type PipelineConfig struct {
@@ -24,29 +22,13 @@ type PipelineConfig struct {
 
 func NewPipeline(manager *state.StateManager, stages []Stage, config *PipelineConfig) *Pipeline {
 	return &Pipeline{
-		stateManager:    manager,
-		stages:          stages,
-		config:          config,
-		columnsMetadata: make(map[string][]*models.ColumnMetadata),
+		stateManager: manager,
+		stages:       stages,
+		config:       config,
 	}
 }
 
-func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string) error {
-	return p.RunWithMetadata(ctx, jobID, rowKeys, nil)
-}
-
-func (p *Pipeline) RunWithMetadata(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
-	if columnsMetadata != nil {
-		p.mu.Lock()
-		p.columnsMetadata[jobID] = columnsMetadata
-		p.mu.Unlock()
-		defer func() {
-			p.mu.Lock()
-			delete(p.columnsMetadata, jobID)
-			p.mu.Unlock()
-		}()
-	}
-
+func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
 	if err := p.stateManager.InitializeJob(ctx, jobID, rowKeys); err != nil {
 		return err
 	}
@@ -66,11 +48,7 @@ func (p *Pipeline) RunWithMetadata(ctx context.Context, jobID string, rowKeys []
 		}(stage, channels[i], channels[i+1])
 	}
 
-	p.mu.RLock()
-	colMeta := p.columnsMetadata[jobID]
-	p.mu.RUnlock()
-
-	go p.feedInitialMessages(ctx, jobID, rowKeys, colMeta, channels[0])
+	go p.feedInitialMessages(ctx, jobID, rowKeys, columnsMetadata, channels[0])
 
 	go p.collectResults(ctx, jobID, channels[len(channels)-1])
 
