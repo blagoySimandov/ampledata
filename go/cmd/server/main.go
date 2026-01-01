@@ -32,7 +32,10 @@ func main() {
 	webSearcher := services.NewSerperClient(cfg.SerperAPIKey)
 	decisionMaker := services.NewGroqDecisionMaker(cfg.GroqAPIKey)
 	crawler := services.NewCrawl4aiClient(cfg.Crawl4aiURL)
-	extractor := services.NewGroqContentExtractor(cfg.GroqAPIKey)
+	extractor, err := services.NewGeminiContentExtractor(cfg.GeminiAPIKey)
+	if err != nil {
+		log.Fatalf("Failed to create Gemini content extractor: %v", err)
+	}
 
 	stages := []pipeline.Stage{
 		pipeline.NewSerpStage(queryBuilder, webSearcher, stateManager, cfg.WorkersPerStage),

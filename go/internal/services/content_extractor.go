@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"google.golang.org/genai"
 )
 
 type ExtractionResult struct {
@@ -23,14 +23,51 @@ type ContentExtractor interface {
 }
 
 type GroqContentExtractor struct {
-	apiKey     string
-	httpClient *http.Client
-	model      string
+	apiKey                  string
+	httpClient              *http.Client
+	model                   string
+	extractionPromptBuilder IExtractionPromptBuilder
+}
+
+type GeminiContentExtractor struct {
+	model                   string
+	client                  *genai.Client
+	extractionPromptBuilder IExtractionPromptBuilder
+}
+
+func NewGeminiContentExtractor(apiKey string) (*GeminiContentExtractor, error) {
+	ctx := context.Background() // ctx used for auth/initilization, not passed to later requests
+	client, err := genai.NewClient(ctx, nil)
+	model := "gemini-2.0-flash-lite"
+	if err != nil {
+		return nil, err
+	}
+	return &GeminiContentExtractor{
+		model:                   model,
+		client:                  client,
+		extractionPromptBuilder: NewExtractionPromptBuilder(),
+	}, nil
+}
+
+func (g *GeminiContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata) (*ExtractionResult, error) {
+	prompt := g.extractionPromptBuilder.Build(content, columnsMetadata, entityKey)
+	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate content: %w", err)
+	}
+
+	er, err := parseResponse(result.Text())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return er, nil
 }
 
 func NewGroqContentExtractor(apiKey string) *GroqContentExtractor {
 	return &GroqContentExtractor{
-		apiKey: apiKey,
+		apiKey:                  apiKey,
+		extractionPromptBuilder: NewExtractionPromptBuilder(),
 		httpClient: &http.Client{
 			Timeout: 60 * time.Second,
 		},
@@ -39,7 +76,7 @@ func NewGroqContentExtractor(apiKey string) *GroqContentExtractor {
 }
 
 func (g *GroqContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata) (*ExtractionResult, error) {
-	prompt := g.buildExtractionPrompt(content, columnsMetadata, entityKey)
+	prompt := g.extractionPromptBuilder.Build(content, columnsMetadata, entityKey)
 
 	reqBody := map[string]interface{}{
 		"model": g.model,
@@ -91,53 +128,10 @@ func (g *GroqContentExtractor) Extract(ctx context.Context, content string, enti
 		return nil, fmt.Errorf("no response from LLM")
 	}
 
-	return g.parseResponse(groqResp.Choices[0].Message.Content)
+	return parseResponse(groqResp.Choices[0].Message.Content)
 }
 
-func (g *GroqContentExtractor) buildExtractionPrompt(content string, columnsMetadata []*models.ColumnMetadata, entity string) string {
-	var columnsInfo []string
-	for _, col := range columnsMetadata {
-		desc := ""
-		if col.Description != nil {
-			desc = fmt.Sprintf(" (%s)", *col.Description)
-		}
-		columnsInfo = append(columnsInfo, fmt.Sprintf("- %s [type: %s]%s", col.Name, col.Type, desc))
-	}
-	columnsText := strings.Join(columnsInfo, "\n")
-
-	truncatedContent := content
-	if len(content) > 8000 {
-		truncatedContent = content[:8000]
-	}
-
-	return fmt.Sprintf(`You are a data extraction specialist. Extract the following fields from the provided website content about %s.
-
-## Fields to Extract (ONLY extract these fields)
-%s
-
-## Website Content
-%s
-
-## Your Task
-
-Extract ONLY the fields listed above from the website content. Do not extract any other fields.
-
-IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata:
-- For number types: use numeric values without quotes (e.g., 1000)
-- For string types: use quoted strings
-- For boolean types: use true/false without quotes
-- For date types: use ISO 8601 format (YYYY-MM-DD)
-
-If a field cannot be found in the content, omit it from the response.
-
-## Response Format (JSON only, no markdown)
-{
-    "extracted_data": {"field_name": value_with_correct_type},
-    "reasoning": "Explanation of what was extracted from the content and how you found each field"
-}`, entity, columnsText, truncatedContent)
-}
-
-func (g *GroqContentExtractor) parseResponse(content string) (*ExtractionResult, error) {
+func parseResponse(content string) (*ExtractionResult, error) {
 	content = cleanJSONMarkdown(content)
 
 	var result ExtractionResult

@@ -219,33 +219,3 @@ func (g *GroqDecisionMaker) getMissingColumns(extractedData map[string]interface
 
 	return missing
 }
-
-func cleanJSONMarkdown(content string) string {
-	content = strings.TrimSpace(content)
-
-	if !strings.Contains(content, "```") {
-		return content
-	}
-
-	parts := strings.Split(content, "```")
-	if len(parts) < 2 {
-		return content
-	}
-
-	inner := parts[1]
-
-	if strings.HasPrefix(inner, "json") {
-		inner = inner[4:]
-	} else if strings.HasPrefix(inner, "JSON") {
-		inner = inner[4:]
-	}
-
-	return strings.TrimSpace(inner)
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
