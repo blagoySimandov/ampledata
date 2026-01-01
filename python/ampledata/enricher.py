@@ -5,7 +5,13 @@ from crawl_decision_maker import ICrawlDecisionMaker
 from web_crawler import IWebCrawler
 from content_extractor import IContentExtractor, ContentExtractionResult
 from abc import ABC, abstractmethod
-from state_manager import IStateManager, RowState, RowStage, JobStoppedException, JobStatus
+from state_manager import (
+    IStateManager,
+    RowState,
+    RowStage,
+    JobStoppedException,
+    JobStatus,
+)
 from typing import Awaitable, Callable
 import asyncio
 
@@ -132,7 +138,7 @@ class AsyncEnricher(IEnricher):
                     "Cannot provide both job_id and row_keys; job_id implies resume"
                 )
 
-            await self.state_manager.resume(job_id)
+            # await self.state_manager.resume(job_id)
 
         try:
             # Stage 1: Fetch SERPs
@@ -150,7 +156,7 @@ class AsyncEnricher(IEnricher):
             # Mark complete
             await self._run_stage(job_id, RowStage.COMPLETED, self._finalize)
 
-            await self.state_manager.complete(job_id)
+            # await self.state_manager.complete(job_id)
 
         except JobStoppedException:
             pass  # Graceful exit on stop (pause/cancel)
