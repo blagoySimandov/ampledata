@@ -1,6 +1,6 @@
 # AmpleData
 
-A Python framework for enriching data using web search, crawling, and LLM extraction.
+A service for enriching data using web search, crawling, and LLM extraction.
 
 ## Overview
 
