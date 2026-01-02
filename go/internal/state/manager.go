@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TODO: use IStateManager interface
 type StateManager struct {
 	store       Store
 	cancelFuncs map[string]context.CancelFunc
@@ -125,7 +126,7 @@ func (m *StateManager) GetPendingForStage(ctx context.Context, jobID string, sta
 		requiredStage = models.StagePending
 	}
 
-	return m.store.GetRowsAtStage(ctx, jobID, requiredStage)
+	return m.store.GetRowsAtStage(ctx, jobID, requiredStage, 0, 0)
 }
 
 func (m *StateManager) CheckCancelled(ctx context.Context, jobID string) (bool, error) {

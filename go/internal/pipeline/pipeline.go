@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"log"
 	"sync"
 	"time"
 
@@ -38,25 +39,36 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, colu
 		channels[i] = make(chan Message, p.config.ChannelBufferSize)
 	}
 
-	var wg sync.WaitGroup
+	var stagesWg sync.WaitGroup
+	var collectWg sync.WaitGroup
 
 	for i, stage := range p.stages {
-		wg.Add(1)
+		stagesWg.Add(1)
 		go func(s Stage, in, out chan Message) {
-			defer wg.Done()
+			defer stagesWg.Done()
 			s.Run(ctx, in, out)
 		}(stage, channels[i], channels[i+1])
 	}
 
-	go p.feedInitialMessages(ctx, jobID, rowKeys, columnsMetadata, channels[0])
+	var feedWg sync.WaitGroup
+	feedWg.Add(1)
+	go func() {
+		defer feedWg.Done()
+		p.feedInitialMessages(ctx, jobID, rowKeys, columnsMetadata, channels[0])
+	}()
 
-	go p.collectResults(ctx, jobID, channels[len(channels)-1])
+	collectWg.Add(1)
+	go func() {
+		defer collectWg.Done()
+		p.collectResults(ctx, jobID, channels[len(channels)-1])
+	}()
 
-	wg.Wait()
+	feedWg.Wait()
+	close(channels[0])
 
-	for _, ch := range channels {
-		close(ch)
-	}
+	stagesWg.Wait()
+
+	collectWg.Wait()
 
 	return nil
 }
@@ -90,9 +102,15 @@ func (p *Pipeline) collectResults(ctx context.Context, jobID string, inChan <-ch
 		case <-ctx.Done():
 			return
 		case msg, ok := <-inChan:
+			log.Println("before closing collectResults") // This gets printed once for each job row.. normal
 			if !ok {
+				log.Println("closing collectResults") // This never gets printed, meaning channel never closed...
 				if completedCount > 0 || failedCount > 0 {
-					p.stateManager.Complete(ctx, jobID)
+					err := p.stateManager.Complete(ctx, jobID)
+					// TODO: proper error state handling. should be persisted in the db... maybe return ?
+					if err != nil {
+						log.Printf("failed to mark job as complete: %s", err)
+					}
 				}
 				return
 			}
@@ -104,7 +122,11 @@ func (p *Pipeline) collectResults(ctx context.Context, jobID string, inChan <-ch
 
 				msg.State.Stage = models.StageCompleted
 				msg.State.UpdatedAt = time.Now()
-				p.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCompleted, nil)
+				// TODO: proper error state handling. should persist in the db...
+				err := p.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCompleted, nil)
+				if err != nil {
+					log.Printf("failed to transition row state: %s", err)
+				}
 			}
 		}
 	}

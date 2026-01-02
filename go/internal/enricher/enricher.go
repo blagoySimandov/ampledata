@@ -37,17 +37,8 @@ func (e *Enricher) Cancel(ctx context.Context, jobID string) error {
 	return e.stateManager.Cancel(ctx, jobID)
 }
 
-func (e *Enricher) GetResults(ctx context.Context, jobID string) ([]*models.EnrichmentResult, error) {
-	progress, err := e.stateManager.Progress(ctx, jobID)
-	if err != nil {
-		return nil, err
-	}
-
-	if progress.Status != models.JobStatusCompleted && progress.Status != models.JobStatusCancelled {
-		return nil, nil
-	}
-
-	completedRows, err := e.stateManager.Store().GetRowsAtStage(ctx, jobID, models.StageCompleted)
+func (e *Enricher) GetResults(ctx context.Context, jobID string, offset, limit int) ([]*models.EnrichmentResult, error) {
+	completedRows, err := e.stateManager.Store().GetRowsAtStage(ctx, jobID, models.StageCompleted, offset, limit)
 	if err != nil {
 		return nil, err
 	}

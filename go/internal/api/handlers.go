@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
@@ -30,7 +31,8 @@ func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
 
 	jobID := uuid.New().String()
 
-	go h.enricher.Enrich(context.Background(), jobID, req.RowKeys, req.ColumnsMetadata)
+	errChan := make(chan error, 1)
+	errChan <- h.enricher.Enrich(context.Background(), jobID, req.RowKeys, req.ColumnsMetadata)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.EnrichmentResponse{
@@ -70,7 +72,18 @@ func (h *EnrichHandler) GetJobResults(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["jobID"]
 
-	results, err := h.enricher.GetResults(r.Context(), jobID)
+	offset := 0
+	limit := 0
+
+	if offsetStr := r.URL.Query().Get("start"); offsetStr != "" {
+		fmt.Sscanf(offsetStr, "%d", &offset)
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		fmt.Sscanf(limitStr, "%d", &limit)
+	}
+
+	results, err := h.enricher.GetResults(r.Context(), jobID, offset, limit)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

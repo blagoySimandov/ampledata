@@ -42,6 +42,7 @@ func (s *CrawlStage) Run(ctx context.Context, inChan <-chan Message, outChan cha
 	}
 
 	wg.Wait()
+	close(outChan)
 }
 
 func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Message, out chan<- Message) {

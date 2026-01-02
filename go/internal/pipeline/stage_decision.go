@@ -42,6 +42,7 @@ func (s *DecisionStage) Run(ctx context.Context, inChan <-chan Message, outChan 
 	}
 
 	wg.Wait()
+	close(outChan)
 }
 
 func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Message, out chan<- Message) {

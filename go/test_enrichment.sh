@@ -14,7 +14,7 @@ echo -e "${GREEN}1. Starting enrichment job with sample data${NC}"
 RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/enrich" \
   -H "Content-Type: application/json" \
   -d '{
-    "row_keys": ["company_1", "company_2", "company_3"],
+    "row_keys": ["google", "apple", "qualcomm"],
     "columns_metadata": [
       {
         "name": "company_name",
@@ -48,8 +48,8 @@ echo -e "\n${YELLOW}Job ID: $JOB_ID${NC}\n"
 echo -e "${GREEN}2. Checking job progress${NC}"
 curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress" | jq .
 
-echo -e "\n${GREEN}3. Waiting 3 seconds before checking progress again...${NC}"
-sleep 3
+echo -e "\n${GREEN}3. Waiting 10 seconds before checking progress again...${NC}"
+sleep 10
 
 echo -e "${GREEN}4. Checking job progress again${NC}"
 curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress" | jq .

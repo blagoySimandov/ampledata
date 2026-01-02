@@ -42,6 +42,7 @@ func (s *ExtractStage) Run(ctx context.Context, inChan <-chan Message, outChan c
 	}
 
 	wg.Wait()
+	close(outChan)
 }
 
 func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Message, out chan<- Message) {

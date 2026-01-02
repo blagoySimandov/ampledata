@@ -44,6 +44,7 @@ func (s *SerpStage) Run(ctx context.Context, inChan <-chan Message, outChan chan
 	}
 
 	wg.Wait()
+	close(outChan)
 }
 
 func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Message, out chan<- Message) {

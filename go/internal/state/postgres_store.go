@@ -168,15 +168,23 @@ func (s *PostgresStore) GetRowState(ctx context.Context, jobID string, key strin
 	return dbState.ToRowState(), nil
 }
 
-func (s *PostgresStore) GetRowsAtStage(ctx context.Context, jobID string, stage models.RowStage) ([]*models.RowState, error) {
+func (s *PostgresStore) GetRowsAtStage(ctx context.Context, jobID string, stage models.RowStage, offset, limit int) ([]*models.RowState, error) {
 	var dbStates []models.RowStateDB
 
-	err := s.db.NewSelect().
+	query := s.db.NewSelect().
 		Model(&dbStates).
 		Where("job_id = ?", jobID).
 		Where("stage = ?", stage).
-		Order("created_at ASC").
-		Scan(ctx)
+		Order("created_at ASC")
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query rows at stage: %w", err)
 	}
