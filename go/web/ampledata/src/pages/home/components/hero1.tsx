@@ -66,6 +66,7 @@ const Hero1 = ({
                   className="w-full sm:w-auto px-8 py-3 text-lg"
                   render={<a href={buttons.secondary.url} />}
                   nativeButton={false}
+                  size={"lg"}
                 >
                   {buttons.secondary.text}
                   <ArrowRight className="size-5" />
