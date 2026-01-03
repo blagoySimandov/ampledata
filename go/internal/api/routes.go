@@ -14,6 +14,7 @@ func SetupRoutes(enrHandler *EnrichHandler) *mux.Router {
 	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET")
 	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST")
 	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET")
+	r.HandleFunc("/api/v1/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST")
 
 	return r
 }

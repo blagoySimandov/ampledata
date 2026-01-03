@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
+	"slices"
 
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -75,11 +77,19 @@ func (h *EnrichHandler) GetJobResults(w http.ResponseWriter, r *http.Request) {
 	limit := 0
 
 	if offsetStr := r.URL.Query().Get("start"); offsetStr != "" {
-		fmt.Sscanf(offsetStr, "%d", &offset)
+		_, err := fmt.Sscanf(offsetStr, "%d", &offset)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		fmt.Sscanf(limitStr, "%d", &limit)
+		_, err := fmt.Sscanf(limitStr, "%d", &limit)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 	}
 
 	results, err := h.enricher.GetResults(r.Context(), jobID, offset, limit)
@@ -90,4 +100,36 @@ func (h *EnrichHandler) GetJobResults(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
+}
+
+func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.Request) {
+	var reqBody SignedURLRequest
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	if !slices.Contains(WHITELISTED_CONTENT_TYPES, reqBody.ContentType) {
+		http.Error(w, fmt.Errorf("invalid content type: %s", reqBody.ContentType).Error(), http.StatusBadRequest)
+		return
+	}
+
+	if reqBody.Length <= 0 {
+		http.Error(w, "invalid length", http.StatusBadRequest)
+		return
+	}
+
+	ext, _ := mime.ExtensionsByType(reqBody.ContentType)
+	name := generateName(ext[0])
+	url, err := generateSignedURL(name, reqBody.ContentType)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := SignedURLResponse{
+		URL: url,
+	}
+	json.NewEncoder(w).Encode(response)
+	return
 }
