@@ -12,6 +12,7 @@ type Config struct {
 	GroqAPIKey        string
 	Crawl4aiURL       string
 	GeminiAPIKey      string
+	WorkOSClientID    string
 	WorkersPerStage   int
 	ChannelBufferSize int
 }
@@ -24,6 +25,7 @@ func Load() *Config {
 		GroqAPIKey:        getEnv("GROQ_API_KEY", ""),
 		GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
 		Crawl4aiURL:       getEnv("CRAWL4AI_URL", "http://localhost:8000"),
+		WorkOSClientID:    getEnv("WORKOS_CLIENT_ID", ""),
 		WorkersPerStage:   getEnvInt("WORKERS_PER_STAGE", 5),
 		ChannelBufferSize: getEnvInt("CHANNEL_BUFFER_SIZE", 100),
 	}

@@ -1,20 +1,24 @@
 package api
 
 import (
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(enrHandler *EnrichHandler) *mux.Router {
+func SetupRoutes(enrHandler *EnrichHandler, authMiddleware *auth.Middleware) *mux.Router {
 	r := mux.NewRouter()
 
 	r.Use(LoggingMiddleware)
 	r.Use(RecoveryMiddleware)
 
-	r.HandleFunc("/api/v1/enrich", enrHandler.EnrichKeys).Methods("POST")
-	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET")
-	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST")
-	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET")
-	r.HandleFunc("/api/v1/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST")
+	protected := r.PathPrefix("/api/v1").Subrouter()
+	protected.Use(authMiddleware.RequireAuth)
+
+	protected.HandleFunc("/enrich", enrHandler.EnrichKeys).Methods("POST")
+	protected.HandleFunc("/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET")
+	protected.HandleFunc("/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST")
+	protected.HandleFunc("/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET")
+	protected.HandleFunc("/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST")
 
 	return r
 }

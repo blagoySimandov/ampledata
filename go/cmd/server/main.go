@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/api"
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
@@ -52,8 +53,16 @@ func main() {
 
 	enr := enricher.NewEnricher(p, stateManager)
 
+	jwtVerifier, err := auth.NewJWTVerifier(cfg.WorkOSClientID)
+	if err != nil {
+		log.Fatalf("Failed to create JWT verifier: %v", err)
+	}
+	defer jwtVerifier.Close()
+
+	authMiddleware := auth.NewMiddleware(jwtVerifier)
+
 	handler := api.NewEnrichHandler(enr)
-	router := api.SetupRoutes(handler)
+	router := api.SetupRoutes(handler, authMiddleware)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,
