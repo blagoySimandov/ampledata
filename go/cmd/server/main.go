@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/api"
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
@@ -19,6 +20,12 @@ import (
 
 func main() {
 	cfg := config.Load()
+
+	authHandler := auth.NewAuth(
+		cfg.WorkOSAPIKey,
+		cfg.WorkOSClientID,
+		cfg.WorkOSRedirectURI,
+	)
 
 	store, err := state.NewPostgresStore(cfg.DatabaseURL)
 	if err != nil {
@@ -53,7 +60,7 @@ func main() {
 	enr := enricher.NewEnricher(p, stateManager)
 
 	handler := api.NewEnrichHandler(enr)
-	router := api.SetupRoutes(handler)
+	router := api.SetupRoutes(handler, authHandler)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

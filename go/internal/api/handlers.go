@@ -8,11 +8,17 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
+
+func getUserID(ctx context.Context) (string, bool) {
+	userID, ok := ctx.Value(auth.ContextKeyUserID).(string)
+	return userID, ok
+}
 
 type EnrichHandler struct {
 	enricher *enricher.Enricher

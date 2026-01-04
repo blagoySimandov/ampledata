@@ -14,6 +14,9 @@ type Config struct {
 	GeminiAPIKey      string
 	WorkersPerStage   int
 	ChannelBufferSize int
+	WorkOSAPIKey      string
+	WorkOSClientID    string
+	WorkOSRedirectURI string
 }
 
 func Load() *Config {
@@ -26,6 +29,9 @@ func Load() *Config {
 		Crawl4aiURL:       getEnv("CRAWL4AI_URL", "http://localhost:8000"),
 		WorkersPerStage:   getEnvInt("WORKERS_PER_STAGE", 5),
 		ChannelBufferSize: getEnvInt("CHANNEL_BUFFER_SIZE", 100),
+		WorkOSAPIKey:      getEnv("WORKOS_API_KEY", ""),
+		WorkOSClientID:    getEnv("WORKOS_CLIENT_ID", ""),
+		WorkOSRedirectURI: getEnv("WORKOS_REDIRECT_URI", "http://localhost:8080/callback"),
 	}
 }
 
