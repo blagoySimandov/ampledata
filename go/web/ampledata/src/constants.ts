@@ -1,5 +1,5 @@
 export const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
-export const API_HOSTNAME = import.meta.env.VITE_API_HOSTNAME || 'localhost:8080';
+export const API_HOSTNAME = import.meta.env.VITE_API_HOSTNAME || 'http://localhost:8080';
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 export const AUTH_ROUTES = {
