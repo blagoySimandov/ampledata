@@ -44,9 +44,15 @@ export const UI_MESSAGES = {
   UNAUTHORIZED: 'Unauthorized',
   SIGN_IN: 'Sign In',
   SIGN_OUT: 'Sign Out',
+  PROFILE: 'Profile',
+  ACCOUNT: 'Account',
+  SETTINGS: 'Settings',
 } as const;
 
 export const QUERY_KEYS = {
   JOB_PROGRESS: (jobId: string) => ['job', 'progress', jobId],
   JOB_RESULTS: (jobId: string) => ['job', 'results', jobId],
 } as const;
+
+export const DEFAULT_AVATAR = 'https://api.dicebear.com/7.x/initials/svg?seed=';
+
