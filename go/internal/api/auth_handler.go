@@ -80,7 +80,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authResp, err := h.client.RefreshSession(r.Context(), usermanagement.RefreshSessionOpts{
+	authResp, err := h.client.AuthenticateWithRefreshToken(r.Context(), usermanagement.AuthenticateWithRefreshTokenOpts{
 		RefreshToken: req.RefreshToken,
 		ClientID:     h.clientID,
 	})
