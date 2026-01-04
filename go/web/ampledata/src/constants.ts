@@ -1,4 +1,5 @@
 export const WORKOS_CLIENT_ID = import.meta.env.VITE_WORKOS_CLIENT_ID || '';
+export const WORKOS_API_HOSTNAME = import.meta.env.VITE_WORKOS_API_HOSTNAME || 'api.workos.com';
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
 export const AUTH_ROUTES = {
@@ -43,4 +44,9 @@ export const UI_MESSAGES = {
   UNAUTHORIZED: 'Unauthorized',
   SIGN_IN: 'Sign In',
   SIGN_OUT: 'Sign Out',
+} as const;
+
+export const QUERY_KEYS = {
+  JOB_PROGRESS: (jobId: string) => ['job', 'progress', jobId],
+  JOB_RESULTS: (jobId: string) => ['job', 'results', jobId],
 } as const;
