@@ -2,7 +2,9 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
 )
@@ -13,6 +15,7 @@ const (
 	userInfoErrorMessage      = "Failed to get user info"
 	refreshTokenErrorMessage  = "Failed to refresh token"
 	invalidRequestMessage     = "Invalid request"
+	workosAuthURL             = "https://api.workos.com/user_management/authorize"
 )
 
 type AuthHandler struct {
@@ -28,6 +31,39 @@ func NewAuthHandler(apiKey, clientID, redirectURI string) *AuthHandler {
 		clientID:    clientID,
 		redirectURI: redirectURI,
 	}
+}
+
+func (h *AuthHandler) Authorize(w http.ResponseWriter, r *http.Request) {
+	codeChallenge := r.URL.Query().Get("code_challenge")
+	codeChallengeMethod := r.URL.Query().Get("code_challenge_method")
+	state := r.URL.Query().Get("state")
+	screenHint := r.URL.Query().Get("screen_hint")
+	provider := r.URL.Query().Get("provider")
+	redirectURI := r.URL.Query().Get("redirect_uri")
+
+	params := url.Values{}
+	params.Add("client_id", h.clientID)
+	params.Add("redirect_uri", redirectURI)
+	params.Add("response_type", "code")
+
+	if codeChallenge != "" {
+		params.Add("code_challenge", codeChallenge)
+	}
+	if codeChallengeMethod != "" {
+		params.Add("code_challenge_method", codeChallengeMethod)
+	}
+	if state != "" {
+		params.Add("state", state)
+	}
+	if screenHint != "" {
+		params.Add("screen_hint", screenHint)
+	}
+	if provider != "" {
+		params.Add("provider", provider)
+	}
+
+	authorizeURL := fmt.Sprintf("%s?%s", workosAuthURL, params.Encode())
+	http.Redirect(w, r, authorizeURL, http.StatusFound)
 }
 
 type AuthenticateRequest struct {

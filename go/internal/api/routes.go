@@ -12,8 +12,9 @@ func SetupRoutes(enrHandler *EnrichHandler, authHandler *AuthHandler, authMiddle
 	r.Use(RecoveryMiddleware)
 	r.Use(CORSMiddleware)
 
-	r.HandleFunc("/api/auth/authenticate", authHandler.Authenticate).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/auth/refresh", authHandler.RefreshToken).Methods("POST", "OPTIONS")
+	r.HandleFunc("/user_management/authorize", authHandler.Authorize).Methods("GET", "OPTIONS")
+	r.HandleFunc("/user_management/authenticate", authHandler.Authenticate).Methods("POST", "OPTIONS")
+	r.HandleFunc("/auth/refresh", authHandler.RefreshToken).Methods("POST", "OPTIONS")
 
 	protected := r.PathPrefix("/api/v1").Subrouter()
 	protected.Use(authMiddleware.RequireAuth)
