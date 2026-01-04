@@ -60,9 +60,10 @@ func main() {
 	defer jwtVerifier.Close()
 
 	authMiddleware := auth.NewMiddleware(jwtVerifier)
+	authHandler := api.NewAuthHandler(cfg.WorkOSAPIKey, cfg.WorkOSClientID, cfg.WorkOSRedirectURI)
 
 	handler := api.NewEnrichHandler(enr)
-	router := api.SetupRoutes(handler, authMiddleware)
+	router := api.SetupRoutes(handler, authHandler, authMiddleware)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

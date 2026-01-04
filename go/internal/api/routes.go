@@ -5,11 +5,15 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(enrHandler *EnrichHandler, authMiddleware *auth.Middleware) *mux.Router {
+func SetupRoutes(enrHandler *EnrichHandler, authHandler *AuthHandler, authMiddleware *auth.Middleware) *mux.Router {
 	r := mux.NewRouter()
 
 	r.Use(LoggingMiddleware)
 	r.Use(RecoveryMiddleware)
+	r.Use(CORSMiddleware)
+
+	r.HandleFunc("/api/auth/authenticate", authHandler.Authenticate).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/auth/refresh", authHandler.RefreshToken).Methods("POST", "OPTIONS")
 
 	protected := r.PathPrefix("/api/v1").Subrouter()
 	protected.Use(authMiddleware.RequireAuth)
