@@ -119,8 +119,8 @@ func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.R
 	}
 
 	ext, _ := mime.ExtensionsByType(reqBody.ContentType)
-	name := generateName(ext[0])
-	url, err := generateSignedURL(name, reqBody.ContentType)
+	id := generateJobId(ext[0])
+	url, err := generateSignedURL(id, reqBody.ContentType)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -128,7 +128,8 @@ func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.R
 
 	w.Header().Set("Content-Type", "application/json")
 	response := SignedURLResponse{
-		URL: url,
+		URL:   url,
+		JobID: id,
 	}
 	json.NewEncoder(w).Encode(response)
 	return

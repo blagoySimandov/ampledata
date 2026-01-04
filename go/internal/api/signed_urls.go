@@ -13,8 +13,10 @@ type SignedURLRequest struct {
 	ContentType string `json:"contentType"`
 	Length      int    `json:"length"`
 }
+
 type SignedURLResponse struct {
-	URL string `json:"url"`
+	URL   string `json:"url"`
+	JobID string `json:"jobId"`
 }
 
 var WHITELISTED_CONTENT_TYPES = []string{
@@ -50,7 +52,7 @@ func generateSignedURL(objectName string, contentType string) (string, error) {
 }
 
 // extension is with the dot. Example ".csv"
-func generateName(extension string) string {
+func generateJobId(extension string) string {
 	filename := uuid.New().String() + extension
 	return filename
 }
