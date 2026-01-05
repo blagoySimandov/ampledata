@@ -15,6 +15,7 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
+	"github.com/workos/workos-go/v6/pkg/usermanagement"
 )
 
 func main() {
@@ -52,8 +53,11 @@ func main() {
 
 	enr := enricher.NewEnricher(p, stateManager)
 
+	// Initialize WorkOS client for authentication
+	workosClient := usermanagement.NewClient(cfg.WorkOSAPIKey)
+
 	handler := api.NewEnrichHandler(enr)
-	router := api.SetupRoutes(handler)
+	router := api.SetupRoutes(handler, workosClient)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

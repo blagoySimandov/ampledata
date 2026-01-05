@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"mime"
 	"net/http"
 	"slices"
@@ -25,6 +26,13 @@ func NewEnrichHandler(enr *enricher.Enricher) *EnrichHandler {
 }
 
 func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
+	// Example: Get the authenticated user from the request context
+	user, ok := GetUserFromRequest(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req models.EnrichmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -32,6 +40,9 @@ func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jobID := uuid.New().String()
+
+	// You can now use the user information for logging, auditing, etc.
+	log.Printf("User %s (%s) started enrichment job %s", user.Email, user.ID, jobID)
 
 	go h.enricher.Enrich(context.Background(), jobID, req.RowKeys, req.ColumnsMetadata)
 
