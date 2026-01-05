@@ -27,9 +27,9 @@ type WorkOSUser struct {
 }
 
 type JWTVerifier struct {
-	clientID string
-	keySet   jwk.Set
-	mu       sync.RWMutex
+	clientID  string
+	keySet    jwk.Set
+	mu        sync.RWMutex
 	lastFetch time.Time
 }
 
