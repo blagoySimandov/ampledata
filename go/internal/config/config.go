@@ -12,6 +12,8 @@ type Config struct {
 	GroqAPIKey        string
 	Crawl4aiURL       string
 	GeminiAPIKey      string
+	WorkOSAPIKey      string
+	WorkOSClientID    string
 	WorkersPerStage   int
 	ChannelBufferSize int
 }
@@ -23,6 +25,8 @@ func Load() *Config {
 		SerperAPIKey:      getEnv("SERPER_API_KEY", ""),
 		GroqAPIKey:        getEnv("GROQ_API_KEY", ""),
 		GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
+		WorkOSAPIKey:      getEnv("WORKOS_API_KEY", ""),
+		WorkOSClientID:    getEnv("WORKOS_CLIENT_ID", ""),
 		Crawl4aiURL:       getEnv("CRAWL4AI_URL", "http://localhost:8000"),
 		WorkersPerStage:   getEnvInt("WORKERS_PER_STAGE", 5),
 		ChannelBufferSize: getEnvInt("CHANNEL_BUFFER_SIZE", 100),

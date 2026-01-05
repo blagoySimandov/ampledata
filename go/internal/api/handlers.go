@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"mime"
 	"net/http"
 	"slices"
 
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/google/uuid"
@@ -25,6 +27,12 @@ func NewEnrichHandler(enr *enricher.Enricher) *EnrichHandler {
 }
 
 func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.GetUserFromRequest(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req models.EnrichmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -32,6 +40,8 @@ func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jobID := uuid.New().String()
+
+	log.Printf("User %s (%s) started enrichment job %s", user.Email, user.ID, jobID)
 
 	go h.enricher.Enrich(context.Background(), jobID, req.RowKeys, req.ColumnsMetadata)
 
