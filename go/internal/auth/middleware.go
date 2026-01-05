@@ -2,11 +2,15 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
-	"github.com/workos/workos-go/v6/pkg/usermanagement"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 )
 
 type contextKey string
@@ -22,7 +26,64 @@ type WorkOSUser struct {
 	LastName  string `json:"last_name"`
 }
 
-func Middleware(client *usermanagement.Client) func(http.Handler) http.Handler {
+type JWTVerifier struct {
+	clientID string
+	keySet   jwk.Set
+	mu       sync.RWMutex
+	lastFetch time.Time
+}
+
+func NewJWTVerifier(clientID string) (*JWTVerifier, error) {
+	v := &JWTVerifier{
+		clientID: clientID,
+	}
+
+	if err := v.refreshKeySet(); err != nil {
+		return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
+	}
+
+	return v, nil
+}
+
+func (v *JWTVerifier) refreshKeySet() error {
+	jwksURL := fmt.Sprintf("https://api.workos.com/sso/jwks/%s", v.clientID)
+
+	keySet, err := jwk.Fetch(context.Background(), jwksURL)
+	if err != nil {
+		return err
+	}
+
+	v.mu.Lock()
+	v.keySet = keySet
+	v.lastFetch = time.Now()
+	v.mu.Unlock()
+
+	return nil
+}
+
+func (v *JWTVerifier) getKeySet() jwk.Set {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+
+	if time.Since(v.lastFetch) > 1*time.Hour {
+		go v.refreshKeySet()
+	}
+
+	return v.keySet
+}
+
+func (v *JWTVerifier) VerifyToken(tokenString string) (jwt.Token, error) {
+	keySet := v.getKeySet()
+
+	token, err := jwt.ParseString(tokenString, jwt.WithKeySet(keySet), jwt.WithValidate(true))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token: %w", err)
+	}
+
+	return token, nil
+}
+
+func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -41,20 +102,20 @@ func Middleware(client *usermanagement.Client) func(http.Handler) http.Handler {
 
 			accessToken := parts[1]
 
-			auth, err := client.AuthenticateWithAccessToken(r.Context(), usermanagement.AuthenticateWithAccessTokenOpts{
-				AccessToken: accessToken,
-			})
+			token, err := verifier.VerifyToken(accessToken)
 			if err != nil {
-				log.Printf("Failed to authenticate token: %v", err)
+				log.Printf("Failed to verify token: %v", err)
 				http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
 				return
 			}
 
+			claims := token.PrivateClaims()
+
 			user := &WorkOSUser{
-				ID:        auth.User.ID,
-				Email:     auth.User.Email,
-				FirstName: auth.User.FirstName,
-				LastName:  auth.User.LastName,
+				ID:        getStringClaim(claims, "sid"),
+				Email:     getStringClaim(claims, "email"),
+				FirstName: getStringClaim(claims, "first_name"),
+				LastName:  getStringClaim(claims, "last_name"),
 			}
 
 			ctx := context.WithValue(r.Context(), userContextKey, user)
@@ -64,6 +125,15 @@ func Middleware(client *usermanagement.Client) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func getStringClaim(claims map[string]interface{}, key string) string {
+	if val, ok := claims[key]; ok {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
 }
 
 func GetUserFromContext(ctx context.Context) (*WorkOSUser, bool) {

@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/api"
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
-	"github.com/workos/workos-go/v6/pkg/usermanagement"
 )
 
 func main() {
@@ -53,10 +53,13 @@ func main() {
 
 	enr := enricher.NewEnricher(p, stateManager)
 
-	workosClient := usermanagement.NewClient(cfg.WorkOSAPIKey)
+	jwtVerifier, err := auth.NewJWTVerifier(cfg.WorkOSClientID)
+	if err != nil {
+		log.Fatalf("Failed to create JWT verifier: %v", err)
+	}
 
 	handler := api.NewEnrichHandler(enr)
-	router := api.SetupRoutes(handler, workosClient)
+	router := api.SetupRoutes(handler, jwtVerifier)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,
