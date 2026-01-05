@@ -5,20 +5,27 @@ import (
 	"net/http"
 
 	"github.com/blagoySimandov/ampledata/go/internal/config"
-	"github.com/workos/workos-go/v6/pkg/sso"
 	"github.com/workos/workos-go/v6/pkg/usermanagement"
 )
 
-const (
-	ORG_ID = "org_test_idp" // Will figure out later when and why i need this.
-)
+func LoginHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cfg := config.GetConfig()
 
-func LoginHandler() http.Handler {
-	cfg := config.GetConfig()
-	return sso.Login(sso.GetAuthorizationURLOpts{
-		Organization: ORG_ID,
-		RedirectURI:  cfg.WorkOSRedirectURL,
-	})
+		authorizationURL, err := usermanagement.GetAuthorizationURL(
+			usermanagement.GetAuthorizationURLOpts{
+				ClientID:    cfg.WorkOSClientID,
+				Provider:    "authkit",
+				RedirectURI: cfg.WorkOSRedirectURL,
+			},
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		http.Redirect(w, r, authorizationURL.String(), http.StatusSeeOther)
+	}
 }
 
 func CallbackHandler(w http.ResponseWriter, r *http.Request) {

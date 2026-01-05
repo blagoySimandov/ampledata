@@ -23,7 +23,7 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		DatabaseURL:       getEnv("DATABASE_URL_ENRICH", "postgres://enrichment:enrichment@localhost:5432/enrichment?sslmode=disable"),
-		FE_BASE_URL:       getEnv("FE_BASE_URL", "http://localhost:5432"),
+		FE_BASE_URL:       getEnv("FE_BASE_URL", "http://localhost:5173"),
 		ServerAddr:        getEnv("SERVER_ADDR", ":8080"),
 		SerperAPIKey:      getEnv("SERPER_API_KEY", ""),
 		GroqAPIKey:        getEnv("GROQ_API_KEY", ""),
