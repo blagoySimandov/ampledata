@@ -20,44 +20,39 @@ export function Navbar() {
     <NavbarMain>
       <Container>
         <NavbarContent>
-        <NavbarBrand>
-          <NavbarLogo>
-            <img src={logo} alt="AmpleData" className="h-8" />
-          </NavbarLogo>
-          <NavigationMenu className="hidden md:flex">
-            <NavigationMenuList>
-              <NavigationMenuItem>
-                <NavigationMenuLink href="#features" className="text-base">
-                  Features
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuLink href="#pricing" className="text-base">
-                  Pricing
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuLink href="#docs" className="text-base">
-                  Docs
-                </NavigationMenuLink>
-              </NavigationMenuItem>
-            </NavigationMenuList>
-          </NavigationMenu>
-        </NavbarBrand>
+          <NavbarBrand>
+            <NavbarLogo>
+              <img src={logo} alt="AmpleData" className="h-8" />
+            </NavbarLogo>
+            <NavigationMenu className="hidden md:flex">
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuLink href="#features" className="text-base">
+                    Features
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink href="#pricing" className="text-base">
+                    Pricing
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink href="#docs" className="text-base">
+                    Docs
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+          </NavbarBrand>
 
-        <NavbarActions>
-          <Button variant="ghost">
-            <a href="#login" className="text-base">
-              Login
-            </a>
-          </Button>
-          <Button>
-            <a href="#signup" className="text-base">
-              Sign Up
-            </a>
-          </Button>
-        </NavbarActions>
-      </NavbarContent>
+          <NavbarActions>
+            <Button variant="ghost">
+              <a href="http://localhost:8080/login" className="text-base">
+                Login
+              </a>
+            </Button>
+          </NavbarActions>
+        </NavbarContent>
       </Container>
     </NavbarMain>
   );

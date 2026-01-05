@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/gorilla/mux"
 )
 
@@ -15,6 +16,8 @@ func SetupRoutes(enrHandler *EnrichHandler) *mux.Router {
 	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST")
 	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET")
 	r.HandleFunc("/api/v1/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST")
+	r.Handle("/login", auth.LoginHandler()).Methods("GET")
+	r.HandleFunc("/auth/callback", auth.CallbackHandler).Methods("GET")
 
 	return r
 }

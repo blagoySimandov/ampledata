@@ -7,6 +7,7 @@ import (
 
 type Config struct {
 	DatabaseURL       string
+	FE_BASE_URL       string
 	ServerAddr        string
 	SerperAPIKey      string
 	GroqAPIKey        string
@@ -14,11 +15,15 @@ type Config struct {
 	GeminiAPIKey      string
 	WorkersPerStage   int
 	ChannelBufferSize int
+	WorkOSApiKey      string
+	WorkOSClientID    string
+	WorkOSRedirectURL string
 }
 
 func Load() *Config {
 	return &Config{
 		DatabaseURL:       getEnv("DATABASE_URL_ENRICH", "postgres://enrichment:enrichment@localhost:5432/enrichment?sslmode=disable"),
+		FE_BASE_URL:       getEnv("FE_BASE_URL", "http://localhost:5432"),
 		ServerAddr:        getEnv("SERVER_ADDR", ":8080"),
 		SerperAPIKey:      getEnv("SERPER_API_KEY", ""),
 		GroqAPIKey:        getEnv("GROQ_API_KEY", ""),
@@ -26,6 +31,9 @@ func Load() *Config {
 		Crawl4aiURL:       getEnv("CRAWL4AI_URL", "http://localhost:8000"),
 		WorkersPerStage:   getEnvInt("WORKERS_PER_STAGE", 5),
 		ChannelBufferSize: getEnvInt("CHANNEL_BUFFER_SIZE", 100),
+		WorkOSApiKey:      getEnv("WORKOS_API_KEY", ""),
+		WorkOSClientID:    getEnv("WORKOS_CLIENT_ID", ""),
+		WorkOSRedirectURL: getEnv("WORKOS_REDIRECT_URL", "http://localhost:8080/auth/callback"),
 	}
 }
 
@@ -43,4 +51,13 @@ func getEnvInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+var config *Config
+
+func GetConfig() *Config {
+	if config == nil {
+		config = Load()
+	}
+	return config
 }

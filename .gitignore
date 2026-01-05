@@ -2,3 +2,4 @@
 .DS_Store
 python/.claude
 __pycache__
+.claude

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/api"
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
@@ -18,7 +19,8 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg := config.GetConfig()
+	auth.Configure()
 
 	store, err := state.NewPostgresStore(cfg.DatabaseURL)
 	if err != nil {
