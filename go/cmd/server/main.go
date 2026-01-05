@@ -53,7 +53,6 @@ func main() {
 
 	enr := enricher.NewEnricher(p, stateManager)
 
-	// Initialize WorkOS client for authentication
 	workosClient := usermanagement.NewClient(cfg.WorkOSAPIKey)
 
 	handler := api.NewEnrichHandler(enr)

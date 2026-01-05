@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/google/uuid"
@@ -26,8 +27,7 @@ func NewEnrichHandler(enr *enricher.Enricher) *EnrichHandler {
 }
 
 func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
-	// Example: Get the authenticated user from the request context
-	user, ok := GetUserFromRequest(r)
+	user, ok := auth.GetUserFromRequest(r)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -41,7 +41,6 @@ func (h *EnrichHandler) EnrichKeys(w http.ResponseWriter, r *http.Request) {
 
 	jobID := uuid.New().String()
 
-	// You can now use the user information for logging, auditing, etc.
 	log.Printf("User %s (%s) started enrichment job %s", user.Email, user.ID, jobID)
 
 	go h.enricher.Enrich(context.Background(), jobID, req.RowKeys, req.ColumnsMetadata)
