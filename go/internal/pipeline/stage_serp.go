@@ -11,23 +11,23 @@ import (
 )
 
 type SerpStage struct {
-	queryBuilder services.QueryBuilder
-	webSearcher  services.WebSearcher
-	stateManager *state.StateManager
-	workerCount  int
+	queryBuilderFactory services.QueryBuilderFactory
+	webSearcher         services.WebSearcher
+	stateManager        *state.StateManager
+	workerCount         int
 }
 
 func NewSerpStage(
-	queryBuilder services.QueryBuilder,
+	queryBuilderFactory services.QueryBuilderFactory,
 	webSearcher services.WebSearcher,
 	stateManager *state.StateManager,
 	workerCount int,
 ) *SerpStage {
 	return &SerpStage{
-		queryBuilder: queryBuilder,
-		webSearcher:  webSearcher,
-		stateManager: stateManager,
-		workerCount:  workerCount,
+		queryBuilderFactory: queryBuilderFactory,
+		webSearcher:         webSearcher,
+		stateManager:        stateManager,
+		workerCount:         workerCount,
 	}
 }
 
@@ -64,7 +64,8 @@ func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Me
 				return
 			}
 
-			query := s.queryBuilder.Build(msg.RowKey)
+			queryBuilder := s.queryBuilderFactory.Create(msg.ColumnsMetadata, nil)
+			query := queryBuilder.Build(msg.RowKey)
 			serp, err := s.webSearcher.Search(ctx, query)
 			if err != nil {
 				msg.Error = err

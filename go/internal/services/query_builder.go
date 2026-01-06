@@ -10,6 +10,10 @@ type QueryBuilder interface {
 	Build(entity string) string
 }
 
+type QueryBuilderFactory interface {
+	Create(columnsMetadata []*models.ColumnMetadata, entityType *string) QueryBuilder
+}
+
 type DefaultQueryBuilder struct {
 	columnsMetadata []*models.ColumnMetadata
 	entityType      *string
@@ -34,4 +38,14 @@ func (qb *DefaultQueryBuilder) Build(entity string) string {
 	}
 
 	return strings.Join(parts, " ")
+}
+
+type DefaultQueryBuilderFactory struct{}
+
+func NewQueryBuilderFactory() QueryBuilderFactory {
+	return &DefaultQueryBuilderFactory{}
+}
+
+func (f *DefaultQueryBuilderFactory) Create(columnsMetadata []*models.ColumnMetadata, entityType *string) QueryBuilder {
+	return NewQueryBuilder(columnsMetadata, entityType)
 }

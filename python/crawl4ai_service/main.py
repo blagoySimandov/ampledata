@@ -38,14 +38,18 @@ async def crawl(request: CrawlRequest) -> CrawlResponse:
         markdown_generator=DefaultMarkdownGenerator(
             content_filter=BM25ContentFilter(user_query=request.query)
         ),
-        word_count_threshold=10,
-        excluded_tags=["form", "header", "footer", "nav"],
+        # word_count_threshold=10,
+        excluded_tags=["form", "header", "footer", "nav", "script"],
         magic=True,
         simulate_user=True,
     )
+
     if crawler is None:
         return CrawlResponse(content="", success=False)
-    results = await crawler.arun_many(urls=request.urls, config=config)
+    try:
+        results = await crawler.arun_many(urls=request.urls, config=config)
+    except Exception as e:
+        return CrawlResponse(content=str(e), success=False)
 
     results_markdown = []
     for result in results:  # type: ignore

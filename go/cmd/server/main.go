@@ -28,7 +28,7 @@ func main() {
 
 	stateManager := state.NewStateManager(store)
 
-	queryBuilder := services.NewQueryBuilder(nil, nil)
+	queryBuilderFactory := services.NewQueryBuilderFactory()
 	webSearcher := services.NewSerperClient(cfg.SerperAPIKey)
 	decisionMaker := services.NewGroqDecisionMaker(cfg.GroqAPIKey)
 	crawler := services.NewCrawl4aiClient(cfg.Crawl4aiURL)
@@ -38,7 +38,7 @@ func main() {
 	}
 
 	stages := []pipeline.Stage{
-		pipeline.NewSerpStage(queryBuilder, webSearcher, stateManager, cfg.WorkersPerStage),
+		pipeline.NewSerpStage(queryBuilderFactory, webSearcher, stateManager, cfg.WorkersPerStage),
 		pipeline.NewDecisionStage(decisionMaker, stateManager, cfg.WorkersPerStage),
 		pipeline.NewCrawlStage(crawler, stateManager, cfg.WorkersPerStage),
 		pipeline.NewExtractStage(extractor, stateManager, cfg.WorkersPerStage),
