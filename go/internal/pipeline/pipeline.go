@@ -33,8 +33,17 @@ func NewPipeline(manager *state.StateManager, stages []Stage, config *PipelineCo
 }
 
 func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
-	if err := p.stateManager.InitializeJob(ctx, jobID, rowKeys); err != nil {
-		return err
+	// Check if job already exists (file-based workflow creates job before pipeline runs)
+	status, err := p.stateManager.Store().GetJobStatus(ctx, jobID)
+	if err != nil {
+		// Job doesn't exist yet, initialize it (legacy workflow)
+		if err := p.stateManager.InitializeJob(ctx, jobID, rowKeys); err != nil {
+			return err
+		}
+	} else if status == models.JobStatusRunning {
+		// Job exists and is running (file-based workflow)
+		// Row states should already be created, but verify
+		log.Printf("Job %s already exists with status %s, skipping initialization", jobID, status)
 	}
 
 	patterns, err := p.patternGenerator.GeneratePatterns(ctx, columnsMetadata)

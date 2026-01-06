@@ -204,6 +204,13 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create row states for the job
+	if err := h.store.BulkCreateRows(r.Context(), jobID, rowKeys); err != nil {
+		log.Printf("Failed to create row states: %v", err)
+		http.Error(w, "Failed to create row states", http.StatusInternalServerError)
+		return
+	}
+
 	log.Printf("User %s (%s) started enrichment job %s with %d rows", user.Email, user.ID, jobID, len(rowKeys))
 
 	go h.enricher.Enrich(context.Background(), jobID, rowKeys, req.ColumnsMetadata)
