@@ -18,6 +18,7 @@ const (
 type JobStatus string
 
 const (
+	JobStatusPending   JobStatus = "PENDING"
 	JobStatusRunning   JobStatus = "RUNNING"
 	JobStatusPaused    JobStatus = "PAUSED"
 	JobStatusCancelled JobStatus = "CANCELLED"

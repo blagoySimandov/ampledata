@@ -13,6 +13,7 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
+	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
@@ -26,6 +27,12 @@ func main() {
 		log.Fatalf("Failed to create PostgreSQL store: %v", err)
 	}
 	defer store.Close()
+
+	gcsReader, err := gcs.NewCSVReader("ampledata-enrichment-uploads")
+	if err != nil {
+		log.Fatalf("Failed to create GCS reader: %v", err)
+	}
+	defer gcsReader.Close()
 
 	stateManager := state.NewStateManager(store)
 
@@ -61,7 +68,7 @@ func main() {
 		log.Fatalf("Failed to create JWT verifier: %v", err)
 	}
 
-	handler := api.NewEnrichHandler(enr)
+	handler := api.NewEnrichHandler(enr, gcsReader, store)
 	router := api.SetupRoutes(handler, jwtVerifier)
 
 	srv := &http.Server{

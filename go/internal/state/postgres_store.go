@@ -83,6 +83,26 @@ func (s *PostgresStore) InitializeDatabase(ctx context.Context) error {
 		return fmt.Errorf("failed to create updated_at index: %w", err)
 	}
 
+	_, err = s.db.NewCreateIndex().
+		Model((*models.JobDB)(nil)).
+		Index("idx_jobs_user_id").
+		Column("user_id").
+		IfNotExists().
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create user_id index: %w", err)
+	}
+
+	_, err = s.db.NewCreateIndex().
+		Model((*models.JobDB)(nil)).
+		Index("idx_jobs_status").
+		Column("status").
+		IfNotExists().
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create status index: %w", err)
+	}
+
 	return nil
 }
 
@@ -90,9 +110,10 @@ func (s *PostgresStore) CreateJob(ctx context.Context, jobID string, totalRows i
 	now := time.Now()
 	job := &models.JobDB{
 		JobID:     jobID,
+		UserID:    "",
 		TotalRows: totalRows,
 		Status:    status,
-		StartedAt: now,
+		StartedAt: &now,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -104,6 +125,92 @@ func (s *PostgresStore) CreateJob(ctx context.Context, jobID string, totalRows i
 		return fmt.Errorf("failed to create job: %w", err)
 	}
 	return nil
+}
+
+func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID, filePath string) error {
+	now := time.Now()
+	job := &models.JobDB{
+		JobID:     jobID,
+		UserID:    userID,
+		FilePath:  filePath,
+		TotalRows: 0,
+		Status:    models.JobStatusPending,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	_, err := s.db.NewInsert().
+		Model(job).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create pending job: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) GetJob(ctx context.Context, jobID string) (*models.JobDB, error) {
+	var job models.JobDB
+	err := s.db.NewSelect().
+		Model(&job).
+		Where("job_id = ?", jobID).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+	return &job, nil
+}
+
+func (s *PostgresStore) UpdateJobConfiguration(ctx context.Context, jobID, keyColumn string, columnsMetadata []*models.ColumnMetadata, entityType *string) error {
+	_, err := s.db.NewUpdate().
+		Model((*models.JobDB)(nil)).
+		Set("key_column = ?", keyColumn).
+		Set("columns_metadata = ?", columnsMetadata).
+		Set("entity_type = ?", entityType).
+		Set("updated_at = ?", time.Now()).
+		Where("job_id = ?", jobID).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update job configuration: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) StartJob(ctx context.Context, jobID string, totalRows int) error {
+	now := time.Now()
+	_, err := s.db.NewUpdate().
+		Model((*models.JobDB)(nil)).
+		Set("status = ?", models.JobStatusRunning).
+		Set("total_rows = ?", totalRows).
+		Set("started_at = ?", now).
+		Set("updated_at = ?", now).
+		Where("job_id = ?", jobID).
+		Where("status = ?", models.JobStatusPending).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start job: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.JobDB, error) {
+	var jobs []*models.JobDB
+	query := s.db.NewSelect().
+		Model(&jobs).
+		Where("user_id = ?", userID).
+		Order("created_at DESC")
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs by user: %w", err)
+	}
+	return jobs, nil
 }
 
 func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKeys []string) error {
@@ -259,13 +366,16 @@ func (s *PostgresStore) GetJobProgress(ctx context.Context, jobID string) (*mode
 		rowsByStage[models.RowStage(sc.Stage)] = sc.Count
 	}
 
-	return &models.JobProgress{
+	progress := &models.JobProgress{
 		JobID:       jobID,
 		TotalRows:   job.TotalRows,
 		RowsByStage: rowsByStage,
-		StartedAt:   job.StartedAt,
 		Status:      job.Status,
-	}, nil
+	}
+	if job.StartedAt != nil {
+		progress.StartedAt = *job.StartedAt
+	}
+	return progress, nil
 }
 
 func (s *PostgresStore) Close() error {

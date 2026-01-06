@@ -53,6 +53,5 @@ func generateSignedURL(objectName string, contentType string) (string, error) {
 
 // extension is with the dot. Example ".csv"
 func generateJobId(extension string) string {
-	filename := uuid.New().String() + extension
-	return filename
+	return uuid.New().String() + extension
 }

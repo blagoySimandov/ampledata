@@ -10,12 +10,17 @@ import (
 type JobDB struct {
 	bun.BaseModel `bun:"table:jobs,alias:j"`
 
-	JobID     string    `bun:"job_id,pk" json:"job_id"`
-	TotalRows int       `bun:"total_rows,notnull" json:"total_rows"`
-	StartedAt time.Time `bun:"started_at,notnull,default:current_timestamp" json:"started_at"`
-	Status    JobStatus `bun:"status,notnull,default:'RUNNING'" json:"status"`
-	CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt time.Time `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+	JobID           string            `bun:"job_id,pk" json:"job_id"`
+	UserID          string            `bun:"user_id,notnull" json:"user_id"`
+	FilePath        string            `bun:"file_path" json:"file_path"`
+	KeyColumn       *string           `bun:"key_column" json:"key_column"`
+	ColumnsMetadata []*ColumnMetadata `bun:"columns_metadata,type:jsonb" json:"columns_metadata"`
+	EntityType      *string           `bun:"entity_type" json:"entity_type"`
+	TotalRows       int               `bun:"total_rows,notnull" json:"total_rows"`
+	StartedAt       *time.Time        `bun:"started_at" json:"started_at"`
+	Status          JobStatus         `bun:"status,notnull,default:'PENDING'" json:"status"`
+	CreatedAt       time.Time         `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt       time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
 type RowStateDB struct {
