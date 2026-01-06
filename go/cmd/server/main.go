@@ -63,7 +63,7 @@ func main() {
 
 	enr := enricher.NewEnricher(p, stateManager)
 
-	jwtVerifier, err := auth.NewJWTVerifier(cfg.WorkOSClientID)
+	jwtVerifier, err := auth.NewJWTVerifier(cfg.WorkOSClientID, cfg.DebugAuthBypass)
 	if err != nil {
 		log.Fatalf("Failed to create JWT verifier: %v", err)
 	}
