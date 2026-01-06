@@ -45,6 +45,45 @@ func (s *DecisionStage) Run(ctx context.Context, inChan <-chan Message, outChan 
 	close(outChan)
 }
 
+func (s *DecisionStage) mergeSerpResults(results []*models.GoogleSearchResults) *models.GoogleSearchResults {
+	if len(results) == 0 {
+		return nil
+	}
+	if len(results) == 1 {
+		return results[0]
+	}
+
+	merged := &models.GoogleSearchResults{
+		SearchParameters: results[0].SearchParameters,
+		Organic:          []models.OrganicResult{},
+		PeopleAlsoAsk:    []models.PeopleAlsoAskItem{},
+		RelatedSearches:  []models.RelatedSearch{},
+	}
+
+	seenURLs := make(map[string]bool)
+	for _, result := range results {
+		if result.KnowledgeGraph != nil && merged.KnowledgeGraph == nil {
+			merged.KnowledgeGraph = result.KnowledgeGraph
+		}
+
+		for _, organic := range result.Organic {
+			url := ""
+			if organic.Link != nil {
+				url = *organic.Link
+			}
+			if url != "" && !seenURLs[url] {
+				merged.Organic = append(merged.Organic, organic)
+				seenURLs[url] = true
+			}
+		}
+
+		merged.PeopleAlsoAsk = append(merged.PeopleAlsoAsk, result.PeopleAlsoAsk...)
+		merged.RelatedSearches = append(merged.RelatedSearches, result.RelatedSearches...)
+	}
+
+	return merged
+}
+
 func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Message, out chan<- Message) {
 	defer wg.Done()
 
@@ -68,14 +107,15 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
-			} else if msg.State.SerpData.Results == nil {
+			} else if msg.State.SerpData.Results == nil || len(msg.State.SerpData.Results) == 0 {
 				errStr := "SERP results not found in data"
 				msg.Error = fmt.Errorf(errStr)
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
 			} else {
-				decision, err := s.decisionMaker.MakeDecision(ctx, msg.State.SerpData.Results, msg.RowKey, 3, msg.ColumnsMetadata)
+				mergedResults := s.mergeSerpResults(msg.State.SerpData.Results)
+				decision, err := s.decisionMaker.MakeDecision(ctx, mergedResults, msg.RowKey, 3, msg.ColumnsMetadata)
 				if err != nil {
 					errStr := err.Error()
 					msg.Error = err

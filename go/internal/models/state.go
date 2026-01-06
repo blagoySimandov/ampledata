@@ -25,8 +25,8 @@ const (
 )
 
 type SerpData struct {
-	Query   string               `json:"query"`
-	Results *GoogleSearchResults `json:"results"`
+	Queries []string                `json:"queries"`
+	Results []*GoogleSearchResults  `json:"results"`
 }
 
 type Decision struct {

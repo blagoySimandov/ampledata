@@ -11,23 +11,23 @@ import (
 )
 
 type SerpStage struct {
-	queryBuilderFactory services.QueryBuilderFactory
 	webSearcher         services.WebSearcher
 	stateManager        *state.StateManager
+	queryBuilderFactory *services.QueryBuilderFactory
 	workerCount         int
 }
 
 func NewSerpStage(
-	queryBuilderFactory services.QueryBuilderFactory,
 	webSearcher services.WebSearcher,
 	stateManager *state.StateManager,
+	queryBuilderFactory *services.QueryBuilderFactory,
 	workerCount int,
 ) *SerpStage {
 	return &SerpStage{
-		queryBuilderFactory: queryBuilderFactory,
 		webSearcher:         webSearcher,
 		stateManager:        stateManager,
 		workerCount:         workerCount,
+		queryBuilderFactory: queryBuilderFactory,
 	}
 }
 
@@ -64,19 +64,31 @@ func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Me
 				return
 			}
 
-			queryBuilder := s.queryBuilderFactory.Create(msg.ColumnsMetadata, nil)
-			query := queryBuilder.Build(msg.RowKey)
-			serp, err := s.webSearcher.Search(ctx, query)
-			if err != nil {
-				msg.Error = err
-				errStr := err.Error()
+			queryBuilder := services.NewPatternQueryBuilder(msg.QueryPatterns, msg.ColumnsMetadata)
+			queries := queryBuilder.Build(msg.RowKey)
+
+			allResults := []*models.GoogleSearchResults{}
+			var lastErr error
+
+			for _, query := range queries {
+				serp, err := s.webSearcher.Search(ctx, query)
+				if err != nil {
+					lastErr = err
+					continue
+				}
+				allResults = append(allResults, serp)
+			}
+
+			if len(allResults) == 0 {
+				msg.Error = lastErr
+				errStr := lastErr.Error()
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
 			} else {
 				msg.State.SerpData = &models.SerpData{
-					Query:   query,
-					Results: serp,
+					Queries: queries,
+					Results: allResults,
 				}
 				msg.State.Stage = models.StageSerpFetched
 				msg.State.UpdatedAt = time.Now()

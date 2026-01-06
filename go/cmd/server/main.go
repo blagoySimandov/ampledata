@@ -29,7 +29,10 @@ func main() {
 
 	stateManager := state.NewStateManager(store)
 
-	queryBuilderFactory := services.NewQueryBuilderFactory()
+	patternGenerator, err := services.NewGeminiPatternGenerator(cfg.GeminiAPIKey)
+	if err != nil {
+		log.Fatalf("Failed to create Gemini pattern generator: %v", err)
+	}
 	webSearcher := services.NewSerperClient(cfg.SerperAPIKey)
 	decisionMaker := services.NewGroqDecisionMaker(cfg.GroqAPIKey)
 	crawler := services.NewCrawl4aiClient(cfg.Crawl4aiURL)
@@ -39,7 +42,7 @@ func main() {
 	}
 
 	stages := []pipeline.Stage{
-		pipeline.NewSerpStage(queryBuilderFactory, webSearcher, stateManager, cfg.WorkersPerStage),
+		pipeline.NewSerpStage(webSearcher, stateManager, cfg.WorkersPerStage),
 		pipeline.NewDecisionStage(decisionMaker, stateManager, cfg.WorkersPerStage),
 		pipeline.NewCrawlStage(crawler, stateManager, cfg.WorkersPerStage),
 		pipeline.NewExtractStage(extractor, stateManager, cfg.WorkersPerStage),
@@ -49,7 +52,7 @@ func main() {
 		WorkersPerStage:   cfg.WorkersPerStage,
 		ChannelBufferSize: cfg.ChannelBufferSize,
 	}
-	p := pipeline.NewPipeline(stateManager, stages, pipelineConfig)
+	p := pipeline.NewPipeline(stateManager, stages, pipelineConfig, patternGenerator)
 
 	enr := enricher.NewEnricher(p, stateManager)
 

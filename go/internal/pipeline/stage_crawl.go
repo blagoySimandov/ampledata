@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -82,7 +83,7 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 						"crawl_results": msg.State.CrawlResults,
 					})
 				} else {
-					query := msg.State.SerpData.Query
+					query := strings.Join(msg.State.SerpData.Queries, " ")
 
 					content, err := s.crawler.Crawl(ctx, urlsToCrawl, query)
 					if err != nil {

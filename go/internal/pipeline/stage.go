@@ -11,6 +11,7 @@ type Message struct {
 	RowKey          string
 	State           *models.RowState
 	ColumnsMetadata []*models.ColumnMetadata
+	QueryPatterns   []string
 	Error           error
 }
 

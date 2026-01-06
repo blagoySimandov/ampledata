@@ -7,13 +7,15 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
 
 type Pipeline struct {
-	stateManager *state.StateManager
-	stages       []Stage
-	config       *PipelineConfig
+	stateManager      *state.StateManager
+	stages            []Stage
+	config            *PipelineConfig
+	patternGenerator  services.QueryPatternGenerator
 }
 
 type PipelineConfig struct {
@@ -21,11 +23,12 @@ type PipelineConfig struct {
 	ChannelBufferSize int
 }
 
-func NewPipeline(manager *state.StateManager, stages []Stage, config *PipelineConfig) *Pipeline {
+func NewPipeline(manager *state.StateManager, stages []Stage, config *PipelineConfig, patternGenerator services.QueryPatternGenerator) *Pipeline {
 	return &Pipeline{
-		stateManager: manager,
-		stages:       stages,
-		config:       config,
+		stateManager:     manager,
+		stages:           stages,
+		config:           config,
+		patternGenerator: patternGenerator,
 	}
 }
 
@@ -33,6 +36,12 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, colu
 	if err := p.stateManager.InitializeJob(ctx, jobID, rowKeys); err != nil {
 		return err
 	}
+
+	patterns, err := p.patternGenerator.GeneratePatterns(ctx, columnsMetadata)
+	if err != nil {
+		log.Printf("Warning: pattern generation failed: %v. Using fallback patterns.", err)
+	}
+	log.Printf("Generated %d query patterns for job %s: %v", len(patterns), jobID, patterns)
 
 	channels := make([]chan Message, len(p.stages)+1)
 	for i := range channels {
@@ -54,7 +63,7 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, colu
 	feedWg.Add(1)
 	go func() {
 		defer feedWg.Done()
-		p.feedInitialMessages(ctx, jobID, rowKeys, columnsMetadata, channels[0])
+		p.feedInitialMessages(ctx, jobID, rowKeys, columnsMetadata, patterns, channels[0])
 	}()
 
 	collectWg.Add(1)
@@ -73,7 +82,7 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, colu
 	return nil
 }
 
-func (p *Pipeline) feedInitialMessages(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, outChan chan<- Message) {
+func (p *Pipeline) feedInitialMessages(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, queryPatterns []string, outChan chan<- Message) {
 	for _, key := range rowKeys {
 		select {
 		case <-ctx.Done():
@@ -82,6 +91,7 @@ func (p *Pipeline) feedInitialMessages(ctx context.Context, jobID string, rowKey
 			JobID:           jobID,
 			RowKey:          key,
 			ColumnsMetadata: columnsMetadata,
+			QueryPatterns:   queryPatterns,
 			State: &models.RowState{
 				Key:       key,
 				Stage:     models.StagePending,

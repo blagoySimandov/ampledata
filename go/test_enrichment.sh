@@ -40,6 +40,7 @@ RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/enrich" \
     "entity_type": "company"
   }')
 
+echo "$RESPONSE"
 echo "$RESPONSE" | jq .
 JOB_ID=$(echo "$RESPONSE" | jq -r '.job_id')
 
