@@ -2,10 +2,10 @@ package pipeline
 
 import (
 	"context"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logging"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
@@ -33,15 +33,25 @@ func NewPipeline(manager *state.StateManager, stages []Stage, config *PipelineCo
 }
 
 func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
+	// Create a job-level WideEvent for this pipeline execution
+	jobEvent := logging.NewWideEvent("job_processing")
+	ctx = logging.WithContext(ctx, jobEvent)
+
+	logging.EnrichJob(ctx, jobID, string(models.JobStatusRunning))
+	logging.EnrichJobRows(ctx, len(rowKeys), 0, 0)
+	logging.EnrichPipeline(ctx, "initializing", nil)
+
 	if err := p.stateManager.InitializeJob(ctx, jobID, rowKeys); err != nil {
+		logging.EnrichError(ctx, err, "initialize_job")
+		logging.Emit(ctx)
 		return err
 	}
 
 	patterns, err := p.patternGenerator.GeneratePatterns(ctx, columnsMetadata)
 	if err != nil {
-		log.Printf("Warning: pattern generation failed: %v. Using fallback patterns.", err)
+		logging.EnrichMetadata(ctx, "pattern_generation_warning", err.Error())
 	}
-	log.Printf("Generated %d query patterns for job %s: %v", len(patterns), jobID, patterns)
+	logging.EnrichPipeline(ctx, "pattern_generation", patterns)
 
 	channels := make([]chan Message, len(p.stages)+1)
 	for i := range channels {
@@ -79,6 +89,9 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, colu
 
 	collectWg.Wait()
 
+	// Emit the final job event
+	logging.Emit(ctx)
+
 	return nil
 }
 
@@ -114,10 +127,12 @@ func (p *Pipeline) collectResults(ctx context.Context, jobID string, inChan <-ch
 		case msg, ok := <-inChan:
 			if !ok {
 				if completedCount > 0 || failedCount > 0 {
+					logging.EnrichJobRows(ctx, completedCount+failedCount, completedCount, failedCount)
+					logging.EnrichJob(ctx, jobID, string(models.JobStatusCompleted))
+
 					err := p.stateManager.Complete(ctx, jobID)
-					// TODO: proper error state handling. should be persisted in the db... maybe return ?
 					if err != nil {
-						log.Printf("failed to mark job as complete: %s", err)
+						logging.EnrichError(ctx, err, "mark_job_complete")
 					}
 				}
 				return
@@ -130,10 +145,9 @@ func (p *Pipeline) collectResults(ctx context.Context, jobID string, inChan <-ch
 
 				msg.State.Stage = models.StageCompleted
 				msg.State.UpdatedAt = time.Now()
-				// TODO: proper error state handling. should persist in the db...
 				err := p.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCompleted, nil)
 				if err != nil {
-					log.Printf("failed to transition row state: %s", err)
+					logging.EnrichError(ctx, err, "transition_row_complete")
 				}
 			}
 		}

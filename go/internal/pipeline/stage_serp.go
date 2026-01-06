@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logging"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
@@ -56,6 +57,8 @@ func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Me
 				return
 			}
 
+			start := time.Now()
+
 			cancelled, _ := s.stateManager.CheckCancelled(ctx, msg.JobID)
 			if cancelled {
 				return
@@ -76,12 +79,15 @@ func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Me
 				allResults = append(allResults, serp)
 			}
 
+			duration := time.Since(start)
+
 			if len(allResults) == 0 {
 				msg.Error = lastErr
 				errStr := lastErr.Error()
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
+				logging.EmitRowEvent(ctx, "row_serp_failed", msg.JobID, msg.RowKey, string(models.StageSerpFetched), duration, lastErr)
 			} else {
 				msg.State.SerpData = &models.SerpData{
 					Queries: queries,
@@ -93,6 +99,7 @@ func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Me
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageSerpFetched, map[string]interface{}{
 					"serp_data": msg.State.SerpData,
 				})
+				logging.EmitRowEvent(ctx, "row_serp_completed", msg.JobID, msg.RowKey, string(models.StageSerpFetched), duration, nil)
 			}
 
 			select {

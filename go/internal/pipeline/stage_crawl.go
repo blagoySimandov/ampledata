@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logging"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
@@ -58,6 +59,8 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 				return
 			}
 
+			start := time.Now()
+
 			cancelled, _ := s.stateManager.CheckCancelled(ctx, msg.JobID)
 			if cancelled {
 				return
@@ -69,6 +72,7 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
+				logging.EmitRowEvent(ctx, "row_crawl_failed", msg.JobID, msg.RowKey, string(models.StageCrawled), time.Since(start), msg.Error)
 			} else {
 				urlsToCrawl := msg.State.Decision.URLsToCrawl
 				if len(urlsToCrawl) == 0 {
@@ -82,6 +86,7 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCrawled, map[string]interface{}{
 						"crawl_results": msg.State.CrawlResults,
 					})
+					logging.EmitRowEvent(ctx, "row_crawl_skipped", msg.JobID, msg.RowKey, string(models.StageCrawled), time.Since(start), nil)
 				} else {
 					query := strings.Join(msg.State.SerpData.Queries, " ")
 
@@ -92,6 +97,7 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 						s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 							"error": errStr,
 						})
+						logging.EmitRowEvent(ctx, "row_crawl_failed", msg.JobID, msg.RowKey, string(models.StageCrawled), time.Since(start), err)
 					} else {
 						msg.State.CrawlResults = &models.CrawlResults{
 							Content: &content,
@@ -103,6 +109,7 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 						s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageCrawled, map[string]interface{}{
 							"crawl_results": msg.State.CrawlResults,
 						})
+						logging.EmitRowEvent(ctx, "row_crawl_completed", msg.JobID, msg.RowKey, string(models.StageCrawled), time.Since(start), nil)
 					}
 				}
 			}

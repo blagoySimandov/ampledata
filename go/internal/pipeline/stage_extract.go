@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logging"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
@@ -57,6 +58,8 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 				return
 			}
 
+			start := time.Now()
+
 			cancelled, _ := s.stateManager.CheckCancelled(ctx, msg.JobID)
 			if cancelled {
 				return
@@ -68,6 +71,7 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
+				logging.EmitRowEvent(ctx, "row_extract_failed", msg.JobID, msg.RowKey, string(models.StageEnriched), time.Since(start), msg.Error)
 			} else {
 				hasContent := msg.State.CrawlResults.Content != nil && *msg.State.CrawlResults.Content != ""
 				var content string
@@ -97,6 +101,7 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 							s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 								"error": errStr,
 							})
+							logging.EmitRowEvent(ctx, "row_extract_failed", msg.JobID, msg.RowKey, string(models.StageEnriched), time.Since(start), err)
 						} else {
 							extractedFromDecision := msg.State.Decision.ExtractedData
 							if extractedFromDecision == nil {
@@ -126,6 +131,14 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageEnriched, map[string]interface{}{
 						"extracted_data": msg.State.ExtractedData,
 					})
+
+					fields := []string{}
+					if msg.State.ExtractedData != nil {
+						for k := range msg.State.ExtractedData {
+							fields = append(fields, k)
+						}
+					}
+					logging.EmitRowEvent(ctx, "row_extract_completed", msg.JobID, msg.RowKey, string(models.StageEnriched), time.Since(start), nil)
 				}
 			}
 

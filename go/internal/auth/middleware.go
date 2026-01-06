@@ -3,12 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logging"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -88,14 +88,14 @@ func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
-				log.Printf("Missing Authorization header")
+				logging.EnrichError(r.Context(), fmt.Errorf("missing authorization header"), "auth")
 				http.Error(w, "Unauthorized: Missing Authorization header", http.StatusUnauthorized)
 				return
 			}
 
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) != 2 || parts[0] != "Bearer" {
-				log.Printf("Invalid Authorization header format")
+				logging.EnrichError(r.Context(), fmt.Errorf("invalid authorization header format"), "auth")
 				http.Error(w, "Unauthorized: Invalid Authorization header format", http.StatusUnauthorized)
 				return
 			}
@@ -104,7 +104,7 @@ func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 
 			token, err := verifier.VerifyToken(accessToken)
 			if err != nil {
-				log.Printf("Failed to verify token: %v", err)
+				logging.EnrichError(r.Context(), fmt.Errorf("token verification failed: %w", err), "auth")
 				http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
 				return
 			}
@@ -120,7 +120,9 @@ func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), userContextKey, user)
 
-			log.Printf("User authenticated: %s (%s)", user.Email, user.ID)
+			// Enrich the WideEvent with user information
+			fullName := strings.TrimSpace(user.FirstName + " " + user.LastName)
+			logging.EnrichUser(ctx, user.ID, user.Email, fullName)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

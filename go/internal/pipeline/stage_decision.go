@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logging"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
@@ -96,6 +97,8 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 				return
 			}
 
+			start := time.Now()
+
 			cancelled, _ := s.stateManager.CheckCancelled(ctx, msg.JobID)
 			if cancelled {
 				return
@@ -107,12 +110,14 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
+				logging.EmitRowEvent(ctx, "row_decision_failed", msg.JobID, msg.RowKey, string(models.StageDecisionMade), time.Since(start), msg.Error)
 			} else if msg.State.SerpData.Results == nil || len(msg.State.SerpData.Results) == 0 {
 				errStr := "SERP results not found in data"
 				msg.Error = fmt.Errorf(errStr)
 				s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 					"error": errStr,
 				})
+				logging.EmitRowEvent(ctx, "row_decision_failed", msg.JobID, msg.RowKey, string(models.StageDecisionMade), time.Since(start), msg.Error)
 			} else {
 				mergedResults := s.mergeSerpResults(msg.State.SerpData.Results)
 				decision, err := s.decisionMaker.MakeDecision(ctx, mergedResults, msg.RowKey, 3, msg.ColumnsMetadata)
@@ -122,6 +127,7 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
 						"error": errStr,
 					})
+					logging.EmitRowEvent(ctx, "row_decision_failed", msg.JobID, msg.RowKey, string(models.StageDecisionMade), time.Since(start), err)
 				} else {
 					msg.State.Decision = &models.Decision{
 						URLsToCrawl:    decision.URLsToCrawl,
@@ -135,6 +141,7 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageDecisionMade, map[string]interface{}{
 						"decision": msg.State.Decision,
 					})
+					logging.EmitRowEvent(ctx, "row_decision_completed", msg.JobID, msg.RowKey, string(models.StageDecisionMade), time.Since(start), nil)
 				}
 			}
 

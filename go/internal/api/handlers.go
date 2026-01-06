@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"mime"
 	"net/http"
 	"slices"
@@ -12,6 +11,7 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
+	"github.com/blagoySimandov/ampledata/go/internal/logging"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/gorilla/mux"
@@ -35,8 +35,11 @@ func (h *EnrichHandler) GetJobProgress(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["jobID"]
 
+	logging.EnrichJob(r.Context(), jobID, "checking_progress")
+
 	progress, err := h.enricher.GetProgress(r.Context(), jobID)
 	if err != nil {
+		logging.EnrichError(r.Context(), err, "get_progress")
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
@@ -49,10 +52,15 @@ func (h *EnrichHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["jobID"]
 
+	logging.EnrichJob(r.Context(), jobID, "cancelling")
+
 	if err := h.enricher.Cancel(r.Context(), jobID); err != nil {
+		logging.EnrichError(r.Context(), err, "cancel_job")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	logging.EnrichJob(r.Context(), jobID, "cancelled")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Job cancelled"})
@@ -62,12 +70,15 @@ func (h *EnrichHandler) GetJobResults(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jobID := vars["jobID"]
 
+	logging.EnrichJob(r.Context(), jobID, "fetching_results")
+
 	offset := 0
 	limit := 0
 
 	if offsetStr := r.URL.Query().Get("start"); offsetStr != "" {
 		_, err := fmt.Sscanf(offsetStr, "%d", &offset)
 		if err != nil {
+			logging.EnrichError(r.Context(), err, "parse_offset")
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -76,13 +87,18 @@ func (h *EnrichHandler) GetJobResults(w http.ResponseWriter, r *http.Request) {
 	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
 		_, err := fmt.Sscanf(limitStr, "%d", &limit)
 		if err != nil {
+			logging.EnrichError(r.Context(), err, "parse_limit")
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
 
+	logging.EnrichMetadata(r.Context(), "offset", offset)
+	logging.EnrichMetadata(r.Context(), "limit", limit)
+
 	results, err := h.enricher.GetResults(r.Context(), jobID, offset, limit)
 	if err != nil {
+		logging.EnrichError(r.Context(), err, "get_results")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -118,18 +134,19 @@ func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.R
 	jobID := generateJobId(ext[0])
 
 	if err := h.store.CreatePendingJob(r.Context(), jobID, user.ID, jobID); err != nil {
-		log.Printf("Failed to create pending job: %v", err)
+		logging.EnrichError(r.Context(), err, "create_pending_job")
 		http.Error(w, "Failed to create job", http.StatusInternalServerError)
 		return
 	}
 
+	logging.EnrichJob(r.Context(), jobID, string(models.JobStatusPending))
+
 	url, err := generateSignedURL(jobID, reqBody.ContentType)
 	if err != nil {
+		logging.EnrichError(r.Context(), err, "generate_signed_url")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	log.Printf("User %s (%s) created pending job %s", user.Email, user.ID, jobID)
 
 	w.Header().Set("Content-Type", "application/json")
 	response := SignedURLResponse{
@@ -192,19 +209,24 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logging.EnrichJob(r.Context(), jobID, "configuring")
+	logging.EnrichJobRows(r.Context(), len(rowKeys), 0, 0)
+	logging.EnrichMetadata(r.Context(), "key_column", req.KeyColumn)
+	logging.EnrichMetadata(r.Context(), "column_count", len(req.ColumnsMetadata))
+
 	if err := h.store.UpdateJobConfiguration(r.Context(), jobID, req.KeyColumn, req.ColumnsMetadata, req.EntityType); err != nil {
-		log.Printf("Failed to update job configuration: %v", err)
+		logging.EnrichError(r.Context(), err, "update_job_config")
 		http.Error(w, "Failed to update job configuration", http.StatusInternalServerError)
 		return
 	}
 
 	if err := h.store.StartJob(r.Context(), jobID, len(rowKeys)); err != nil {
-		log.Printf("Failed to start job: %v", err)
+		logging.EnrichError(r.Context(), err, "start_job")
 		http.Error(w, "Failed to start job", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("User %s (%s) started enrichment job %s with %d rows", user.Email, user.ID, jobID, len(rowKeys))
+	logging.EnrichJob(r.Context(), jobID, string(models.JobStatusRunning))
 
 	go h.enricher.Enrich(context.Background(), jobID, rowKeys, req.ColumnsMetadata)
 
@@ -234,10 +256,14 @@ func (h *EnrichHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 
 	jobs, err := h.store.GetJobsByUser(r.Context(), user.ID, offset, limit)
 	if err != nil {
-		log.Printf("Failed to retrieve jobs: %v", err)
+		logging.EnrichError(r.Context(), err, "list_jobs")
 		http.Error(w, "Failed to retrieve jobs", http.StatusInternalServerError)
 		return
 	}
+
+	logging.EnrichMetadata(r.Context(), "jobs_count", len(jobs))
+	logging.EnrichMetadata(r.Context(), "offset", offset)
+	logging.EnrichMetadata(r.Context(), "limit", limit)
 
 	summaries := make([]*models.JobSummary, len(jobs))
 	for i, job := range jobs {
