@@ -40,9 +40,8 @@ func NewJWTVerifier(clientID string, debugBypass bool) (*JWTVerifier, error) {
 		debugBypass: debugBypass,
 	}
 
-	// Skip JWKS fetch if debug bypass is enabled
 	if debugBypass {
-		log.Printf("⚠️  DEBUG_AUTH_BYPASS enabled - authentication disabled for development")
+		log.Printf("DEBUG_AUTH_BYPASS enabled - authentication disabled for development!")
 		return v, nil
 	}
 
