@@ -12,10 +12,10 @@ import (
 )
 
 type Pipeline struct {
-	stateManager      *state.StateManager
-	stages            []Stage
-	config            *PipelineConfig
-	patternGenerator  services.QueryPatternGenerator
+	stateManager     *state.StateManager
+	stages           []Stage
+	config           *PipelineConfig
+	patternGenerator services.QueryPatternGenerator
 }
 
 type PipelineConfig struct {
@@ -112,9 +112,7 @@ func (p *Pipeline) collectResults(ctx context.Context, jobID string, inChan <-ch
 		case <-ctx.Done():
 			return
 		case msg, ok := <-inChan:
-			log.Println("before closing collectResults") // This gets printed once for each job row.. normal
 			if !ok {
-				log.Println("closing collectResults") // This never gets printed, meaning channel never closed...
 				if completedCount > 0 || failedCount > 0 {
 					err := p.stateManager.Complete(ctx, jobID)
 					// TODO: proper error state handling. should be persisted in the db... maybe return ?
