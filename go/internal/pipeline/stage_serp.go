@@ -11,23 +11,20 @@ import (
 )
 
 type SerpStage struct {
-	webSearcher         services.WebSearcher
-	stateManager        *state.StateManager
-	queryBuilderFactory *services.QueryBuilderFactory
-	workerCount         int
+	webSearcher  services.WebSearcher
+	stateManager *state.StateManager
+	workerCount  int
 }
 
 func NewSerpStage(
 	webSearcher services.WebSearcher,
 	stateManager *state.StateManager,
-	queryBuilderFactory *services.QueryBuilderFactory,
 	workerCount int,
 ) *SerpStage {
 	return &SerpStage{
-		webSearcher:         webSearcher,
-		stateManager:        stateManager,
-		workerCount:         workerCount,
-		queryBuilderFactory: queryBuilderFactory,
+		webSearcher:  webSearcher,
+		stateManager: stateManager,
+		workerCount:  workerCount,
 	}
 }
 
