@@ -27,15 +27,22 @@ type WorkOSUser struct {
 }
 
 type JWTVerifier struct {
-	clientID  string
-	keySet    jwk.Set
-	mu        sync.RWMutex
-	lastFetch time.Time
+	clientID    string
+	keySet      jwk.Set
+	mu          sync.RWMutex
+	lastFetch   time.Time
+	debugBypass bool
 }
 
-func NewJWTVerifier(clientID string) (*JWTVerifier, error) {
+func NewJWTVerifier(clientID string, debugBypass bool) (*JWTVerifier, error) {
 	v := &JWTVerifier{
-		clientID: clientID,
+		clientID:    clientID,
+		debugBypass: debugBypass,
+	}
+
+	if debugBypass {
+		log.Printf("DEBUG_AUTH_BYPASS enabled - authentication disabled for development!")
+		return v, nil
 	}
 
 	if err := v.refreshKeySet(); err != nil {
@@ -86,6 +93,20 @@ func (v *JWTVerifier) VerifyToken(tokenString string) (jwt.Token, error) {
 func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Debug bypass: inject a fake user and skip all auth checks
+			if verifier.debugBypass {
+				debugUser := &WorkOSUser{
+					ID:        "debug-user-id",
+					Email:     "debug@localhost",
+					FirstName: "Debug",
+					LastName:  "User",
+				}
+				ctx := context.WithValue(r.Context(), userContextKey, debugUser)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
+			// Normal auth flow
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
 				log.Printf("Missing Authorization header")
