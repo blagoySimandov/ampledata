@@ -53,6 +53,7 @@ func (e *Enricher) GetResults(ctx context.Context, jobID string, offset, limit i
 		results[i] = &models.EnrichmentResult{
 			Key:           row.Key,
 			ExtractedData: row.ExtractedData,
+			Confidence:    row.Confidence,
 			Sources:       sources,
 			Error:         row.Error,
 		}

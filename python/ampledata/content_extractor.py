@@ -8,8 +8,15 @@ from utils import clean_json_md
 
 
 @dataclass
+class FieldConfidence:
+    score: float  # 0.0 to 1.0
+    reason: str   # Brief explanation
+
+
+@dataclass
 class ContentExtractionResult:
     extracted_data: dict[str, Any]
+    confidence: dict[str, FieldConfidence]
     reasoning: str
 
 
@@ -83,6 +90,10 @@ class GroqContentExtractor(IContentExtractor):
 
 Extract ONLY the fields listed above from the website content. Do not extract any other fields.
 
+CRITICAL: NEVER infer, estimate, or make up data. Only extract information that is explicitly stated in the content.
+- If you see "10000+" do NOT convert it to "10001" - use the exact value or omit if uncertain
+- If information is approximate, partial, or unclear, reflect that uncertainty in the confidence score
+
 IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata:
 - For number types: use numeric values without quotes (e.g., 1000)
 - For string types: use quoted strings
@@ -94,19 +105,45 @@ If a field cannot be found in the content, omit it from the response.
 ## Response Format (JSON only, no markdown)
 {{
     "extracted_data": {{"field_name": value_with_correct_type}},
-    "reasoning": "Explanation of what was extracted from the content and how you found each field"
-}}"""
+    "confidence": {{
+        "field_name": {{
+            "score": 0.95,
+            "reason": "Brief 1-sentence explanation"
+        }}
+    }},
+    "reasoning": "Overall extraction summary"
+}}
+
+## Confidence Scoring Guidelines
+- 1.0: Exact match, explicitly stated
+- 0.8-0.9: Clear statement, minor interpretation needed
+- 0.6-0.7: Partial information or context-based inference
+- 0.4-0.5: Significant uncertainty or approximation
+- <0.4: High uncertainty, possibly derived or estimated"""
 
     def _parse_response(self, content: str) -> ContentExtractionResult:
         content = clean_json_md(content)
         try:
             data = json.loads(content)
+
+            # Parse confidence data
+            confidence_dict = {}
+            raw_confidence = data.get("confidence", {})
+            for key, val in raw_confidence.items():
+                if isinstance(val, dict):
+                    confidence_dict[key] = FieldConfidence(
+                        score=val.get("score", 0.0),
+                        reason=val.get("reason", "")
+                    )
+
             return ContentExtractionResult(
                 extracted_data=data.get("extracted_data", {}),
+                confidence=confidence_dict,
                 reasoning=data.get("reasoning", ""),
             )
         except json.JSONDecodeError:
             return ContentExtractionResult(
                 extracted_data={},
+                confidence={},
                 reasoning=f"Failed to parse LLM response: {content[:100]}",
             )
