@@ -34,10 +34,11 @@ type JobListResponse struct {
 }
 
 type EnrichmentResult struct {
-	Key           string                 `json:"key"`
-	ExtractedData map[string]interface{} `json:"extracted_data"`
-	Sources       []string               `json:"sources"`
-	Error         *string                `json:"error,omitempty"`
+	Key           string                          `json:"key"`
+	ExtractedData map[string]interface{}          `json:"extracted_data"`
+	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources       []string                        `json:"sources"`
+	Error         *string                         `json:"error,omitempty"`
 }
 
 type EnrichmentResponse struct {

@@ -76,6 +76,7 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 				}
 				if !hasContent || content == "" {
 					msg.State.ExtractedData = msg.State.Decision.ExtractedData
+					msg.State.Confidence = make(map[string]*models.FieldConfidenceInfo)
 				} else {
 					missingColumns := msg.State.Decision.MissingColumns
 					missingColsMetadata := []*models.ColumnMetadata{}
@@ -103,6 +104,7 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 								extractedFromDecision = make(map[string]interface{})
 							}
 
+							// Merge extracted data
 							merged := make(map[string]interface{})
 							for k, v := range extractedFromDecision {
 								merged[k] = v
@@ -111,11 +113,25 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 								merged[k] = v
 							}
 
+							// Merge confidence data
+							mergedConfidence := make(map[string]*models.FieldConfidenceInfo)
+							if result.Confidence != nil {
+								for k, v := range result.Confidence {
+									mergedConfidence[k] = &models.FieldConfidenceInfo{
+										Score:  v.Score,
+										Reason: v.Reason,
+									}
+								}
+							}
+
 							msg.State.ExtractedData = merged
+							msg.State.Confidence = mergedConfidence
 						}
 					} else {
 						extractedFromDecision := msg.State.Decision.ExtractedData
 						msg.State.ExtractedData = extractedFromDecision
+						// No new confidence data if we're just using decision data
+						msg.State.Confidence = make(map[string]*models.FieldConfidenceInfo)
 					}
 				}
 
@@ -125,6 +141,7 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 
 					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageEnriched, map[string]interface{}{
 						"extracted_data": msg.State.ExtractedData,
+						"confidence":     msg.State.Confidence,
 					})
 				}
 			}
