@@ -49,6 +49,7 @@ func main() {
 	}
 
 	stages := []pipeline.Stage{
+		pipeline.NewPatternStage(patternGenerator, stateManager, cfg.WorkersPerStage),
 		pipeline.NewSerpStage(webSearcher, stateManager, cfg.WorkersPerStage),
 		pipeline.NewDecisionStage(decisionMaker, stateManager, cfg.WorkersPerStage),
 		pipeline.NewCrawlStage(crawler, stateManager, cfg.WorkersPerStage),
@@ -59,7 +60,7 @@ func main() {
 		WorkersPerStage:   cfg.WorkersPerStage,
 		ChannelBufferSize: cfg.ChannelBufferSize,
 	}
-	p := pipeline.NewPipeline(stateManager, stages, pipelineConfig, patternGenerator)
+	p := pipeline.NewPipeline(stateManager, stages, pipelineConfig)
 
 	enr := enricher.NewEnricher(p, stateManager)
 
