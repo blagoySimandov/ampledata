@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
+	"strings"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
@@ -16,7 +16,7 @@ type Activities struct {
 	stateManager       *state.StateManager
 	webSearcher        services.WebSearcher
 	decisionMaker      services.DecisionMaker
-	crawler            services.Crawler
+	crawler            services.WebCrawler
 	contentExtractor   services.ContentExtractor
 	patternGenerator   services.QueryPatternGenerator
 }
@@ -26,7 +26,7 @@ func NewActivities(
 	stateManager *state.StateManager,
 	webSearcher services.WebSearcher,
 	decisionMaker services.DecisionMaker,
-	crawler services.Crawler,
+	crawler services.WebCrawler,
 	contentExtractor services.ContentExtractor,
 	patternGenerator services.QueryPatternGenerator,
 ) *Activities {
@@ -76,6 +76,7 @@ type DecisionOutput struct {
 type CrawlInput struct {
 	JobID           string
 	RowKey          string
+	SerpData        *models.SerpData
 	Decision        *models.Decision
 	ColumnsMetadata []*models.ColumnMetadata
 }
@@ -199,10 +200,18 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 		mergedResults.PeopleAlsoAsk = append(mergedResults.PeopleAlsoAsk, input.SerpData.Results[i].PeopleAlsoAsk...)
 	}
 
-	// Use decision maker to analyze results
-	decision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.ColumnsMetadata, input.RowKey)
+	// Use decision maker to analyze results (max 3 URLs)
+	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("decision making failed: %w", err)
+	}
+
+	// Convert services.CrawlDecision to models.Decision
+	decision := &models.Decision{
+		URLsToCrawl:    crawlDecision.URLsToCrawl,
+		ExtractedData:  crawlDecision.ExtractedData,
+		Reasoning:      crawlDecision.Reasoning,
+		MissingColumns: crawlDecision.MissingColumns,
 	}
 
 	log.Printf("[Activity] Decision made for job %s, row %s: %d URLs to crawl, %d missing columns",
@@ -232,8 +241,14 @@ func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput,
 		}, nil
 	}
 
+	// Build query string from SERP queries
+	query := ""
+	if input.SerpData != nil && len(input.SerpData.Queries) > 0 {
+		query = strings.Join(input.SerpData.Queries, " ")
+	}
+
 	// Crawl the URLs
-	content, err := a.crawler.Crawl(ctx, input.Decision.URLsToCrawl)
+	content, err := a.crawler.Crawl(ctx, input.Decision.URLsToCrawl, query)
 	if err != nil {
 		return nil, fmt.Errorf("crawling failed: %w", err)
 	}
@@ -260,17 +275,44 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 
 	// If we have crawled content, extract from it
 	if input.CrawlResults != nil && input.CrawlResults.Content != nil && *input.CrawlResults.Content != "" {
-		extracted, conf, err := a.contentExtractor.ExtractContent(
-			ctx,
-			*input.CrawlResults.Content,
-			input.Decision.MissingColumns,
-			input.ColumnsMetadata,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("content extraction failed: %w", err)
+		// Build metadata for missing columns
+		missingColsMetadata := []*models.ColumnMetadata{}
+		for _, colName := range input.Decision.MissingColumns {
+			for _, col := range input.ColumnsMetadata {
+				if col.Name == colName {
+					missingColsMetadata = append(missingColsMetadata, col)
+					break
+				}
+			}
 		}
-		extractedData = extracted
-		confidence = conf
+
+		if len(missingColsMetadata) > 0 {
+			result, err := a.contentExtractor.Extract(
+				ctx,
+				*input.CrawlResults.Content,
+				input.RowKey,
+				missingColsMetadata,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("content extraction failed: %w", err)
+			}
+
+			extractedData = result.ExtractedData
+
+			// Convert services.FieldConfidence to models.FieldConfidenceInfo
+			confidence = make(map[string]*models.FieldConfidenceInfo)
+			if result.Confidence != nil {
+				for k, v := range result.Confidence {
+					confidence[k] = &models.FieldConfidenceInfo{
+						Score:  v.Score,
+						Reason: v.Reason,
+					}
+				}
+			}
+		} else {
+			extractedData = make(map[string]interface{})
+			confidence = make(map[string]*models.FieldConfidenceInfo)
+		}
 	} else {
 		// No crawled content, use only decision stage data
 		extractedData = make(map[string]interface{})

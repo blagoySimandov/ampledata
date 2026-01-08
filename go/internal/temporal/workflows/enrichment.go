@@ -147,6 +147,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	err = workflow.ExecuteActivity(ctx, "Crawl", activities.CrawlInput{
 		JobID:           input.JobID,
 		RowKey:          input.RowKey,
+		SerpData:        serpOutput.SerpData,
 		Decision:        decisionOutput.Decision,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &crawlOutput)
