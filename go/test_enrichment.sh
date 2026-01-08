@@ -32,7 +32,7 @@ SIGNED_URL_RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/enrichment-signed-url" \
     \"contentType\": \"text/csv\",
     \"length\": $CSV_SIZE
   }")
-
+echo "$SIGNED_URL_RESPONSE"
 echo "$SIGNED_URL_RESPONSE" | jq .
 SIGNED_URL=$(echo "$SIGNED_URL_RESPONSE" | jq -r '.url')
 JOB_ID=$(echo "$SIGNED_URL_RESPONSE" | jq -r '.jobId')

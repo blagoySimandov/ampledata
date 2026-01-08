@@ -1,0 +1,2 @@
+ALTER TABLE row_states
+ADD COLUMN IF NOT EXISTS confidence JSONB;

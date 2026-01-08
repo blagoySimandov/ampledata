@@ -29,8 +29,13 @@ func (m *StateManager) GenerateJobID() string {
 }
 
 func (m *StateManager) InitializeJob(ctx context.Context, jobID string, rowKeys []string) error {
-	if err := m.store.CreateJob(ctx, jobID, len(rowKeys), models.JobStatusRunning); err != nil {
-		return fmt.Errorf("failed to create job: %w", err)
+	job, err := m.store.GetJob(ctx, jobID)
+	if err != nil {
+		return fmt.Errorf("job not found: %w", err)
+	}
+
+	if job.Status != models.JobStatusRunning {
+		return fmt.Errorf("job %s is not in RUNNING status, current status: %s", jobID, job.Status)
 	}
 
 	if err := m.store.BulkCreateRows(ctx, jobID, rowKeys); err != nil {
