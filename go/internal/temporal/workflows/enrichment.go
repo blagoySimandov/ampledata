@@ -59,8 +59,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}
 
 	// Stage 1: SERP Fetch
-	logger.Info("Stage 1: SERP Fetch", "rowKey", input.RowKey)
-
 	var serpOutput activities.SerpFetchOutput
 	err := workflow.ExecuteActivity(ctx, "SerpFetch", activities.SerpFetchInput{
 		JobID:           input.JobID,
@@ -99,8 +97,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}
 
 	// Stage 2: Decision Making
-	logger.Info("Stage 2: Decision Making", "rowKey", input.RowKey)
-
 	var decisionOutput activities.DecisionOutput
 	err = workflow.ExecuteActivity(ctx, "MakeDecision", activities.DecisionInput{
 		JobID:           input.JobID,
@@ -138,8 +134,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}
 
 	// Stage 3: Crawl (if needed)
-	logger.Info("Stage 3: Crawl", "rowKey", input.RowKey, "urlsToCrawl", len(decisionOutput.Decision.URLsToCrawl))
-
 	var crawlOutput activities.CrawlOutput
 	err = workflow.ExecuteActivity(ctx, "Crawl", activities.CrawlInput{
 		JobID:           input.JobID,
@@ -178,8 +172,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}
 
 	// Stage 4: Extract
-	logger.Info("Stage 4: Extract", "rowKey", input.RowKey)
-
 	var extractOutput activities.ExtractOutput
 	err = workflow.ExecuteActivity(ctx, "Extract", activities.ExtractInput{
 		JobID:           input.JobID,
@@ -225,8 +217,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	output.Success = true
 
 	// Stage 5: Feedback Analysis (for future feedback loop support)
-	logger.Info("Stage 5: Feedback Analysis", "rowKey", input.RowKey)
-
 	var feedbackOutput activities.FeedbackAnalysisOutput
 	err = workflow.ExecuteActivity(ctx, "AnalyzeFeedback", activities.FeedbackAnalysisInput{
 		JobID:           input.JobID,

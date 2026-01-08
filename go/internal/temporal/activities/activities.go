@@ -126,8 +126,6 @@ type FeedbackAnalysisOutput struct {
 
 // GeneratePatterns generates query patterns for the enrichment job
 func (a *Activities) GeneratePatterns(ctx context.Context, input GeneratePatternsInput) (*GeneratePatternsOutput, error) {
-	log.Printf("[Activity] Generating patterns for job %s", input.JobID)
-
 	patterns, err := a.patternGenerator.GeneratePatterns(ctx, input.ColumnsMetadata)
 	if err != nil {
 		log.Printf("Warning: pattern generation failed: %v. Using fallback patterns.", err)
@@ -144,8 +142,6 @@ func (a *Activities) GeneratePatterns(ctx context.Context, input GeneratePattern
 
 // SerpFetch performs web search for a row
 func (a *Activities) SerpFetch(ctx context.Context, input SerpFetchInput) (*SerpFetchOutput, error) {
-	log.Printf("[Activity] SERP fetch for job %s, row %s", input.JobID, input.RowKey)
-
 	// Build queries from patterns
 	queryBuilder := services.NewPatternQueryBuilder(input.QueryPatterns, input.ColumnsMetadata)
 	queries := queryBuilder.Build(input.RowKey)
@@ -184,8 +180,6 @@ func (a *Activities) SerpFetch(ctx context.Context, input SerpFetchInput) (*Serp
 
 // MakeDecision analyzes SERP results and decides what to crawl
 func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*DecisionOutput, error) {
-	log.Printf("[Activity] Making decision for job %s, row %s", input.JobID, input.RowKey)
-
 	if input.SerpData == nil || len(input.SerpData.Results) == 0 {
 		return nil, fmt.Errorf("no SERP data available for decision making")
 	}
@@ -224,8 +218,6 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 
 // Crawl fetches content from selected URLs
 func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput, error) {
-	log.Printf("[Activity] Crawling for job %s, row %s", input.JobID, input.RowKey)
-
 	if input.Decision == nil {
 		return nil, fmt.Errorf("no decision data available for crawling")
 	}
@@ -268,8 +260,6 @@ func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput,
 
 // Extract extracts structured data from crawled content
 func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractOutput, error) {
-	log.Printf("[Activity] Extracting data for job %s, row %s", input.JobID, input.RowKey)
-
 	var extractedData map[string]interface{}
 	var confidence map[string]*models.FieldConfidenceInfo
 
@@ -346,8 +336,6 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 
 // UpdateState updates the row state in the database
 func (a *Activities) UpdateState(ctx context.Context, input StateUpdateInput) error {
-	log.Printf("[Activity] Updating state for job %s, row %s to %s", input.JobID, input.RowKey, input.Stage)
-
 	err := a.stateManager.Transition(ctx, input.JobID, input.RowKey, input.Stage, input.Data)
 	if err != nil {
 		return fmt.Errorf("state transition failed: %w", err)
@@ -359,8 +347,6 @@ func (a *Activities) UpdateState(ctx context.Context, input StateUpdateInput) er
 // AnalyzeFeedback analyzes the enrichment results to determine if feedback is needed
 // This supports the future feedback loop capability
 func (a *Activities) AnalyzeFeedback(ctx context.Context, input FeedbackAnalysisInput) (*FeedbackAnalysisOutput, error) {
-	log.Printf("[Activity] Analyzing feedback for job %s, row %s", input.JobID, input.RowKey)
-
 	output := &FeedbackAnalysisOutput{
 		NeedsFeedback:        false,
 		LowConfidenceColumns: []string{},
