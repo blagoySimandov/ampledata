@@ -71,7 +71,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		logger.Error("SERP fetch failed", "error", err)
 
 		// Update state to failed
-		_ = workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
+		stateErr := workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
 			RowKey: input.RowKey,
 			Stage:  models.StageFailed,
@@ -79,6 +79,9 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 				"error": output.Error,
 			},
 		}).Get(ctx, nil)
+		if stateErr != nil {
+			logger.Error("Failed to update state to FAILED after SERP error", "stateError", stateErr, "originalError", err)
+		}
 
 		return output, nil
 	}
@@ -108,7 +111,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
 		logger.Error("Decision making failed", "error", err)
 
-		_ = workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
+		stateErr := workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
 			RowKey: input.RowKey,
 			Stage:  models.StageFailed,
@@ -116,6 +119,9 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 				"error": output.Error,
 			},
 		}).Get(ctx, nil)
+		if stateErr != nil {
+			logger.Error("Failed to update state to FAILED after decision error", "stateError", stateErr, "originalError", err)
+		}
 
 		return output, nil
 	}
@@ -146,7 +152,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		output.Error = fmt.Sprintf("Crawling failed: %v", err)
 		logger.Error("Crawling failed", "error", err)
 
-		_ = workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
+		stateErr := workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
 			RowKey: input.RowKey,
 			Stage:  models.StageFailed,
@@ -154,6 +160,9 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 				"error": output.Error,
 			},
 		}).Get(ctx, nil)
+		if stateErr != nil {
+			logger.Error("Failed to update state to FAILED after crawl error", "stateError", stateErr, "originalError", err)
+		}
 
 		return output, nil
 	}
@@ -184,7 +193,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		output.Error = fmt.Sprintf("Extraction failed: %v", err)
 		logger.Error("Extraction failed", "error", err)
 
-		_ = workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
+		stateErr := workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
 			RowKey: input.RowKey,
 			Stage:  models.StageFailed,
@@ -192,6 +201,9 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 				"error": output.Error,
 			},
 		}).Get(ctx, nil)
+		if stateErr != nil {
+			logger.Error("Failed to update state to FAILED after extraction error", "stateError", stateErr, "originalError", err)
+		}
 
 		return output, nil
 	}
