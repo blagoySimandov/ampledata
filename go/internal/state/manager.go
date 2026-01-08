@@ -29,10 +29,6 @@ func (m *StateManager) GenerateJobID() string {
 }
 
 func (m *StateManager) InitializeJob(ctx context.Context, jobID string, rowKeys []string) error {
-	if err := m.store.CreateJob(ctx, jobID, len(rowKeys), models.JobStatusRunning); err != nil {
-		return fmt.Errorf("failed to create job: %w", err)
-	}
-
 	if err := m.store.BulkCreateRows(ctx, jobID, rowKeys); err != nil {
 		return fmt.Errorf("failed to create rows: %w", err)
 	}
