@@ -14,13 +14,20 @@ import (
 type StateManager struct {
 	store       Store
 	cancelFuncs map[string]context.CancelFunc
+	workflowIDs map[string]workflowIDPair // jobID -> workflow ID and run ID
 	mu          sync.RWMutex
+}
+
+type workflowIDPair struct {
+	WorkflowID string
+	RunID      string
 }
 
 func NewStateManager(store Store) *StateManager {
 	return &StateManager{
 		store:       store,
 		cancelFuncs: make(map[string]context.CancelFunc),
+		workflowIDs: make(map[string]workflowIDPair),
 	}
 }
 
@@ -49,6 +56,24 @@ func (m *StateManager) RegisterCancelFunc(jobID string, cancel context.CancelFun
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cancelFuncs[jobID] = cancel
+}
+
+func (m *StateManager) RegisterWorkflowID(jobID, workflowID, runID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.workflowIDs[jobID] = workflowIDPair{
+		WorkflowID: workflowID,
+		RunID:      runID,
+	}
+}
+
+func (m *StateManager) GetWorkflowID(jobID string) (string, string) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if pair, ok := m.workflowIDs[jobID]; ok {
+		return pair.WorkflowID, pair.RunID
+	}
+	return "", ""
 }
 
 func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStage models.RowStage, dataUpdate map[string]interface{}) error {
@@ -100,6 +125,11 @@ func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStag
 		if extractedData, ok := dataUpdate["extracted_data"]; ok {
 			if data, ok := extractedData.(map[string]interface{}); ok {
 				state.ExtractedData = data
+			}
+		}
+		if confidence, ok := dataUpdate["confidence"]; ok {
+			if data, ok := confidence.(map[string]*models.FieldConfidenceInfo); ok {
+				state.Confidence = data
 			}
 		}
 		if errMsg, ok := dataUpdate["error"]; ok {

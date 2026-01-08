@@ -14,9 +14,11 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
-	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
+	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
+	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
+	"github.com/blagoySimandov/ampledata/go/internal/temporal/worker"
 )
 
 func main() {
@@ -48,20 +50,37 @@ func main() {
 		log.Fatalf("Failed to create Gemini content extractor: %v", err)
 	}
 
-	stages := []pipeline.Stage{
-		pipeline.NewSerpStage(webSearcher, stateManager, cfg.WorkersPerStage),
-		pipeline.NewDecisionStage(decisionMaker, stateManager, cfg.WorkersPerStage),
-		pipeline.NewCrawlStage(crawler, stateManager, cfg.WorkersPerStage),
-		pipeline.NewExtractStage(extractor, stateManager, cfg.WorkersPerStage),
+	// Create Temporal client
+	log.Printf("Connecting to Temporal at %s", cfg.TemporalHostPort)
+	tc, err := temporalClient.NewClient(cfg.TemporalHostPort, cfg.TemporalNamespace)
+	if err != nil {
+		log.Fatalf("Failed to create Temporal client: %v", err)
 	}
+	defer tc.Close()
+	log.Println("Connected to Temporal successfully")
 
-	pipelineConfig := &pipeline.PipelineConfig{
-		WorkersPerStage:   cfg.WorkersPerStage,
-		ChannelBufferSize: cfg.ChannelBufferSize,
+	// Create activities with all dependencies
+	acts := activities.NewActivities(
+		stateManager,
+		webSearcher,
+		decisionMaker,
+		crawler,
+		extractor,
+		patternGenerator,
+	)
+
+	// Create and start Temporal worker
+	log.Printf("Starting Temporal worker on task queue: %s", cfg.TemporalTaskQueue)
+	w := worker.NewWorker(tc, cfg.TemporalTaskQueue, acts)
+	err = w.Start()
+	if err != nil {
+		log.Fatalf("Failed to start Temporal worker: %v", err)
 	}
-	p := pipeline.NewPipeline(stateManager, stages, pipelineConfig, patternGenerator)
+	defer w.Stop()
+	log.Println("Temporal worker started successfully")
 
-	enr := enricher.NewEnricher(p, stateManager)
+	// Create Temporal-based enricher
+	enr := enricher.NewTemporalEnricher(tc, stateManager, cfg.TemporalTaskQueue)
 
 	jwtVerifier, err := auth.NewJWTVerifier(cfg.WorkOSClientID, cfg.DebugAuthBypass)
 	if err != nil {
