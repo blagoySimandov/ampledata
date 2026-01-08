@@ -74,8 +74,18 @@ func (s *PatternStage) processMessage(ctx context.Context, workerID int, msg Mes
 		Str("rowKey", msg.RowKey).
 		Msg("Processing message")
 
-	// Generate query patterns from column metadata
-	patterns, err := s.patternGenerator.GeneratePatterns(ctx, msg.ColumnsMetadata)
+	isRetry := msg.Feedback != nil && msg.Feedback.IsRetry()
+	if isRetry {
+		log.Debug().
+			Str("stage", s.Name()).
+			Str("jobID", msg.JobID).
+			Str("rowKey", msg.RowKey).
+			Int("attemptNumber", msg.Feedback.AttemptNumber).
+			Strs("focusColumns", msg.Feedback.FocusColumns).
+			Msg("Generating patterns with feedback for retry")
+	}
+
+	patterns, err := s.patternGenerator.GeneratePatternsWithFeedback(ctx, msg.ColumnsMetadata, msg.Feedback)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -89,7 +99,6 @@ func (s *PatternStage) processMessage(ctx context.Context, workerID int, msg Mes
 		return
 	}
 
-	// Add patterns to message
 	msg.QueryPatterns = patterns
 
 	log.Debug().
@@ -99,8 +108,8 @@ func (s *PatternStage) processMessage(ctx context.Context, workerID int, msg Mes
 		Str("rowKey", msg.RowKey).
 		Int("numPatterns", len(patterns)).
 		Strs("patterns", patterns).
+		Bool("isRetry", isRetry).
 		Msg("Generated query patterns")
 
-	// Pass message to next stage
 	outChan <- msg
 }

@@ -17,6 +17,11 @@ type Config struct {
 	WorkersPerStage   int
 	ChannelBufferSize int
 	DebugAuthBypass   bool
+
+	RetryEnabled             bool
+	RetryMaxAttempts         int
+	RetryConfidenceThreshold float64
+	RetryRequireImprovement  bool
 }
 
 func Load() *Config {
@@ -32,6 +37,11 @@ func Load() *Config {
 		WorkersPerStage:   getEnvInt("WORKERS_PER_STAGE", 5),
 		ChannelBufferSize: getEnvInt("CHANNEL_BUFFER_SIZE", 100),
 		DebugAuthBypass:   getEnvBool("DEBUG_AUTH_BYPASS", false),
+
+		RetryEnabled:             getEnvBool("RETRY_ENABLED", true),
+		RetryMaxAttempts:         getEnvInt("RETRY_MAX_ATTEMPTS", 2),
+		RetryConfidenceThreshold: getEnvFloat("RETRY_CONFIDENCE_THRESHOLD", 0.6),
+		RetryRequireImprovement:  getEnvBool("RETRY_REQUIRE_IMPROVEMENT", true),
 	}
 }
 
@@ -55,6 +65,15 @@ func getEnvBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
 		if boolValue, err := strconv.ParseBool(value); err == nil {
 			return boolValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
+			return floatValue
 		}
 	}
 	return defaultValue

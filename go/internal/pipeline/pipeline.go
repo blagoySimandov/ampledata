@@ -29,6 +29,10 @@ func NewPipeline(manager *state.StateManager, stages []Stage, config *PipelineCo
 	}
 }
 
+func (p *Pipeline) Stages() []Stage {
+	return p.stages
+}
+
 func (p *Pipeline) Run(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
 	if err := p.stateManager.InitializeJob(ctx, jobID, rowKeys); err != nil {
 		return err

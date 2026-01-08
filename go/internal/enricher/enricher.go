@@ -4,18 +4,21 @@ import (
 	"context"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
 
+type EnrichmentRunner interface {
+	Run(ctx context.Context, jobID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error
+}
+
 type Enricher struct {
-	pipeline     *pipeline.Pipeline
+	runner       EnrichmentRunner
 	stateManager *state.StateManager
 }
 
-func NewEnricher(p *pipeline.Pipeline, stateManager *state.StateManager) *Enricher {
+func NewEnricher(runner EnrichmentRunner, stateManager *state.StateManager) *Enricher {
 	return &Enricher{
-		pipeline:     p,
+		runner:       runner,
 		stateManager: stateManager,
 	}
 }
@@ -26,7 +29,7 @@ func (e *Enricher) Enrich(ctx context.Context, jobID string, rowKeys []string, c
 
 	e.stateManager.RegisterCancelFunc(jobID, cancel)
 
-	return e.pipeline.Run(jobCtx, jobID, rowKeys, columnsMetadata)
+	return e.runner.Run(jobCtx, jobID, rowKeys, columnsMetadata)
 }
 
 func (e *Enricher) GetProgress(ctx context.Context, jobID string) (*models.JobProgress, error) {

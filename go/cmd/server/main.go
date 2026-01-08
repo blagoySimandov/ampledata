@@ -11,9 +11,11 @@ import (
 
 	"github.com/blagoySimandov/ampledata/go/internal/api"
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
+	"github.com/blagoySimandov/ampledata/go/internal/cache"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
+	"github.com/blagoySimandov/ampledata/go/internal/orchestrator"
 	"github.com/blagoySimandov/ampledata/go/internal/pipeline"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
@@ -36,10 +38,12 @@ func main() {
 
 	stateManager := state.NewStateManager(store)
 
-	patternGenerator, err := services.NewGeminiPatternGenerator(cfg.GeminiAPIKey)
+	basePatternGenerator, err := services.NewGeminiPatternGenerator(cfg.GeminiAPIKey)
 	if err != nil {
 		log.Fatalf("Failed to create Gemini pattern generator: %v", err)
 	}
+	patternCache := cache.NewInMemoryPatternCache()
+	patternGenerator := services.NewCachedPatternGenerator(basePatternGenerator, patternCache)
 	webSearcher := services.NewSerperClient(cfg.SerperAPIKey)
 	decisionMaker := services.NewGroqDecisionMaker(cfg.GroqAPIKey)
 	crawler := services.NewCrawl4aiClient(cfg.Crawl4aiURL)
@@ -62,7 +66,28 @@ func main() {
 	}
 	p := pipeline.NewPipeline(stateManager, stages, pipelineConfig)
 
-	enr := enricher.NewEnricher(p, stateManager)
+	var runner enricher.EnrichmentRunner
+	if cfg.RetryEnabled {
+		log.Printf("Retry enabled: maxAttempts=%d, confidenceThreshold=%.2f",
+			cfg.RetryMaxAttempts, cfg.RetryConfidenceThreshold)
+
+		retryPolicy := orchestrator.NewDefaultRetryPolicy(orchestrator.RetryPolicyConfig{
+			MaxRetries:         cfg.RetryMaxAttempts,
+			Threshold:          cfg.RetryConfidenceThreshold,
+			RequireImprovement: cfg.RetryRequireImprovement,
+		})
+
+		runner = orchestrator.NewRetryOrchestrator(orchestrator.OrchestratorConfig{
+			Pipeline:       p,
+			StateManager:   stateManager,
+			Policy:         retryPolicy,
+			PipelineConfig: pipelineConfig,
+		})
+	} else {
+		runner = p
+	}
+
+	enr := enricher.NewEnricher(runner, stateManager)
 
 	jwtVerifier, err := auth.NewJWTVerifier(cfg.WorkOSClientID, cfg.DebugAuthBypass)
 	if err != nil {

@@ -61,6 +61,15 @@ func (s *SerpStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan Me
 				return
 			}
 
+			if msg.Error != nil {
+				select {
+				case out <- msg:
+				case <-ctx.Done():
+					return
+				}
+				continue
+			}
+
 			queryBuilder := services.NewPatternQueryBuilder(msg.QueryPatterns, msg.ColumnsMetadata)
 			queries := queryBuilder.Build(msg.RowKey)
 

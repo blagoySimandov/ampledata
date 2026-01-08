@@ -10,12 +10,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/feedback"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"google.golang.org/genai"
 )
 
 type QueryPatternGenerator interface {
 	GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error)
+	GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, fb *feedback.EnrichmentFeedback) ([]string, error)
 }
 
 type GeminiPatternGenerator struct {
@@ -36,7 +38,11 @@ func NewGeminiPatternGenerator(apiKey string) (*GeminiPatternGenerator, error) {
 }
 
 func (g *GeminiPatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
-	prompt := g.buildPrompt(columnsMetadata)
+	return g.GeneratePatternsWithFeedback(ctx, columnsMetadata, nil)
+}
+
+func (g *GeminiPatternGenerator) GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, fb *feedback.EnrichmentFeedback) ([]string, error) {
+	prompt := g.buildPromptWithFeedback(columnsMetadata, fb)
 
 	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
 	if err != nil {
@@ -101,6 +107,52 @@ Output: [
 Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText)
 }
 
+func (g *GeminiPatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.ColumnMetadata, fb *feedback.EnrichmentFeedback) string {
+	basePrompt := g.buildPrompt(columnsMetadata)
+
+	if fb == nil || !fb.IsRetry() {
+		return basePrompt
+	}
+
+	var feedbackSection strings.Builder
+
+	feedbackSection.WriteString(fmt.Sprintf("\n\n[IMPORTANT: THIS IS RETRY ATTEMPT %d]\n\n", fb.AttemptNumber))
+
+	if len(fb.FocusColumns) > 0 {
+		feedbackSection.WriteString(fmt.Sprintf("PRIORITY: Focus on finding data for these columns that had low confidence: %s\n\n", strings.Join(fb.FocusColumns, ", ")))
+	}
+
+	if len(fb.AvoidPatterns) > 0 {
+		feedbackSection.WriteString("PREVIOUS PATTERNS THAT DID NOT WORK WELL:\n")
+		for _, p := range fb.AvoidPatterns {
+			feedbackSection.WriteString(fmt.Sprintf("- %s\n", p))
+		}
+		feedbackSection.WriteString("\nGenerate DIFFERENT patterns that might yield better results.\n")
+	}
+
+	if len(fb.PreviousAttempts) > 0 {
+		feedbackSection.WriteString("\nPREVIOUS ATTEMPT RESULTS:\n")
+		for _, attempt := range fb.PreviousAttempts {
+			if len(attempt.WeakColumns) > 0 {
+				weakNames := make([]string, len(attempt.WeakColumns))
+				for i, wc := range attempt.WeakColumns {
+					weakNames[i] = fmt.Sprintf("%s (conf: %.2f)", wc.Name, wc.Confidence)
+				}
+				feedbackSection.WriteString(fmt.Sprintf("- Attempt %d: Low confidence on: %s\n", attempt.Number, strings.Join(weakNames, ", ")))
+			}
+		}
+	}
+
+	if len(fb.Hints) > 0 {
+		feedbackSection.WriteString("\nSUGGESTIONS:\n")
+		for _, hint := range fb.Hints {
+			feedbackSection.WriteString(fmt.Sprintf("- %s\n", hint))
+		}
+	}
+
+	return basePrompt + feedbackSection.String()
+}
+
 func (g *GeminiPatternGenerator) parseResponse(content string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	content = cleanJSONMarkdown(content)
 	content = strings.TrimSpace(content)
@@ -148,9 +200,13 @@ func NewGroqPatternGenerator(apiKey string) *GroqPatternGenerator {
 }
 
 func (g *GroqPatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
-	prompt := g.buildPrompt(columnsMetadata)
+	return g.GeneratePatternsWithFeedback(ctx, columnsMetadata, nil)
+}
 
-	reqBody := map[string]interface{}{
+func (g *GroqPatternGenerator) GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, fb *feedback.EnrichmentFeedback) ([]string, error) {
+	prompt := g.buildPromptWithFeedback(columnsMetadata, fb)
+
+	reqBody := map[string]any{
 		"model": g.model,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
@@ -248,6 +304,52 @@ Output: [
 ]
 
 Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText)
+}
+
+func (g *GroqPatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.ColumnMetadata, fb *feedback.EnrichmentFeedback) string {
+	basePrompt := g.buildPrompt(columnsMetadata)
+
+	if fb == nil || !fb.IsRetry() {
+		return basePrompt
+	}
+
+	var feedbackSection strings.Builder
+
+	feedbackSection.WriteString(fmt.Sprintf("\n\n[IMPORTANT: THIS IS RETRY ATTEMPT %d]\n\n", fb.AttemptNumber))
+
+	if len(fb.FocusColumns) > 0 {
+		feedbackSection.WriteString(fmt.Sprintf("PRIORITY: Focus on finding data for these columns that had low confidence: %s\n\n", strings.Join(fb.FocusColumns, ", ")))
+	}
+
+	if len(fb.AvoidPatterns) > 0 {
+		feedbackSection.WriteString("PREVIOUS PATTERNS THAT DID NOT WORK WELL:\n")
+		for _, p := range fb.AvoidPatterns {
+			feedbackSection.WriteString(fmt.Sprintf("- %s\n", p))
+		}
+		feedbackSection.WriteString("\nGenerate DIFFERENT patterns that might yield better results.\n")
+	}
+
+	if len(fb.PreviousAttempts) > 0 {
+		feedbackSection.WriteString("\nPREVIOUS ATTEMPT RESULTS:\n")
+		for _, attempt := range fb.PreviousAttempts {
+			if len(attempt.WeakColumns) > 0 {
+				weakNames := make([]string, len(attempt.WeakColumns))
+				for i, wc := range attempt.WeakColumns {
+					weakNames[i] = fmt.Sprintf("%s (conf: %.2f)", wc.Name, wc.Confidence)
+				}
+				feedbackSection.WriteString(fmt.Sprintf("- Attempt %d: Low confidence on: %s\n", attempt.Number, strings.Join(weakNames, ", ")))
+			}
+		}
+	}
+
+	if len(fb.Hints) > 0 {
+		feedbackSection.WriteString("\nSUGGESTIONS:\n")
+		for _, hint := range fb.Hints {
+			feedbackSection.WriteString(fmt.Sprintf("- %s\n", hint))
+		}
+	}
+
+	return basePrompt + feedbackSection.String()
 }
 
 func (g *GroqPatternGenerator) parseResponse(content string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {

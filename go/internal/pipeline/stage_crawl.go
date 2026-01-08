@@ -63,6 +63,15 @@ func (s *CrawlStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan M
 				return
 			}
 
+			if msg.Error != nil {
+				select {
+				case out <- msg:
+				case <-ctx.Done():
+					return
+				}
+				continue
+			}
+
 			if msg.State.Decision == nil || msg.State.SerpData == nil {
 				errStr := "Missing decision or SERP data"
 				msg.Error = fmt.Errorf(errStr)

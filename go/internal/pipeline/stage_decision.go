@@ -9,6 +9,7 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
+	"github.com/rs/zerolog/log"
 )
 
 type DecisionStage struct {
@@ -101,6 +102,15 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 				return
 			}
 
+			if msg.Error != nil {
+				select {
+				case out <- msg:
+				case <-ctx.Done():
+					return
+				}
+				continue
+			}
+
 			if msg.State.SerpData == nil {
 				errStr := "SERP data is missing"
 				msg.Error = fmt.Errorf(errStr)
@@ -119,12 +129,14 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 				if err != nil {
 					errStr := err.Error()
 					msg.Error = err
-					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]interface{}{
+					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageFailed, map[string]any{
 						"error": errStr,
 					})
 				} else {
+					filteredURLs := s.filterAvoidedURLs(decision.URLsToCrawl, msg)
+
 					msg.State.Decision = &models.Decision{
-						URLsToCrawl:    decision.URLsToCrawl,
+						URLsToCrawl:    filteredURLs,
 						ExtractedData:  decision.ExtractedData,
 						Reasoning:      decision.Reasoning,
 						MissingColumns: decision.MissingColumns,
@@ -132,7 +144,7 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 					msg.State.Stage = models.StageDecisionMade
 					msg.State.UpdatedAt = time.Now()
 
-					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageDecisionMade, map[string]interface{}{
+					s.stateManager.Transition(ctx, msg.JobID, msg.RowKey, models.StageDecisionMade, map[string]any{
 						"decision": msg.State.Decision,
 					})
 				}
@@ -145,4 +157,31 @@ func (s *DecisionStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-cha
 			}
 		}
 	}
+}
+
+func (s *DecisionStage) filterAvoidedURLs(urls []string, msg Message) []string {
+	if msg.Feedback == nil || len(msg.Feedback.AvoidURLs) == 0 {
+		return urls
+	}
+
+	avoidSet := make(map[string]struct{})
+	for _, u := range msg.Feedback.AvoidURLs {
+		avoidSet[u] = struct{}{}
+	}
+
+	filtered := make([]string, 0, len(urls))
+	for _, u := range urls {
+		if _, avoid := avoidSet[u]; !avoid {
+			filtered = append(filtered, u)
+		} else {
+			log.Debug().
+				Str("stage", s.Name()).
+				Str("jobID", msg.JobID).
+				Str("rowKey", msg.RowKey).
+				Str("url", u).
+				Msg("Filtering out previously crawled URL")
+		}
+	}
+
+	return filtered
 }

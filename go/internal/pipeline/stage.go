@@ -3,6 +3,7 @@ package pipeline
 import (
 	"context"
 
+	"github.com/blagoySimandov/ampledata/go/internal/feedback"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 )
 
@@ -12,6 +13,7 @@ type Message struct {
 	State           *models.RowState
 	ColumnsMetadata []*models.ColumnMetadata
 	QueryPatterns   []string
+	Feedback        *feedback.EnrichmentFeedback
 	Error           error
 }
 

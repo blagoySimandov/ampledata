@@ -62,6 +62,15 @@ func (s *ExtractStage) worker(ctx context.Context, wg *sync.WaitGroup, in <-chan
 				return
 			}
 
+			if msg.Error != nil {
+				select {
+				case out <- msg:
+				case <-ctx.Done():
+					return
+				}
+				continue
+			}
+
 			if msg.State.Decision == nil || msg.State.CrawlResults == nil {
 				errStr := "Missing decision or crawl results"
 				msg.Error = fmt.Errorf(errStr)
