@@ -16,8 +16,8 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
-	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
+	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/worker"
 )
 

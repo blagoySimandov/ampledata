@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -20,11 +22,11 @@ type JobWorkflowInput struct {
 
 // JobWorkflowOutput contains the overall job result
 type JobWorkflowOutput struct {
-	JobID           string
-	TotalRows       int
-	SuccessfulRows  int
-	FailedRows      int
-	CompletedAt     time.Time
+	JobID          string
+	TotalRows      int
+	SuccessfulRows int
+	FailedRows     int
+	CompletedAt    time.Time
 }
 
 // JobWorkflow orchestrates the enrichment of all rows in a job
@@ -38,7 +40,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 	// Configure activity options
 	activityOptions := workflow.ActivityOptions{
 		StartToCloseTimeout: 1 * time.Minute,
-		RetryPolicy: &workflow.RetryPolicy{
+		RetryPolicy: &temporal.RetryPolicy{
 			InitialInterval:    time.Second,
 			BackoffCoefficient: 2.0,
 			MaximumInterval:    30 * time.Second,
@@ -71,7 +73,6 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 		JobID:           input.JobID,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(activityCtx, &patternsOutput)
-
 	if err != nil {
 		logger.Warn("Pattern generation failed, using fallback", "error", err)
 		// Use fallback pattern
@@ -90,7 +91,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 	childWorkflowOptions := workflow.ChildWorkflowOptions{
 		WorkflowExecutionTimeout: 10 * time.Minute,
 		WorkflowTaskTimeout:      1 * time.Minute,
-		ParentClosePolicy:        workflow.ParentClosePolicyTerminate, // Cancel children if parent is cancelled
+		ParentClosePolicy:        *enumspb.PARENT_CLOSE_POLICY_TERMINATE.Enum(), // Cancel children if parent is cancelled
 	}
 	childCtx := workflow.WithChildOptions(ctx, childWorkflowOptions)
 

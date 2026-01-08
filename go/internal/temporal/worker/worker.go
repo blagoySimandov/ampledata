@@ -3,6 +3,7 @@ package worker
 import (
 	"log"
 
+	activity "go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
@@ -26,31 +27,31 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 
 	// Register activities
 	// We use string names for activities to make them more discoverable and maintainable
-	w.RegisterActivityWithOptions(activities.GeneratePatterns, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.GeneratePatterns, activity.RegisterOptions{
 		Name: "GeneratePatterns",
 	})
-	w.RegisterActivityWithOptions(activities.SerpFetch, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.SerpFetch, activity.RegisterOptions{
 		Name: "SerpFetch",
 	})
-	w.RegisterActivityWithOptions(activities.MakeDecision, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.MakeDecision, activity.RegisterOptions{
 		Name: "MakeDecision",
 	})
-	w.RegisterActivityWithOptions(activities.Crawl, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.Crawl, activity.RegisterOptions{
 		Name: "Crawl",
 	})
-	w.RegisterActivityWithOptions(activities.Extract, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.Extract, activity.RegisterOptions{
 		Name: "Extract",
 	})
-	w.RegisterActivityWithOptions(activities.UpdateState, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.UpdateState, activity.RegisterOptions{
 		Name: "UpdateState",
 	})
-	w.RegisterActivityWithOptions(activities.AnalyzeFeedback, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.AnalyzeFeedback, activity.RegisterOptions{
 		Name: "AnalyzeFeedback",
 	})
-	w.RegisterActivityWithOptions(activities.InitializeJob, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.InitializeJob, activity.RegisterOptions{
 		Name: "InitializeJob",
 	})
-	w.RegisterActivityWithOptions(activities.CompleteJob, worker.ActivityRegistrationOptions{
+	w.RegisterActivityWithOptions(activities.CompleteJob, activity.RegisterOptions{
 		Name: "CompleteJob",
 	})
 

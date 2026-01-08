@@ -18,12 +18,12 @@ import (
 )
 
 type EnrichHandler struct {
-	enricher  *enricher.Enricher
+	enricher  enricher.IEnricher
 	gcsReader *gcs.CSVReader
 	store     state.Store
 }
 
-func NewEnrichHandler(enr *enricher.Enricher, gcsReader *gcs.CSVReader, store state.Store) *EnrichHandler {
+func NewEnrichHandler(enr enricher.IEnricher, gcsReader *gcs.CSVReader, store state.Store) *EnrichHandler {
 	return &EnrichHandler{
 		enricher:  enr,
 		gcsReader: gcsReader,

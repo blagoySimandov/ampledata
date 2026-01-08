@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -21,13 +22,13 @@ type EnrichmentWorkflowInput struct {
 
 // EnrichmentWorkflowOutput contains the enrichment result for a single row
 type EnrichmentWorkflowOutput struct {
-	RowKey          string
-	ExtractedData   map[string]interface{}
-	Confidence      map[string]*models.FieldConfidenceInfo
-	Sources         []string
-	Success         bool
-	Error           string
-	IterationCount  int // Number of feedback iterations
+	RowKey         string
+	ExtractedData  map[string]interface{}
+	Confidence     map[string]*models.FieldConfidenceInfo
+	Sources        []string
+	Success        bool
+	Error          string
+	IterationCount int // Number of feedback iterations
 }
 
 // EnrichmentWorkflow processes a single row through the enrichment pipeline
@@ -42,7 +43,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	// Configure activity options with appropriate timeouts
 	activityOptions := workflow.ActivityOptions{
 		StartToCloseTimeout: 2 * time.Minute,
-		RetryPolicy: &workflow.RetryPolicy{
+		RetryPolicy: &temporal.RetryPolicy{
 			InitialInterval:    time.Second,
 			BackoffCoefficient: 2.0,
 			MaximumInterval:    time.Minute,
@@ -67,7 +68,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		ColumnsMetadata: input.ColumnsMetadata,
 		QueryPatterns:   input.QueryPatterns,
 	}).Get(ctx, &serpOutput)
-
 	if err != nil {
 		output.Error = fmt.Sprintf("SERP fetch failed: %v", err)
 		logger.Error("SERP fetch failed", "error", err)
@@ -94,7 +94,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			"serp_data": serpOutput.SerpData,
 		},
 	}).Get(ctx, nil)
-
 	if err != nil {
 		logger.Warn("Failed to update state after SERP fetch", "error", err)
 	}
@@ -109,7 +108,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		SerpData:        serpOutput.SerpData,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &decisionOutput)
-
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
 		logger.Error("Decision making failed", "error", err)
@@ -135,7 +133,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			"decision": decisionOutput.Decision,
 		},
 	}).Get(ctx, nil)
-
 	if err != nil {
 		logger.Warn("Failed to update state after decision", "error", err)
 	}
@@ -151,7 +148,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Decision:        decisionOutput.Decision,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &crawlOutput)
-
 	if err != nil {
 		output.Error = fmt.Sprintf("Crawling failed: %v", err)
 		logger.Error("Crawling failed", "error", err)
@@ -177,7 +173,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			"crawl_results": crawlOutput.CrawlResults,
 		},
 	}).Get(ctx, nil)
-
 	if err != nil {
 		logger.Warn("Failed to update state after crawl", "error", err)
 	}
@@ -193,7 +188,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		CrawlResults:    crawlOutput.CrawlResults,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &extractOutput)
-
 	if err != nil {
 		output.Error = fmt.Sprintf("Extraction failed: %v", err)
 		logger.Error("Extraction failed", "error", err)
@@ -220,7 +214,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			"confidence":     extractOutput.Confidence,
 		},
 	}).Get(ctx, nil)
-
 	if err != nil {
 		logger.Warn("Failed to update state after extraction", "error", err)
 	}
@@ -274,7 +267,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Stage:  models.StageCompleted,
 		Data:   nil,
 	}).Get(ctx, nil)
-
 	if err != nil {
 		logger.Warn("Failed to update state to completed", "error", err)
 	}
