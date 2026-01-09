@@ -113,13 +113,44 @@ func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStag
 			}
 		}
 		if confidence, ok := dataUpdate["confidence"]; ok {
-			if data, ok := confidence.(map[string]*models.FieldConfidenceInfo); ok {
-				state.Confidence = data
+			// Handle both direct type and JSON-deserialized type
+			switch conf := confidence.(type) {
+			case map[string]*models.FieldConfidenceInfo:
+				state.Confidence = conf
+			case map[string]interface{}:
+				// Convert from JSON-deserialized map[string]interface{}
+				converted := make(map[string]*models.FieldConfidenceInfo)
+				for k, v := range conf {
+					if vMap, ok := v.(map[string]interface{}); ok {
+						score, _ := vMap["score"].(float64)
+						reason, _ := vMap["reason"].(string)
+						converted[k] = &models.FieldConfidenceInfo{
+							Score:  score,
+							Reason: reason,
+						}
+					}
+				}
+				if len(converted) > 0 {
+					state.Confidence = converted
+				}
 			}
 		}
 		if sources, ok := dataUpdate["sources"]; ok {
-			if data, ok := sources.([]string); ok {
-				state.Sources = data
+			// Handle both direct type and JSON-deserialized type
+			switch src := sources.(type) {
+			case []string:
+				state.Sources = src
+			case []interface{}:
+				// Convert from JSON-deserialized []interface{}
+				converted := make([]string, 0, len(src))
+				for _, v := range src {
+					if str, ok := v.(string); ok {
+						converted = append(converted, str)
+					}
+				}
+				if len(converted) > 0 {
+					state.Sources = converted
+				}
 			}
 		}
 		if errMsg, ok := dataUpdate["error"]; ok {
