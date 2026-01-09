@@ -228,7 +228,7 @@ func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput,
 		return &CrawlOutput{
 			CrawlResults: &models.CrawlResults{
 				Content: nil,
-				Sources: []string{},
+				Sources: nil, // Use nil instead of empty slice to avoid storing JSON []
 			},
 		}, nil
 	}
@@ -328,9 +328,20 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 	log.Printf("[Activity] Extraction completed for job %s, row %s: %d fields extracted",
 		input.JobID, input.RowKey, len(extractedData))
 
+	// Return nil for empty maps to avoid storing JSON {} in database
+	var finalExtractedData map[string]interface{}
+	if len(extractedData) > 0 {
+		finalExtractedData = extractedData
+	}
+
+	var finalConfidence map[string]*models.FieldConfidenceInfo
+	if len(confidence) > 0 {
+		finalConfidence = confidence
+	}
+
 	return &ExtractOutput{
-		ExtractedData: extractedData,
-		Confidence:    confidence,
+		ExtractedData: finalExtractedData,
+		Confidence:    finalConfidence,
 	}, nil
 }
 

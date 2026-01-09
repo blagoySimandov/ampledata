@@ -242,18 +242,51 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *models.RowState) error {
 	dbState := models.RowStateFromApp(jobID, state)
 
-	_, err := s.db.NewInsert().
+	// First, try to insert
+	res, err := s.db.NewInsert().
 		Model(dbState).
-		On("CONFLICT (job_id, key) DO UPDATE").
-		Set("stage = EXCLUDED.stage").
-		Set("extracted_data = EXCLUDED.extracted_data").
-		Set("confidence = EXCLUDED.confidence").
-		Set("sources = EXCLUDED.sources").
-		Set("error = EXCLUDED.error").
-		Set("updated_at = EXCLUDED.updated_at").
+		On("CONFLICT (job_id, key) DO NOTHING").
 		Exec(ctx)
+
 	if err != nil {
-		return fmt.Errorf("failed to save row state: %w", err)
+		return fmt.Errorf("failed to insert row state: %w", err)
+	}
+
+	// If no rows were inserted, do an update
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		// Build update query dynamically to only update non-nil fields
+		updateQuery := s.db.NewUpdate().
+			Model(dbState).
+			Where("job_id = ?", jobID).
+			Where("key = ?", state.Key).
+			Set("stage = ?", state.Stage).
+			Set("updated_at = ?", state.UpdatedAt)
+
+		// Only update extracted_data if non-nil and non-empty
+		if state.ExtractedData != nil && len(state.ExtractedData) > 0 {
+			updateQuery = updateQuery.Set("extracted_data = ?", state.ExtractedData)
+		}
+
+		// Only update confidence if non-nil and non-empty
+		if state.Confidence != nil && len(state.Confidence) > 0 {
+			updateQuery = updateQuery.Set("confidence = ?", state.Confidence)
+		}
+
+		// Only update sources if non-nil and non-empty
+		if state.Sources != nil && len(state.Sources) > 0 {
+			updateQuery = updateQuery.Set("sources = ?", state.Sources)
+		}
+
+		// Only update error if non-nil
+		if state.Error != nil {
+			updateQuery = updateQuery.Set("error = ?", state.Error)
+		}
+
+		_, err = updateQuery.Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update row state: %w", err)
+		}
 	}
 
 	return nil

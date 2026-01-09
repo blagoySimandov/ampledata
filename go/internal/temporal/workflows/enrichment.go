@@ -202,16 +202,23 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		return output, nil
 	}
 
-	// Update state: Enriched
+	// Update state: Enriched - only include non-nil/non-empty fields
+	enrichedData := make(map[string]interface{})
+	if extractOutput.ExtractedData != nil && len(extractOutput.ExtractedData) > 0 {
+		enrichedData["extracted_data"] = extractOutput.ExtractedData
+	}
+	if extractOutput.Confidence != nil && len(extractOutput.Confidence) > 0 {
+		enrichedData["confidence"] = extractOutput.Confidence
+	}
+	if crawlOutput.CrawlResults != nil && crawlOutput.CrawlResults.Sources != nil && len(crawlOutput.CrawlResults.Sources) > 0 {
+		enrichedData["sources"] = crawlOutput.CrawlResults.Sources
+	}
+
 	err = workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 		JobID:  input.JobID,
 		RowKey: input.RowKey,
 		Stage:  models.StageEnriched,
-		Data: map[string]interface{}{
-			"extracted_data": extractOutput.ExtractedData,
-			"confidence":     extractOutput.Confidence,
-			"sources":        crawlOutput.CrawlResults.Sources,
-		},
+		Data:   enrichedData,
 	}).Get(ctx, nil)
 	if err != nil {
 		logger.Warn("Failed to update state after extraction", "error", err)
