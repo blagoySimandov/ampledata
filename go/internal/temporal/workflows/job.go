@@ -8,9 +8,9 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
-	"github.com/blagoySimandov/ampledata/go/internal/wideevent"
 )
 
 type JobWorkflowInput struct {
@@ -30,7 +30,7 @@ type JobWorkflowOutput struct {
 
 func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutput, error) {
 	info := workflow.GetInfo(ctx)
-	event := wideevent.NewJobEventContext(input.JobID, "")
+	event := logger.NewJobEvent(input.JobID, "")
 	event.SetWorkflowInfo(info.WorkflowExecution.ID, info.WorkflowExecution.RunID)
 	event.TotalRows = len(input.RowKeys)
 
@@ -66,7 +66,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 	if err != nil {
 		patternsOutput.Patterns = []string{"%entity"}
 	}
-	event.Metadata["pattern_count"] = len(patternsOutput.Patterns)
+	event.SetMetadata("pattern_count", len(patternsOutput.Patterns))
 
 	childWorkflowOptions := workflow.ChildWorkflowOptions{
 		WorkflowExecutionTimeout: 10 * time.Minute,

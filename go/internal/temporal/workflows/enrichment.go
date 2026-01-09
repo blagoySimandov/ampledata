@@ -7,9 +7,9 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
-	"github.com/blagoySimandov/ampledata/go/internal/wideevent"
 )
 
 type EnrichmentWorkflowInput struct {
@@ -32,9 +32,9 @@ type EnrichmentWorkflowOutput struct {
 
 func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*EnrichmentWorkflowOutput, error) {
 	info := workflow.GetInfo(ctx)
-	event := wideevent.NewEnrichmentEventContext(input.JobID, input.RowKey, "")
+	event := logger.NewEnrichmentEvent(input.JobID, input.RowKey, "")
 	event.SetWorkflowInfo(info.WorkflowExecution.ID, info.WorkflowExecution.RunID)
-	event.Metadata["retry_count"] = input.RetryCount
+	event.SetMetadata("retry_count", input.RetryCount)
 
 	activityOptions := workflow.ActivityOptions{
 		StartToCloseTimeout: 2 * time.Minute,
