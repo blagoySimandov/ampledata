@@ -129,5 +129,5 @@ Base your confidence on BOTH information availability AND entity certainty:
 ⚠️  ALWAYS reduce confidence by at least 0.2 when:
 - Information is about a related entity instead of the target entity "%s"
 - Multiple entities are mentioned and target is unclear
-- Source is indirect (third-party descriptions, not primary source)`, entityType, entity, entityType, entity, entityType, entityType, entityType, entityType, columnsText, truncatedContent, entity, entityType)
+- Source is indirect (third-party descriptions, not primary source)`, entityType, entity, entityType, entity, entity, columnsText, truncatedContent, entityType, entity, entity, entity)
 }
