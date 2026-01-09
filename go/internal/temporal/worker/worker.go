@@ -5,7 +5,6 @@ import (
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
-	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/workflows"
 )
@@ -15,9 +14,7 @@ type Worker struct {
 }
 
 func NewWorker(temporalClient client.Client, taskQueue string, activities *activities.Activities) *Worker {
-	w := worker.New(temporalClient, taskQueue, worker.Options{
-		Logger: logger.NewTemporalLogger(),
-	})
+	w := worker.New(temporalClient, taskQueue, worker.Options{})
 
 	// Register workflows
 	w.RegisterWorkflow(workflows.JobWorkflow)
