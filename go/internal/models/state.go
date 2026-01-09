@@ -63,6 +63,13 @@ type FieldConfidenceInfo struct {
 	Reason string  `json:"reason"`
 }
 
+type EnrichmentAttempt struct {
+	AttemptNumber        int      `json:"attempt_number"`
+	QueryPatterns        []string `json:"query_patterns"`
+	LowConfidenceColumns []string `json:"low_confidence_columns"`
+	MissingColumns       []string `json:"missing_columns"`
+}
+
 type RowState struct {
 	Key           string                          `json:"key"`
 	Stage         RowStage                        `json:"stage"`

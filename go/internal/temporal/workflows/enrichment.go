@@ -13,12 +13,14 @@ import (
 )
 
 type EnrichmentWorkflowInput struct {
-	JobID           string
-	RowKey          string
-	ColumnsMetadata []*models.ColumnMetadata
-	QueryPatterns   []string
-	EntityType      string
-	RetryCount      int
+	JobID            string
+	RowKey           string
+	ColumnsMetadata  []*models.ColumnMetadata
+	QueryPatterns    []string
+	EntityType       string
+	RetryCount       int
+	PreviousAttempts []*models.EnrichmentAttempt
+	MaxRetries       int
 }
 
 type EnrichmentWorkflowOutput struct {
@@ -54,13 +56,34 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		IterationCount: input.RetryCount + 1,
 	}
 
+	// Generate patterns if this is a retry with feedback
+	queryPatterns := input.QueryPatterns
+	if input.RetryCount > 0 && len(input.PreviousAttempts) > 0 {
+		event.StartStage("PATTERN_REGENERATION")
+		var patternsOutput activities.GeneratePatternsOutput
+		err := workflow.ExecuteActivity(ctx, "GeneratePatternsWithFeedback", activities.GeneratePatternsWithFeedbackInput{
+			JobID:            input.JobID,
+			ColumnsMetadata:  input.ColumnsMetadata,
+			PreviousAttempts: input.PreviousAttempts,
+		}).Get(ctx, &patternsOutput)
+		if err != nil {
+			// Fallback to original patterns if regeneration fails
+			event.FailStage("PATTERN_REGENERATION", err)
+		} else {
+			queryPatterns = patternsOutput.Patterns
+			event.CompleteStage("PATTERN_REGENERATION", map[string]interface{}{
+				"pattern_count": len(patternsOutput.Patterns),
+			})
+		}
+	}
+
 	event.StartStage(models.StageSerpFetched)
 	var serpOutput activities.SerpFetchOutput
 	err := workflow.ExecuteActivity(ctx, "SerpFetch", activities.SerpFetchInput{
 		JobID:           input.JobID,
 		RowKey:          input.RowKey,
 		ColumnsMetadata: input.ColumnsMetadata,
-		QueryPatterns:   input.QueryPatterns,
+		QueryPatterns:   queryPatterns,
 	}).Get(ctx, &serpOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("SERP fetch failed: %v", err)
@@ -226,6 +249,33 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Confidence:      extractOutput.Confidence,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &feedbackOutput)
+
+	// Check if retry is needed and allowed
+	if feedbackOutput.NeedsFeedback && input.RetryCount < input.MaxRetries {
+		// Record this attempt
+		currentAttempt := &models.EnrichmentAttempt{
+			AttemptNumber:        input.RetryCount + 1,
+			QueryPatterns:        queryPatterns,
+			LowConfidenceColumns: feedbackOutput.LowConfidenceColumns,
+			MissingColumns:       feedbackOutput.MissingColumns,
+		}
+
+		previousAttempts := append(input.PreviousAttempts, currentAttempt)
+
+		// Trigger retry with feedback
+		retryInput := EnrichmentWorkflowInput{
+			JobID:            input.JobID,
+			RowKey:           input.RowKey,
+			ColumnsMetadata:  input.ColumnsMetadata,
+			QueryPatterns:    input.QueryPatterns, // Original patterns, will be regenerated
+			EntityType:       input.EntityType,
+			RetryCount:       input.RetryCount + 1,
+			PreviousAttempts: previousAttempts,
+			MaxRetries:       input.MaxRetries,
+		}
+
+		return EnrichmentWorkflow(ctx, retryInput)
+	}
 
 	workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 		JobID:  input.JobID,

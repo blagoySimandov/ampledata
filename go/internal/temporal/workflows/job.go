@@ -18,6 +18,7 @@ type JobWorkflowInput struct {
 	RowKeys         []string
 	ColumnsMetadata []*models.ColumnMetadata
 	EntityType      *string
+	MaxRetries      int
 }
 
 type JobWorkflowOutput struct {
@@ -88,12 +89,14 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 		}
 
 		childInput := EnrichmentWorkflowInput{
-			JobID:           input.JobID,
-			RowKey:          rowKey,
-			ColumnsMetadata: input.ColumnsMetadata,
-			QueryPatterns:   patternsOutput.Patterns,
-			EntityType:      entityType,
-			RetryCount:      0,
+			JobID:            input.JobID,
+			RowKey:           rowKey,
+			ColumnsMetadata:  input.ColumnsMetadata,
+			QueryPatterns:    patternsOutput.Patterns,
+			EntityType:       entityType,
+			RetryCount:       0,
+			PreviousAttempts: []*models.EnrichmentAttempt{},
+			MaxRetries:       input.MaxRetries,
 		}
 
 		childWorkflow := workflow.ExecuteChildWorkflow(childCtx, EnrichmentWorkflow, childInput)

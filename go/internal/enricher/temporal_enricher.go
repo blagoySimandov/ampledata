@@ -16,14 +16,16 @@ type TemporalEnricher struct {
 	temporalClient client.Client
 	stateManager   *state.StateManager
 	taskQueue      string
+	maxRetries     int
 }
 
 // NewTemporalEnricher creates a new enricher that uses Temporal
-func NewTemporalEnricher(temporalClient client.Client, stateManager *state.StateManager, taskQueue string) *TemporalEnricher {
+func NewTemporalEnricher(temporalClient client.Client, stateManager *state.StateManager, taskQueue string, maxRetries int) *TemporalEnricher {
 	return &TemporalEnricher{
 		temporalClient: temporalClient,
 		stateManager:   stateManager,
 		taskQueue:      taskQueue,
+		maxRetries:     maxRetries,
 	}
 }
 
@@ -40,6 +42,7 @@ func (e *TemporalEnricher) Enrich(ctx context.Context, jobID string, rowKeys []s
 		RowKeys:         rowKeys,
 		ColumnsMetadata: columnsMetadata,
 		EntityType:      nil, // Can be added if needed
+		MaxRetries:      e.maxRetries,
 	}
 
 	workflowRun, err := e.temporalClient.ExecuteWorkflow(ctx, workflowOptions, workflows.JobWorkflow, input)

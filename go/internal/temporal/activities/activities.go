@@ -43,6 +43,12 @@ type GeneratePatternsInput struct {
 	ColumnsMetadata []*models.ColumnMetadata
 }
 
+type GeneratePatternsWithFeedbackInput struct {
+	JobID            string
+	ColumnsMetadata  []*models.ColumnMetadata
+	PreviousAttempts []*models.EnrichmentAttempt
+}
+
 type GeneratePatternsOutput struct {
 	Patterns []string
 }
@@ -124,6 +130,26 @@ func (a *Activities) GeneratePatterns(ctx context.Context, input GeneratePattern
 	patterns, err := a.patternGenerator.GeneratePatterns(ctx, input.ColumnsMetadata)
 	if err != nil {
 		logger.Log.Warn("pattern generation failed, using fallback", "error", err, "job_id", input.JobID)
+		patterns = []string{"%entity"}
+		event.SetMetadata("fallback_used", true)
+	}
+
+	event.EmitActivitySuccess(ctx, map[string]interface{}{
+		"pattern_count": len(patterns),
+	})
+
+	return &GeneratePatternsOutput{
+		Patterns: patterns,
+	}, nil
+}
+
+func (a *Activities) GeneratePatternsWithFeedback(ctx context.Context, input GeneratePatternsWithFeedbackInput) (*GeneratePatternsOutput, error) {
+	event := logger.NewActivityEvent("generate_patterns_with_feedback", input.JobID)
+	event.SetMetadata("attempt_count", len(input.PreviousAttempts))
+
+	patterns, err := a.patternGenerator.GeneratePatternsWithFeedback(ctx, input.ColumnsMetadata, input.PreviousAttempts)
+	if err != nil {
+		logger.Log.Warn("pattern generation with feedback failed, using fallback", "error", err, "job_id", input.JobID)
 		patterns = []string{"%entity"}
 		event.SetMetadata("fallback_used", true)
 	}
