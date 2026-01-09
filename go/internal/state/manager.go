@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -112,44 +113,21 @@ func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStag
 				state.ExtractedData = data
 			}
 		}
-		if confidence, ok := dataUpdate["confidence"]; ok {
-			// Handle both direct type and JSON-deserialized type
-			switch conf := confidence.(type) {
-			case map[string]*models.FieldConfidenceInfo:
-				state.Confidence = conf
-			case map[string]interface{}:
-				// Convert from JSON-deserialized map[string]interface{}
-				converted := make(map[string]*models.FieldConfidenceInfo)
-				for k, v := range conf {
-					if vMap, ok := v.(map[string]interface{}); ok {
-						score, _ := vMap["score"].(float64)
-						reason, _ := vMap["reason"].(string)
-						converted[k] = &models.FieldConfidenceInfo{
-							Score:  score,
-							Reason: reason,
-						}
-					}
-				}
-				if len(converted) > 0 {
-					state.Confidence = converted
+		if confidence, ok := dataUpdate["confidence"]; ok && confidence != nil {
+			// Re-marshal and unmarshal to handle JSON-deserialized types
+			if jsonData, err := json.Marshal(confidence); err == nil {
+				var conf map[string]*models.FieldConfidenceInfo
+				if err := json.Unmarshal(jsonData, &conf); err == nil && len(conf) > 0 {
+					state.Confidence = conf
 				}
 			}
 		}
-		if sources, ok := dataUpdate["sources"]; ok {
-			// Handle both direct type and JSON-deserialized type
-			switch src := sources.(type) {
-			case []string:
-				state.Sources = src
-			case []interface{}:
-				// Convert from JSON-deserialized []interface{}
-				converted := make([]string, 0, len(src))
-				for _, v := range src {
-					if str, ok := v.(string); ok {
-						converted = append(converted, str)
-					}
-				}
-				if len(converted) > 0 {
-					state.Sources = converted
+		if sources, ok := dataUpdate["sources"]; ok && sources != nil {
+			// Re-marshal and unmarshal to handle JSON-deserialized types
+			if jsonData, err := json.Marshal(sources); err == nil {
+				var src []string
+				if err := json.Unmarshal(jsonData, &src); err == nil && len(src) > 0 {
+					state.Sources = src
 				}
 			}
 		}
