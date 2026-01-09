@@ -82,7 +82,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			break
 		}
 
-		entityType := "entity"
+		entityType := ""
 		if input.EntityType != nil {
 			entityType = *input.EntityType
 		}
