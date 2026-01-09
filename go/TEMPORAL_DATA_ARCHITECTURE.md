@@ -37,8 +37,9 @@ Temporal is a **workflow orchestration system** that happens to keep a complete 
 PostgreSQL should only store data that your **application needs to query**:
 - ✅ Final enrichment results
 - ✅ Confidence scores for quality assessment
+- ✅ Sources (URLs where data was found) for transparency
 - ✅ Job status and progress tracking
-- ❌ NOT intermediate pipeline artifacts
+- ❌ NOT intermediate pipeline artifacts (raw HTML, full search results)
 
 ---
 
@@ -47,7 +48,7 @@ PostgreSQL should only store data that your **application needs to query**:
 ### Data in PostgreSQL
 
 ```sql
-SELECT key, stage, extracted_data, confidence, error
+SELECT key, stage, extracted_data, confidence, sources, error
 FROM row_states
 WHERE job_id = 'your-job-id';
 ```
@@ -55,6 +56,7 @@ WHERE job_id = 'your-job-id';
 **Contains:**
 - `extracted_data`: Final enriched fields (e.g., `{"email": "john@example.com", "phone": "+1-555-0123"}`)
 - `confidence`: Confidence scores per field (e.g., `{"email": {"score": 0.95, "reason": "Found in contact section"}}`)
+- `sources`: URLs where data was found (e.g., `["https://linkedin.com/in/john", "https://example.com/about"]`)
 - `stage`: Current enrichment stage
 - `error`: Error message if failed
 
@@ -220,6 +222,7 @@ rows, _ := db.Query("SELECT confidence FROM row_states WHERE job_id = $1", jobID
 |-----------|-----------------|---------------|----------|
 | Final results | PostgreSQL | SQL queries | API responses, reporting |
 | Confidence scores | PostgreSQL | SQL queries | Quality assessment, filtering |
+| Sources (URLs) | PostgreSQL | SQL queries | Transparency, verification |
 | Search results | Temporal history | Temporal UI | Debugging, auditing |
 | Crawl decisions | Temporal history | Temporal UI | Debugging, auditing |
 | Raw HTML content | Temporal history | Temporal UI | Debugging, auditing |
