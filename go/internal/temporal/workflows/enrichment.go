@@ -17,6 +17,7 @@ type EnrichmentWorkflowInput struct {
 	RowKey          string
 	ColumnsMetadata []*models.ColumnMetadata
 	QueryPatterns   []string
+	EntityType      string
 	RetryCount      int
 }
 
@@ -64,7 +65,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	if err != nil {
 		output.Error = fmt.Sprintf("SERP fetch failed: %v", err)
 		event.FailStage(models.StageSerpFetched, err)
-		event.Stage = string(models.StageSerpFetched)
 		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
@@ -96,11 +96,11 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		RowKey:          input.RowKey,
 		SerpData:        serpOutput.SerpData,
 		ColumnsMetadata: input.ColumnsMetadata,
+		EntityType:      input.EntityType,
 	}).Get(ctx, &decisionOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
 		event.FailStage(models.StageDecisionMade, err)
-		event.Stage = string(models.StageDecisionMade)
 		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
@@ -135,7 +135,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	if err != nil {
 		output.Error = fmt.Sprintf("Crawling failed: %v", err)
 		event.FailStage(models.StageCrawled, err)
-		event.Stage = string(models.StageCrawled)
 		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
@@ -168,11 +167,11 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Decision:        decisionOutput.Decision,
 		CrawlResults:    crawlOutput.CrawlResults,
 		ColumnsMetadata: input.ColumnsMetadata,
+		EntityType:      input.EntityType,
 	}).Get(ctx, &extractOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Extraction failed: %v", err)
 		event.FailStage(models.StageEnriched, err)
-		event.Stage = string(models.StageEnriched)
 		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
@@ -235,7 +234,6 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Data:   nil,
 	}).Get(ctx, nil)
 
-	event.Stage = string(models.StageCompleted)
 	event.EmitSuccess(ctx)
 
 	return output, nil

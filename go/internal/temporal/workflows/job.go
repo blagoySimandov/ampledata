@@ -82,11 +82,17 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			break
 		}
 
+		entityType := ""
+		if input.EntityType != nil {
+			entityType = *input.EntityType
+		}
+
 		childInput := EnrichmentWorkflowInput{
 			JobID:           input.JobID,
 			RowKey:          rowKey,
 			ColumnsMetadata: input.ColumnsMetadata,
 			QueryPatterns:   patternsOutput.Patterns,
+			EntityType:      entityType,
 			RetryCount:      0,
 		}
 

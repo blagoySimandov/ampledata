@@ -30,7 +30,7 @@ func NewGeminiPatternGenerator(apiKey string) (*GeminiPatternGenerator, error) {
 		return nil, err
 	}
 	return &GeminiPatternGenerator{
-		model:  "gemini-2.0-flash-lite",
+		model:  "gemini-2.5-flash-lite",
 		client: client,
 	}, nil
 }

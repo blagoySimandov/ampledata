@@ -9,5 +9,5 @@ AmpleData takes a dataset with key columns (e.g., company names) and columns to 
 1. Builds search queries from keys + target columns
 2. Searches the web 
 3. Decides whether to crawl — skips crawling if SERP snippets contain the answer
-4. Crawls selected URL with if needed (NOT YET IMPLEMENTED)
-5. Extracts structured data using LLM (NOT YET IMPLEMENTED)
+4. Crawls selected URL with if needed
+5. Extracts structured data using LLM 
