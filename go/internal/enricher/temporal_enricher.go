@@ -84,20 +84,10 @@ func (e *TemporalEnricher) GetResults(ctx context.Context, jobID string, offset,
 		return nil, err
 	}
 
+	// Convert domain models to API DTOs using conversion function
 	results := make([]*models.EnrichmentResult, len(completedRows))
 	for i, row := range completedRows {
-		sources := []string{}
-		if len(row.Sources) != 0 {
-			sources = row.Sources
-		}
-
-		results[i] = &models.EnrichmentResult{
-			Key:           row.Key,
-			ExtractedData: row.ExtractedData,
-			Confidence:    row.Confidence,
-			Sources:       sources,
-			Error:         row.Error,
-		}
+		results[i] = models.ToEnrichmentResult(row)
 	}
 
 	return results, nil

@@ -148,16 +148,16 @@ func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID, fil
 	return nil
 }
 
-func (s *PostgresStore) GetJob(ctx context.Context, jobID string) (*models.JobDB, error) {
-	var job models.JobDB
+func (s *PostgresStore) GetJob(ctx context.Context, jobID string) (*models.Job, error) {
+	var jobDB models.JobDB
 	err := s.db.NewSelect().
-		Model(&job).
+		Model(&jobDB).
 		Where("job_id = ?", jobID).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job: %w", err)
 	}
-	return &job, nil
+	return jobDB.ToJob(), nil
 }
 
 func (s *PostgresStore) UpdateJobConfiguration(ctx context.Context, jobID, keyColumn string, columnsMetadata []*models.ColumnMetadata, entityType *string) error {
@@ -192,10 +192,10 @@ func (s *PostgresStore) StartJob(ctx context.Context, jobID string, totalRows in
 	return nil
 }
 
-func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.JobDB, error) {
-	var jobs []*models.JobDB
+func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.Job, error) {
+	var jobsDB []*models.JobDB
 	query := s.db.NewSelect().
-		Model(&jobs).
+		Model(&jobsDB).
 		Where("user_id = ?", userID).
 		Order("created_at DESC")
 
@@ -209,6 +209,12 @@ func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset
 	err := query.Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs by user: %w", err)
+	}
+
+	// Convert DB models to domain models
+	jobs := make([]*models.Job, len(jobsDB))
+	for i, jobDB := range jobsDB {
+		jobs[i] = jobDB.ToJob()
 	}
 	return jobs, nil
 }

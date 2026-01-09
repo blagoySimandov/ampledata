@@ -7,6 +7,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// JobDB represents the database model for a job (with Bun ORM tags)
 type JobDB struct {
 	bun.BaseModel `bun:"table:jobs,alias:j"`
 
@@ -21,6 +22,40 @@ type JobDB struct {
 	Status          JobStatus         `bun:"status,notnull,default:'PENDING'" json:"status"`
 	CreatedAt       time.Time         `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt       time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+}
+
+// ToJob converts JobDB (database model) to Job (domain model)
+func (j *JobDB) ToJob() *Job {
+	return &Job{
+		JobID:           j.JobID,
+		UserID:          j.UserID,
+		FilePath:        j.FilePath,
+		KeyColumn:       j.KeyColumn,
+		ColumnsMetadata: j.ColumnsMetadata,
+		EntityType:      j.EntityType,
+		TotalRows:       j.TotalRows,
+		StartedAt:       j.StartedAt,
+		Status:          j.Status,
+		CreatedAt:       j.CreatedAt,
+		UpdatedAt:       j.UpdatedAt,
+	}
+}
+
+// JobFromDomain converts Job (domain model) to JobDB (database model)
+func JobFromDomain(job *Job) *JobDB {
+	return &JobDB{
+		JobID:           job.JobID,
+		UserID:          job.UserID,
+		FilePath:        job.FilePath,
+		KeyColumn:       job.KeyColumn,
+		ColumnsMetadata: job.ColumnsMetadata,
+		EntityType:      job.EntityType,
+		TotalRows:       job.TotalRows,
+		StartedAt:       job.StartedAt,
+		Status:          job.Status,
+		CreatedAt:       job.CreatedAt,
+		UpdatedAt:       job.UpdatedAt,
+	}
 }
 
 type RowStateDB struct {

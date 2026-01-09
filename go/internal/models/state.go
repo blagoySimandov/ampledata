@@ -27,6 +27,21 @@ const (
 	JobStatusCompleted JobStatus = "COMPLETED"
 )
 
+// Job represents the domain model for a job (without database tags)
+type Job struct {
+	JobID           string            `json:"job_id"`
+	UserID          string            `json:"user_id"`
+	FilePath        string            `json:"file_path"`
+	KeyColumn       *string           `json:"key_column"`
+	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
+	EntityType      *string           `json:"entity_type"`
+	TotalRows       int               `json:"total_rows"`
+	StartedAt       *time.Time        `json:"started_at"`
+	Status          JobStatus         `json:"status"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
+}
+
 type SerpData struct {
 	Queries []string               `json:"queries"`
 	Results []*GoogleSearchResults `json:"results"`

@@ -269,15 +269,10 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 			}
 
 			extractedData = result.ExtractedData
-
-			confidence = make(map[string]*models.FieldConfidenceInfo)
-			if result.Confidence != nil {
-				for k, v := range result.Confidence {
-					confidence[k] = &models.FieldConfidenceInfo{
-						Score:  v.Score,
-						Reason: v.Reason,
-					}
-				}
+			// No conversion needed - ExtractionResult already uses models.FieldConfidenceInfo
+			confidence = result.Confidence
+			if confidence == nil {
+				confidence = make(map[string]*models.FieldConfidenceInfo)
 			}
 		} else {
 			extractedData = make(map[string]interface{})

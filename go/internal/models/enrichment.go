@@ -53,3 +53,31 @@ type JobProgressResponse struct {
 	StartedAt   string           `json:"started_at"`
 	Status      JobStatus        `json:"status"`
 }
+
+// ToJobSummary converts Job (domain model) to JobSummary (API DTO)
+func ToJobSummary(job *Job) *JobSummary {
+	return &JobSummary{
+		JobID:     job.JobID,
+		Status:    job.Status,
+		TotalRows: job.TotalRows,
+		FilePath:  job.FilePath,
+		CreatedAt: job.CreatedAt,
+		StartedAt: job.StartedAt,
+	}
+}
+
+// ToEnrichmentResult converts RowState (domain model) to EnrichmentResult (API DTO)
+func ToEnrichmentResult(row *RowState) *EnrichmentResult {
+	sources := row.Sources
+	if sources == nil {
+		sources = []string{}
+	}
+
+	return &EnrichmentResult{
+		Key:           row.Key,
+		ExtractedData: row.ExtractedData,
+		Confidence:    row.Confidence,
+		Sources:       sources,
+		Error:         row.Error,
+	}
+}
