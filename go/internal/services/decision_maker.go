@@ -262,7 +262,7 @@ func NewGeminiDecisionMaker(apiKey string) (*GeminiDecisionMaker, error) {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 	return &GeminiDecisionMaker{
-		model:  "gemini-2.0-flash-lite",
+		model:  "gemini-2.5-flash-lite",
 		client: client,
 	}, nil
 }
