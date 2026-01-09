@@ -14,13 +14,20 @@ import (
 type StateManager struct {
 	store       Store
 	cancelFuncs map[string]context.CancelFunc
+	workflowIDs map[string]workflowIDPair // jobID -> workflow ID and run ID
 	mu          sync.RWMutex
+}
+
+type workflowIDPair struct {
+	WorkflowID string
+	RunID      string
 }
 
 func NewStateManager(store Store) *StateManager {
 	return &StateManager{
 		store:       store,
 		cancelFuncs: make(map[string]context.CancelFunc),
+		workflowIDs: make(map[string]workflowIDPair),
 	}
 }
 
@@ -51,29 +58,33 @@ func (m *StateManager) RegisterCancelFunc(jobID string, cancel context.CancelFun
 	m.cancelFuncs[jobID] = cancel
 }
 
-func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStage models.RowStage, dataUpdate map[string]interface{}) error {
-	cancelled, err := m.CheckCancelled(ctx, jobID)
-	if err != nil {
-		return fmt.Errorf("failed to check cancellation: %w", err)
+func (m *StateManager) RegisterWorkflowID(jobID, workflowID, runID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.workflowIDs[jobID] = workflowIDPair{
+		WorkflowID: workflowID,
+		RunID:      runID,
 	}
+}
 
-	if cancelled {
-		state, err := m.store.GetRowState(ctx, jobID, key)
-		if err == nil && state != nil {
-			if state.Stage != models.StageCompleted && state.Stage != models.StageFailed {
-				state.Stage = models.StageCancelled
-				state.UpdatedAt = time.Now()
-				m.store.SaveRowState(ctx, jobID, state)
-			}
-		}
-		return fmt.Errorf("job %s was cancelled", jobID)
+func (m *StateManager) GetWorkflowID(jobID string) (string, string) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if pair, ok := m.workflowIDs[jobID]; ok {
+		return pair.WorkflowID, pair.RunID
+	}
+	return "", ""
+}
+
+func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStage models.RowStage, update *models.StateUpdate) error {
+	if err := m.checkAndHandleCancellation(ctx, jobID, key); err != nil {
+		return err
 	}
 
 	state, err := m.store.GetRowState(ctx, jobID, key)
 	if err != nil {
 		return fmt.Errorf("failed to get row state: %w", err)
 	}
-
 	if state == nil {
 		return fmt.Errorf("no state found for key %s", key)
 	}
@@ -81,40 +92,37 @@ func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStag
 	state.Stage = toStage
 	state.UpdatedAt = time.Now()
 
-	if dataUpdate != nil {
-		if serpData, ok := dataUpdate["serp_data"]; ok {
-			if data, ok := serpData.(*models.SerpData); ok {
-				state.SerpData = data
-			}
-		}
-		if decision, ok := dataUpdate["decision"]; ok {
-			if data, ok := decision.(*models.Decision); ok {
-				state.Decision = data
-			}
-		}
-		if crawlResults, ok := dataUpdate["crawl_results"]; ok {
-			if data, ok := crawlResults.(*models.CrawlResults); ok {
-				state.CrawlResults = data
-			}
-		}
-		if extractedData, ok := dataUpdate["extracted_data"]; ok {
-			if data, ok := extractedData.(map[string]interface{}); ok {
-				state.ExtractedData = data
-			}
-		}
-		if errMsg, ok := dataUpdate["error"]; ok {
-			if errStr, ok := errMsg.(string); ok {
-				state.Error = &errStr
-				state.Stage = models.StageFailed
-			}
-		}
+	if update != nil {
+		state.ApplyUpdate(update)
 	}
 
 	if err := m.store.SaveRowState(ctx, jobID, state); err != nil {
 		return fmt.Errorf("failed to save row state: %w", err)
 	}
-
 	return nil
+}
+
+func (m *StateManager) checkAndHandleCancellation(ctx context.Context, jobID, key string) error {
+	cancelled, err := m.CheckCancelled(ctx, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to check cancellation: %w", err)
+	}
+	if !cancelled {
+		return nil
+	}
+
+	// Best-effort update to cancelled state
+	if state, err := m.store.GetRowState(ctx, jobID, key); err == nil && state != nil {
+		if state.Stage != models.StageCompleted && state.Stage != models.StageFailed {
+			state.Stage = models.StageCancelled
+			state.UpdatedAt = time.Now()
+			err := m.store.SaveRowState(ctx, jobID, state)
+			if err != nil {
+				return fmt.Errorf("failed to save row state: %w", err)
+			}
+		}
+	}
+	return fmt.Errorf("job %s was cancelled", jobID)
 }
 
 func (m *StateManager) GetPendingForStage(ctx context.Context, jobID string, stage models.RowStage) ([]*models.RowState, error) {

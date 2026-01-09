@@ -228,8 +228,11 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 			}
 		}
 
+		// Only insert non-JSONB columns to avoid storing JSON "null"
+		// JSONB columns will be database NULL by default
 		_, err := tx.NewInsert().
 			Model(&rows).
+			Column("job_id", "key", "stage", "created_at", "updated_at").
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to insert row states: %w", err)
@@ -242,17 +245,47 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *models.RowState) error {
 	dbState := models.RowStateFromApp(jobID, state)
 
-	_, err := s.db.NewInsert().
+	now := time.Now()
+	dbState.UpdatedAt = now
+	if dbState.CreatedAt.IsZero() {
+		dbState.CreatedAt = now
+	}
+
+	// Start with base columns for INSERT (includes created_at)
+	insertCols := []string{"job_id", "key", "stage", "created_at", "updated_at"}
+	// Columns to UPDATE (excludes created_at and PK columns)
+	updateCols := []string{"stage", "updated_at"}
+
+	// Only include JSONB columns if they have data
+	if state.ExtractedData != nil {
+		insertCols = append(insertCols, "extracted_data")
+		updateCols = append(updateCols, "extracted_data")
+	}
+	if state.Confidence != nil {
+		insertCols = append(insertCols, "confidence")
+		updateCols = append(updateCols, "confidence")
+	}
+	if state.Sources != nil {
+		insertCols = append(insertCols, "sources")
+		updateCols = append(updateCols, "sources")
+	}
+	if state.Error != nil {
+		insertCols = append(insertCols, "error")
+		updateCols = append(updateCols, "error")
+	}
+
+	// Use INSERT ... ON CONFLICT DO UPDATE with only the columns that have data
+	query := s.db.NewInsert().
 		Model(dbState).
-		On("CONFLICT (job_id, key) DO UPDATE").
-		Set("stage = EXCLUDED.stage").
-		Set("serp_data = EXCLUDED.serp_data").
-		Set("decision = EXCLUDED.decision").
-		Set("crawl_results = EXCLUDED.crawl_results").
-		Set("extracted_data = EXCLUDED.extracted_data").
-		Set("error = EXCLUDED.error").
-		Set("updated_at = EXCLUDED.updated_at").
-		Exec(ctx)
+		Column(insertCols...).
+		On("CONFLICT (job_id, key) DO UPDATE")
+
+	// Set only the update columns (excludes created_at)
+	for _, col := range updateCols {
+		query = query.Set("? = EXCLUDED.?", bun.Ident(col), bun.Ident(col))
+	}
+
+	_, err := query.Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to save row state: %w", err)
 	}

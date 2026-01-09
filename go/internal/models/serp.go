@@ -16,13 +16,13 @@ type KnowledgeGraphAttributes struct {
 }
 
 type KnowledgeGraph struct {
-	Title             *string                    `json:"title,omitempty"`
-	Type              *string                    `json:"type,omitempty"`
-	ImageURL          *string                    `json:"imageUrl,omitempty"`
-	Description       *string                    `json:"description,omitempty"`
-	DescriptionSource *string                    `json:"descriptionSource,omitempty"`
-	DescriptionLink   *string                    `json:"descriptionLink,omitempty"`
-	Attributes        *KnowledgeGraphAttributes  `json:"attributes,omitempty"`
+	Title             *string                   `json:"title,omitempty"`
+	Type              *string                   `json:"type,omitempty"`
+	ImageURL          *string                   `json:"imageUrl,omitempty"`
+	Description       *string                   `json:"description,omitempty"`
+	DescriptionSource *string                   `json:"descriptionSource,omitempty"`
+	DescriptionLink   *string                   `json:"descriptionLink,omitempty"`
+	Attributes        *KnowledgeGraphAttributes `json:"attributes,omitempty"`
 }
 
 type Sitelink struct {
@@ -31,15 +31,15 @@ type Sitelink struct {
 }
 
 type OrganicResult struct {
-	Title       *string     `json:"title,omitempty"`
-	Link        *string     `json:"link,omitempty"`
-	Snippet     *string     `json:"snippet,omitempty"`
-	Sitelinks   []Sitelink  `json:"sitelinks,omitempty"`
-	Date        *string     `json:"date,omitempty"`
-	Position    *int        `json:"position,omitempty"`
-	Rating      *float64    `json:"rating,omitempty"`
-	RatingMax   *int        `json:"ratingMax,omitempty"`
-	RatingCount *int        `json:"ratingCount,omitempty"`
+	Title       *string    `json:"title,omitempty"`
+	Link        *string    `json:"link,omitempty"`
+	Snippet     *string    `json:"snippet,omitempty"`
+	Sitelinks   []Sitelink `json:"sitelinks,omitempty"`
+	Date        *string    `json:"date,omitempty"`
+	Position    *int       `json:"position,omitempty"`
+	Rating      *float64   `json:"rating,omitempty"`
+	RatingMax   *int       `json:"ratingMax,omitempty"`
+	RatingCount *int       `json:"ratingCount,omitempty"`
 }
 
 type PeopleAlsoAskItem struct {

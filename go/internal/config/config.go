@@ -17,6 +17,11 @@ type Config struct {
 	WorkersPerStage   int
 	ChannelBufferSize int
 	DebugAuthBypass   bool
+
+	// Temporal configuration
+	TemporalHostPort  string
+	TemporalNamespace string
+	TemporalTaskQueue string
 }
 
 func Load() *Config {
@@ -32,6 +37,11 @@ func Load() *Config {
 		WorkersPerStage:   getEnvInt("WORKERS_PER_STAGE", 5),
 		ChannelBufferSize: getEnvInt("CHANNEL_BUFFER_SIZE", 100),
 		DebugAuthBypass:   getEnvBool("DEBUG_AUTH_BYPASS", false),
+
+		// Temporal settings
+		TemporalHostPort:  getEnv("TEMPORAL_HOST_PORT", "localhost:7233"),
+		TemporalNamespace: getEnv("TEMPORAL_NAMESPACE", "default"),
+		TemporalTaskQueue: getEnv("TEMPORAL_TASK_QUEUE", "ampledata-enrichment"),
 	}
 }
 
