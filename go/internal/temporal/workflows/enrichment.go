@@ -64,7 +64,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	if err != nil {
 		output.Error = fmt.Sprintf("SERP fetch failed: %v", err)
 		event.FailStage(models.StageSerpFetched, err)
-		event.EmitError(ctx, models.StageSerpFetched, err)
+		event.Stage = string(models.StageSerpFetched)
+		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
@@ -99,7 +100,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
 		event.FailStage(models.StageDecisionMade, err)
-		event.EmitError(ctx, models.StageDecisionMade, err)
+		event.Stage = string(models.StageDecisionMade)
+		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
@@ -133,7 +135,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	if err != nil {
 		output.Error = fmt.Sprintf("Crawling failed: %v", err)
 		event.FailStage(models.StageCrawled, err)
-		event.EmitError(ctx, models.StageCrawled, err)
+		event.Stage = string(models.StageCrawled)
+		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
@@ -169,7 +172,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	if err != nil {
 		output.Error = fmt.Sprintf("Extraction failed: %v", err)
 		event.FailStage(models.StageEnriched, err)
-		event.EmitError(ctx, models.StageEnriched, err)
+		event.Stage = string(models.StageEnriched)
+		event.EmitError(ctx, err)
 
 		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 			JobID:  input.JobID,
@@ -231,7 +235,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Data:   nil,
 	}).Get(ctx, nil)
 
-	event.EmitSuccess(ctx, models.StageCompleted)
+	event.Stage = string(models.StageCompleted)
+	event.EmitSuccess(ctx)
 
 	return output, nil
 }
