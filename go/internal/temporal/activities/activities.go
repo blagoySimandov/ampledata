@@ -63,6 +63,7 @@ type DecisionInput struct {
 	RowKey          string
 	SerpData        *models.SerpData
 	ColumnsMetadata []*models.ColumnMetadata
+	EntityType      string
 }
 
 type DecisionOutput struct {
@@ -87,6 +88,7 @@ type ExtractInput struct {
 	Decision        *models.Decision
 	CrawlResults    *models.CrawlResults
 	ColumnsMetadata []*models.ColumnMetadata
+	EntityType      string
 }
 
 type ExtractOutput struct {
@@ -198,7 +200,7 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 	}
 
 	mergedResults := mergeSerpResults(input.SerpData.Results)
-	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata)
+	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata, input.EntityType)
 	if err != nil {
 		event.EmitActivityError(ctx, fmt.Errorf("decision making failed: %w", err))
 		return nil, fmt.Errorf("decision making failed: %w", err)
@@ -284,8 +286,8 @@ func filterMissingColumnsMetadata(missingColumns []string, allColumns []*models.
 	return result
 }
 
-func (a *Activities) extractFromContent(ctx context.Context, content, rowKey string, metadata []*models.ColumnMetadata) (map[string]interface{}, map[string]*models.FieldConfidenceInfo, error) {
-	result, err := a.contentExtractor.Extract(ctx, content, rowKey, metadata)
+func (a *Activities) extractFromContent(ctx context.Context, content, rowKey string, metadata []*models.ColumnMetadata, entityType string) (map[string]interface{}, map[string]*models.FieldConfidenceInfo, error) {
+	result, err := a.contentExtractor.Extract(ctx, content, rowKey, metadata, entityType)
 	if err != nil {
 		return nil, nil, fmt.Errorf("content extraction failed: %w", err)
 	}
@@ -327,7 +329,7 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 
 		if len(missingColsMetadata) > 0 {
 			var err error
-			extractedData, confidence, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata)
+			extractedData, confidence, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata, input.EntityType)
 			if err != nil {
 				event.EmitActivityError(ctx, err)
 				return nil, err
