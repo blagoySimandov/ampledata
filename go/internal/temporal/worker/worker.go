@@ -1,8 +1,6 @@
 package worker
 
 import (
-	"log"
-
 	activity "go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
@@ -11,14 +9,11 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/workflows"
 )
 
-// Worker wraps a Temporal worker
 type Worker struct {
 	temporalWorker worker.Worker
 }
 
-// NewWorker creates and configures a new Temporal worker
 func NewWorker(temporalClient client.Client, taskQueue string, activities *activities.Activities) *Worker {
-	// Create worker
 	w := worker.New(temporalClient, taskQueue, worker.Options{})
 
 	// Register workflows
@@ -55,21 +50,15 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 		Name: "CompleteJob",
 	})
 
-	log.Printf("Temporal worker created with task queue: %s", taskQueue)
-
 	return &Worker{
 		temporalWorker: w,
 	}
 }
 
-// Start starts the worker
 func (w *Worker) Start() error {
-	log.Println("Starting Temporal worker...")
 	return w.temporalWorker.Start()
 }
 
-// Stop gracefully stops the worker
 func (w *Worker) Stop() {
-	log.Println("Stopping Temporal worker...")
 	w.temporalWorker.Stop()
 }
