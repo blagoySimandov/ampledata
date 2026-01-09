@@ -228,8 +228,11 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 			}
 		}
 
+		// Only insert non-JSONB columns to avoid storing JSON "null"
+		// JSONB columns will be database NULL by default
 		_, err := tx.NewInsert().
 			Model(&rows).
+			Column("job_id", "key", "stage", "created_at", "updated_at").
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to insert row states: %w", err)
@@ -242,51 +245,50 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *models.RowState) error {
 	dbState := models.RowStateFromApp(jobID, state)
 
-	// First, try to insert
-	res, err := s.db.NewInsert().
-		Model(dbState).
-		On("CONFLICT (job_id, key) DO NOTHING").
-		Exec(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to insert row state: %w", err)
+	// Build the insert/update dynamically to avoid storing nil as JSON "null"
+	now := time.Now()
+	dbState.UpdatedAt = now
+	if dbState.CreatedAt.IsZero() {
+		dbState.CreatedAt = now
 	}
 
-	// If no rows were inserted, do an update
-	rowsAffected, _ := res.RowsAffected()
-	if rowsAffected == 0 {
-		// Build update query dynamically to only update non-nil fields
-		updateQuery := s.db.NewUpdate().
-			Model(dbState).
-			Where("job_id = ?", jobID).
-			Where("key = ?", state.Key).
-			Set("stage = ?", state.Stage).
-			Set("updated_at = ?", state.UpdatedAt)
+	// Start with base columns for INSERT (includes created_at)
+	insertCols := []string{"job_id", "key", "stage", "created_at", "updated_at"}
+	// Columns to UPDATE (excludes created_at and PK columns)
+	updateCols := []string{"stage", "updated_at"}
 
-		// Only update extracted_data if non-nil and non-empty
-		if state.ExtractedData != nil && len(state.ExtractedData) > 0 {
-			updateQuery = updateQuery.Set("extracted_data = ?", state.ExtractedData)
-		}
+	// Only include JSONB columns if they have data
+	if state.ExtractedData != nil && len(state.ExtractedData) > 0 {
+		insertCols = append(insertCols, "extracted_data")
+		updateCols = append(updateCols, "extracted_data")
+	}
+	if state.Confidence != nil && len(state.Confidence) > 0 {
+		insertCols = append(insertCols, "confidence")
+		updateCols = append(updateCols, "confidence")
+	}
+	if state.Sources != nil && len(state.Sources) > 0 {
+		insertCols = append(insertCols, "sources")
+		updateCols = append(updateCols, "sources")
+	}
+	if state.Error != nil {
+		insertCols = append(insertCols, "error")
+		updateCols = append(updateCols, "error")
+	}
 
-		// Only update confidence if non-nil and non-empty
-		if state.Confidence != nil && len(state.Confidence) > 0 {
-			updateQuery = updateQuery.Set("confidence = ?", state.Confidence)
-		}
+	// Use INSERT ... ON CONFLICT DO UPDATE with only the columns that have data
+	query := s.db.NewInsert().
+		Model(dbState).
+		Column(insertCols...).
+		On("CONFLICT (job_id, key) DO UPDATE")
 
-		// Only update sources if non-nil and non-empty
-		if state.Sources != nil && len(state.Sources) > 0 {
-			updateQuery = updateQuery.Set("sources = ?", state.Sources)
-		}
+	// Set only the update columns (excludes created_at)
+	for _, col := range updateCols {
+		query = query.Set("? = EXCLUDED.?", bun.Ident(col), bun.Ident(col))
+	}
 
-		// Only update error if non-nil
-		if state.Error != nil {
-			updateQuery = updateQuery.Set("error = ?", state.Error)
-		}
-
-		_, err = updateQuery.Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to update row state: %w", err)
-		}
+	_, err := query.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to save row state: %w", err)
 	}
 
 	return nil
