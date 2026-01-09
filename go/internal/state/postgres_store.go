@@ -246,10 +246,8 @@ func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *m
 		Model(dbState).
 		On("CONFLICT (job_id, key) DO UPDATE").
 		Set("stage = EXCLUDED.stage").
-		Set("serp_data = EXCLUDED.serp_data").
-		Set("decision = EXCLUDED.decision").
-		Set("crawl_results = EXCLUDED.crawl_results").
 		Set("extracted_data = EXCLUDED.extracted_data").
+		Set("confidence = EXCLUDED.confidence").
 		Set("error = EXCLUDED.error").
 		Set("updated_at = EXCLUDED.updated_at").
 		Exec(ctx)

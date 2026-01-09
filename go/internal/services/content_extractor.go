@@ -19,9 +19,9 @@ type FieldConfidence struct {
 }
 
 type ExtractionResult struct {
-	ExtractedData map[string]interface{}       `json:"extracted_data"`
-	Confidence    map[string]*FieldConfidence  `json:"confidence"`
-	Reasoning     string                       `json:"reasoning"`
+	ExtractedData map[string]interface{}      `json:"extracted_data"`
+	Confidence    map[string]*FieldConfidence `json:"confidence"`
+	Reasoning     string                      `json:"reasoning"`
 }
 
 type ContentExtractor interface {

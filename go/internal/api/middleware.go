@@ -40,4 +40,3 @@ func WriteJSON(w http.ResponseWriter, statusCode int, data interface{}) error {
 	w.WriteHeader(statusCode)
 	return json.NewEncoder(w).Encode(data)
 }
-

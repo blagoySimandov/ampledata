@@ -26,8 +26,8 @@ const (
 )
 
 type SerpData struct {
-	Queries []string                `json:"queries"`
-	Results []*GoogleSearchResults  `json:"results"`
+	Queries []string               `json:"queries"`
+	Results []*GoogleSearchResults `json:"results"`
 }
 
 type Decision struct {
@@ -48,16 +48,13 @@ type FieldConfidenceInfo struct {
 }
 
 type RowState struct {
-	Key           string                            `json:"key"`
-	Stage         RowStage                          `json:"stage"`
-	SerpData      *SerpData                         `json:"serp_data,omitempty"`
-	Decision      *Decision                         `json:"decision,omitempty"`
-	CrawlResults  *CrawlResults                     `json:"crawl_results,omitempty"`
-	ExtractedData map[string]interface{}            `json:"extracted_data,omitempty"`
-	Confidence    map[string]*FieldConfidenceInfo   `json:"confidence,omitempty"`
-	Error         *string                           `json:"error,omitempty"`
-	CreatedAt     time.Time                         `json:"created_at"`
-	UpdatedAt     time.Time                         `json:"updated_at"`
+	Key           string                          `json:"key"`
+	Stage         RowStage                        `json:"stage"`
+	ExtractedData map[string]interface{}          `json:"extracted_data,omitempty"`
+	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Error         *string                         `json:"error,omitempty"`
+	CreatedAt     time.Time                       `json:"created_at"`
+	UpdatedAt     time.Time                       `json:"updated_at"`
 }
 
 type JobProgress struct {

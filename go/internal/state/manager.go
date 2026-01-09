@@ -107,21 +107,6 @@ func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStag
 	state.UpdatedAt = time.Now()
 
 	if dataUpdate != nil {
-		if serpData, ok := dataUpdate["serp_data"]; ok {
-			if data, ok := serpData.(*models.SerpData); ok {
-				state.SerpData = data
-			}
-		}
-		if decision, ok := dataUpdate["decision"]; ok {
-			if data, ok := decision.(*models.Decision); ok {
-				state.Decision = data
-			}
-		}
-		if crawlResults, ok := dataUpdate["crawl_results"]; ok {
-			if data, ok := crawlResults.(*models.CrawlResults); ok {
-				state.CrawlResults = data
-			}
-		}
 		if extractedData, ok := dataUpdate["extracted_data"]; ok {
 			if data, ok := extractedData.(map[string]interface{}); ok {
 				state.ExtractedData = data

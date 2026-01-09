@@ -19,7 +19,7 @@ type Config struct {
 	DebugAuthBypass   bool
 
 	// Temporal configuration
-	TemporalHostPort string
+	TemporalHostPort  string
 	TemporalNamespace string
 	TemporalTaskQueue string
 }

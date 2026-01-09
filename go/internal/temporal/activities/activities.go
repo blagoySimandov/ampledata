@@ -13,12 +13,12 @@ import (
 
 // Activities contains all the dependencies needed for enrichment activities
 type Activities struct {
-	stateManager       *state.StateManager
-	webSearcher        services.WebSearcher
-	decisionMaker      services.DecisionMaker
-	crawler            services.WebCrawler
-	contentExtractor   services.ContentExtractor
-	patternGenerator   services.QueryPatternGenerator
+	stateManager     *state.StateManager
+	webSearcher      services.WebSearcher
+	decisionMaker    services.DecisionMaker
+	crawler          services.WebCrawler
+	contentExtractor services.ContentExtractor
+	patternGenerator services.QueryPatternGenerator
 }
 
 // NewActivities creates a new Activities instance with all required dependencies
@@ -116,10 +116,10 @@ type FeedbackAnalysisInput struct {
 
 // FeedbackAnalysisOutput contains feedback information
 type FeedbackAnalysisOutput struct {
-	NeedsFeedback      bool
+	NeedsFeedback        bool
 	LowConfidenceColumns []string
-	MissingColumns     []string
-	AverageConfidence  float64
+	MissingColumns       []string
+	AverageConfidence    float64
 }
 
 // Activities Implementation

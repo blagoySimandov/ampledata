@@ -10,7 +10,7 @@ const (
 )
 
 type ColumnMetadata struct {
-	Name        string      `json:"name"`
-	Type        ColumnType  `json:"type"`
-	Description *string     `json:"description,omitempty"`
+	Name        string     `json:"name"`
+	Type        ColumnType `json:"type"`
+	Description *string    `json:"description,omitempty"`
 }

@@ -91,9 +91,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		JobID:  input.JobID,
 		RowKey: input.RowKey,
 		Stage:  models.StageSerpFetched,
-		Data: map[string]interface{}{
-			"serp_data": serpOutput.SerpData,
-		},
+		Data:   nil,
 	}).Get(ctx, nil)
 	if err != nil {
 		logger.Warn("Failed to update state after SERP fetch", "error", err)
@@ -131,9 +129,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		JobID:  input.JobID,
 		RowKey: input.RowKey,
 		Stage:  models.StageDecisionMade,
-		Data: map[string]interface{}{
-			"decision": decisionOutput.Decision,
-		},
+		Data:   nil,
 	}).Get(ctx, nil)
 	if err != nil {
 		logger.Warn("Failed to update state after decision", "error", err)
@@ -172,9 +168,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		JobID:  input.JobID,
 		RowKey: input.RowKey,
 		Stage:  models.StageCrawled,
-		Data: map[string]interface{}{
-			"crawl_results": crawlOutput.CrawlResults,
-		},
+		Data:   nil,
 	}).Get(ctx, nil)
 	if err != nil {
 		logger.Warn("Failed to update state after crawl", "error", err)
