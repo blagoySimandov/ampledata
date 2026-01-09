@@ -117,6 +117,11 @@ func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStag
 				state.Confidence = data
 			}
 		}
+		if sources, ok := dataUpdate["sources"]; ok {
+			if data, ok := sources.([]string); ok {
+				state.Sources = data
+			}
+		}
 		if errMsg, ok := dataUpdate["error"]; ok {
 			if errStr, ok := errMsg.(string); ok {
 				state.Error = &errStr

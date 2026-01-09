@@ -210,6 +210,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Data: map[string]interface{}{
 			"extracted_data": extractOutput.ExtractedData,
 			"confidence":     extractOutput.Confidence,
+			"sources":        crawlOutput.CrawlResults.Sources,
 		},
 	}).Get(ctx, nil)
 	if err != nil {

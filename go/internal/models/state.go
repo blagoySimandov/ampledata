@@ -52,6 +52,7 @@ type RowState struct {
 	Stage         RowStage                        `json:"stage"`
 	ExtractedData map[string]interface{}          `json:"extracted_data,omitempty"`
 	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources       []string                        `json:"sources,omitempty"`
 	Error         *string                         `json:"error,omitempty"`
 	CreatedAt     time.Time                       `json:"created_at"`
 	UpdatedAt     time.Time                       `json:"updated_at"`

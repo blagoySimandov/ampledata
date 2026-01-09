@@ -33,6 +33,7 @@ type RowStateDB struct {
 	Stage         RowStage                        `bun:"stage,notnull" json:"stage"`
 	ExtractedData map[string]interface{}          `bun:"extracted_data,type:jsonb" json:"extracted_data,omitempty"`
 	Confidence    map[string]*FieldConfidenceInfo `bun:"confidence,type:jsonb" json:"confidence,omitempty"`
+	Sources       []string                        `bun:"sources,type:jsonb" json:"sources,omitempty"`
 	Error         *string                         `bun:"error" json:"error,omitempty"`
 	CreatedAt     time.Time                       `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt     time.Time                       `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
@@ -44,6 +45,7 @@ func (r *RowStateDB) ToRowState() *RowState {
 		Stage:         r.Stage,
 		ExtractedData: r.ExtractedData,
 		Confidence:    r.Confidence,
+		Sources:       r.Sources,
 		Error:         r.Error,
 		CreatedAt:     r.CreatedAt,
 		UpdatedAt:     r.UpdatedAt,
@@ -57,6 +59,7 @@ func RowStateFromApp(jobID string, state *RowState) *RowStateDB {
 		Stage:         state.Stage,
 		ExtractedData: state.ExtractedData,
 		Confidence:    state.Confidence,
+		Sources:       state.Sources,
 		Error:         state.Error,
 		CreatedAt:     state.CreatedAt,
 		UpdatedAt:     state.UpdatedAt,

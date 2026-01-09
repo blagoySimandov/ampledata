@@ -248,6 +248,7 @@ func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *m
 		Set("stage = EXCLUDED.stage").
 		Set("extracted_data = EXCLUDED.extracted_data").
 		Set("confidence = EXCLUDED.confidence").
+		Set("sources = EXCLUDED.sources").
 		Set("error = EXCLUDED.error").
 		Set("updated_at = EXCLUDED.updated_at").
 		Exec(ctx)
