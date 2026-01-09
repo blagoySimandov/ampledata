@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"math/rand"
 	"os"
 	"time"
 
@@ -12,17 +11,13 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-var (
-	Log     *slog.Logger
-	sampler Sampler
-)
+var Log *slog.Logger
 
 func init() {
 	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})
 	Log = slog.New(handler)
-	sampler = NewTailSampler(0.05) // 5% sampling for successful requests
 }
 
 // WideEvent represents a comprehensive log event with all context
@@ -86,46 +81,6 @@ type ErrorInfo struct {
 	Message   string `json:"message"`
 	Code      string `json:"code,omitempty"`
 	Retriable bool   `json:"retriable"`
-}
-
-// Sampler decides whether to keep an event based on tail-based sampling
-type Sampler interface {
-	ShouldSample(event *WideEvent) bool
-}
-
-// TailSampler implements tail-based sampling:
-// - Always keep errors
-// - Always keep slow requests
-// - Sample successful fast requests at a low rate
-type TailSampler struct {
-	successRate      float64
-	slowThresholdMs  int64
-	errorSampleRate  float64
-}
-
-// NewTailSampler creates a tail sampler with the given success rate
-func NewTailSampler(successRate float64) *TailSampler {
-	return &TailSampler{
-		successRate:     successRate,
-		slowThresholdMs: 2000, // 2 seconds
-		errorSampleRate: 1.0,  // Always keep errors
-	}
-}
-
-// ShouldSample implements tail-based sampling logic
-func (s *TailSampler) ShouldSample(event *WideEvent) bool {
-	// Always keep errors
-	if event.Status == "error" || event.Status == "failed" || event.Error != nil {
-		return rand.Float64() < s.errorSampleRate
-	}
-
-	// Always keep slow requests
-	if event.DurationMs > s.slowThresholdMs {
-		return true
-	}
-
-	// Sample successful fast requests at low rate
-	return rand.Float64() < s.successRate
 }
 
 // NewJobEvent creates a new wide event for a job workflow
@@ -239,12 +194,8 @@ func (e *WideEvent) EmitError(wfCtx workflow.Context, err error) {
 	e.emit(wfCtx)
 }
 
-// emit writes the event to logs if it passes sampling
+// emit writes the event to logs
 func (e *WideEvent) emit(wfCtx workflow.Context) {
-	if !sampler.ShouldSample(e) {
-		return
-	}
-
 	logger := workflow.GetLogger(wfCtx)
 
 	// Convert to map for structured logging
@@ -287,10 +238,6 @@ func (e *WideEvent) EmitActivityError(ctx context.Context, err error) {
 
 // emitActivity writes the activity event to logs
 func (e *WideEvent) emitActivity(ctx context.Context) {
-	if !sampler.ShouldSample(e) {
-		return
-	}
-
 	// Convert to structured fields
 	fields := e.toSlogAttrs()
 
