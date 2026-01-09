@@ -102,7 +102,7 @@ type StateUpdateInput struct {
 	JobID  string
 	RowKey string
 	Stage  models.RowStage
-	Data   map[string]interface{}
+	Data   *models.StateUpdate
 }
 
 // FeedbackAnalysisInput is used for analyzing enrichment results to determine if feedback is needed
@@ -121,8 +121,6 @@ type FeedbackAnalysisOutput struct {
 	MissingColumns       []string
 	AverageConfidence    float64
 }
-
-// Activities Implementation
 
 // GeneratePatterns generates query patterns for the enrichment job
 func (a *Activities) GeneratePatterns(ctx context.Context, input GeneratePatternsInput) (*GeneratePatternsOutput, error) {

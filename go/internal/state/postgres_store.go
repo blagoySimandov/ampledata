@@ -245,7 +245,6 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *models.RowState) error {
 	dbState := models.RowStateFromApp(jobID, state)
 
-	// Build the insert/update dynamically to avoid storing nil as JSON "null"
 	now := time.Now()
 	dbState.UpdatedAt = now
 	if dbState.CreatedAt.IsZero() {
@@ -258,15 +257,15 @@ func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *m
 	updateCols := []string{"stage", "updated_at"}
 
 	// Only include JSONB columns if they have data
-	if state.ExtractedData != nil && len(state.ExtractedData) > 0 {
+	if state.ExtractedData != nil {
 		insertCols = append(insertCols, "extracted_data")
 		updateCols = append(updateCols, "extracted_data")
 	}
-	if state.Confidence != nil && len(state.Confidence) > 0 {
+	if state.Confidence != nil {
 		insertCols = append(insertCols, "confidence")
 		updateCols = append(updateCols, "confidence")
 	}
-	if state.Sources != nil && len(state.Sources) > 0 {
+	if state.Sources != nil {
 		insertCols = append(insertCols, "sources")
 		updateCols = append(updateCols, "sources")
 	}

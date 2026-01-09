@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type RowStage string
 
@@ -56,6 +58,29 @@ type RowState struct {
 	Error         *string                         `json:"error,omitempty"`
 	CreatedAt     time.Time                       `json:"created_at"`
 	UpdatedAt     time.Time                       `json:"updated_at"`
+}
+
+type StateUpdate struct {
+	ExtractedData map[string]interface{}          `json:"extracted_data,omitempty"`
+	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources       []string                        `json:"sources,omitempty"`
+	Error         *string                         `json:"error,omitempty"`
+}
+
+func (s *RowState) ApplyUpdate(u *StateUpdate) {
+	if u.ExtractedData != nil {
+		s.ExtractedData = u.ExtractedData
+	}
+	if u.Confidence != nil {
+		s.Confidence = u.Confidence
+	}
+	if u.Sources != nil {
+		s.Sources = u.Sources
+	}
+	if u.Error != nil {
+		s.Error = u.Error
+		s.Stage = StageFailed
+	}
 }
 
 type JobProgress struct {

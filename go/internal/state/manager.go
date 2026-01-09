@@ -2,7 +2,6 @@ package state
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -77,29 +76,15 @@ func (m *StateManager) GetWorkflowID(jobID string) (string, string) {
 	return "", ""
 }
 
-func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStage models.RowStage, dataUpdate map[string]interface{}) error {
-	cancelled, err := m.CheckCancelled(ctx, jobID)
-	if err != nil {
-		return fmt.Errorf("failed to check cancellation: %w", err)
-	}
-
-	if cancelled {
-		state, err := m.store.GetRowState(ctx, jobID, key)
-		if err == nil && state != nil {
-			if state.Stage != models.StageCompleted && state.Stage != models.StageFailed {
-				state.Stage = models.StageCancelled
-				state.UpdatedAt = time.Now()
-				m.store.SaveRowState(ctx, jobID, state)
-			}
-		}
-		return fmt.Errorf("job %s was cancelled", jobID)
+func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStage models.RowStage, update *models.StateUpdate) error {
+	if err := m.checkAndHandleCancellation(ctx, jobID, key); err != nil {
+		return err
 	}
 
 	state, err := m.store.GetRowState(ctx, jobID, key)
 	if err != nil {
 		return fmt.Errorf("failed to get row state: %w", err)
 	}
-
 	if state == nil {
 		return fmt.Errorf("no state found for key %s", key)
 	}
@@ -107,43 +92,37 @@ func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStag
 	state.Stage = toStage
 	state.UpdatedAt = time.Now()
 
-	if dataUpdate != nil {
-		if extractedData, ok := dataUpdate["extracted_data"]; ok {
-			if data, ok := extractedData.(map[string]interface{}); ok {
-				state.ExtractedData = data
-			}
-		}
-		if confidence, ok := dataUpdate["confidence"]; ok && confidence != nil {
-			// Re-marshal and unmarshal to handle JSON-deserialized types
-			if jsonData, err := json.Marshal(confidence); err == nil {
-				var conf map[string]*models.FieldConfidenceInfo
-				if err := json.Unmarshal(jsonData, &conf); err == nil && len(conf) > 0 {
-					state.Confidence = conf
-				}
-			}
-		}
-		if sources, ok := dataUpdate["sources"]; ok && sources != nil {
-			// Re-marshal and unmarshal to handle JSON-deserialized types
-			if jsonData, err := json.Marshal(sources); err == nil {
-				var src []string
-				if err := json.Unmarshal(jsonData, &src); err == nil && len(src) > 0 {
-					state.Sources = src
-				}
-			}
-		}
-		if errMsg, ok := dataUpdate["error"]; ok {
-			if errStr, ok := errMsg.(string); ok {
-				state.Error = &errStr
-				state.Stage = models.StageFailed
-			}
-		}
+	if update != nil {
+		state.ApplyUpdate(update)
 	}
 
 	if err := m.store.SaveRowState(ctx, jobID, state); err != nil {
 		return fmt.Errorf("failed to save row state: %w", err)
 	}
-
 	return nil
+}
+
+func (m *StateManager) checkAndHandleCancellation(ctx context.Context, jobID, key string) error {
+	cancelled, err := m.CheckCancelled(ctx, jobID)
+	if err != nil {
+		return fmt.Errorf("failed to check cancellation: %w", err)
+	}
+	if !cancelled {
+		return nil
+	}
+
+	// Best-effort update to cancelled state
+	if state, err := m.store.GetRowState(ctx, jobID, key); err == nil && state != nil {
+		if state.Stage != models.StageCompleted && state.Stage != models.StageFailed {
+			state.Stage = models.StageCancelled
+			state.UpdatedAt = time.Now()
+			err := m.store.SaveRowState(ctx, jobID, state)
+			if err != nil {
+				return fmt.Errorf("failed to save row state: %w", err)
+			}
+		}
+	}
+	return fmt.Errorf("job %s was cancelled", jobID)
 }
 
 func (m *StateManager) GetPendingForStage(ctx context.Context, jobID string, stage models.RowStage) ([]*models.RowState, error) {

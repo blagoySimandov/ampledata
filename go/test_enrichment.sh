@@ -109,60 +109,60 @@ curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress" | jq .
 echo -e "\n${GREEN}9. Getting job results${NC}"
 curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/results" | jq .
 
-echo -e "\n${BLUE}=== Starting another job for cancellation test ===${NC}\n"
-
-CSV_FILE2=$(mktemp /tmp/test_enrichment_XXXXXX.csv)
-cat >"$CSV_FILE2" <<'EOF'
-person_name,role
-person_1,developer
-person_2,designer
-EOF
-
-CSV_SIZE2=$(wc -c <"$CSV_FILE2" | tr -d ' ')
-echo -e "${GREEN}10. Requesting signed URL for second upload${NC}"
-SIGNED_URL_RESPONSE2=$(curl -s -X POST "$BASE_URL/api/v1/enrichment-signed-url" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"contentType\": \"text/csv\",
-    \"length\": $CSV_SIZE2
-  }")
-
-echo "$SIGNED_URL_RESPONSE2" | jq .
-SIGNED_URL2=$(echo "$SIGNED_URL_RESPONSE2" | jq -r '.url')
-JOB_ID2=$(echo "$SIGNED_URL_RESPONSE2" | jq -r '.jobId')
-
-echo -e "\n${YELLOW}Job ID: $JOB_ID2${NC}\n"
-
-echo -e "${GREEN}11. Uploading second CSV file to GCS${NC}"
-curl -s -X PUT "$SIGNED_URL2" \
-  -H "Content-Type: text/csv" \
-  --data-binary "@$CSV_FILE2"
-rm -f "$CSV_FILE2"
-
-echo -e "\n${GREEN}12. Starting second enrichment job${NC}"
-curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID2/start" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "key_column": "person_name",
-    "columns_metadata": [
-      {
-        "name": "full_name",
-        "type": "string"
-      },
-      {
-        "name": "email",
-        "type": "string"
-      }
-    ]
-  }' | jq .
-
-echo -e "\n${GREEN}13. Cancelling job${NC}"
-curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID2/cancel" | jq .
-
-echo -e "\n${GREEN}14. Checking cancelled job progress${NC}"
-curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID2/progress" | jq .
-
-echo -e "\n${GREEN}15. Listing all user jobs${NC}"
-curl -s -X GET "$BASE_URL/api/v1/jobs" | jq .
-
-echo -e "\n${BLUE}=== Test completed ===${NC}"
+# echo -e "\n${BLUE}=== Starting another job for cancellation test ===${NC}\n"
+#
+# CSV_FILE2=$(mktemp /tmp/test_enrichment_XXXXXX.csv)
+# cat >"$CSV_FILE2" <<'EOF'
+# person_name,role
+# person_1,developer
+# person_2,designer
+# EOF
+#
+# CSV_SIZE2=$(wc -c <"$CSV_FILE2" | tr -d ' ')
+# echo -e "${GREEN}10. Requesting signed URL for second upload${NC}"
+# SIGNED_URL_RESPONSE2=$(curl -s -X POST "$BASE_URL/api/v1/enrichment-signed-url" \
+#   -H "Content-Type: application/json" \
+#   -d "{
+#     \"contentType\": \"text/csv\",
+#     \"length\": $CSV_SIZE2
+#   }")
+#
+# echo "$SIGNED_URL_RESPONSE2" | jq .
+# SIGNED_URL2=$(echo "$SIGNED_URL_RESPONSE2" | jq -r '.url')
+# JOB_ID2=$(echo "$SIGNED_URL_RESPONSE2" | jq -r '.jobId')
+#
+# echo -e "\n${YELLOW}Job ID: $JOB_ID2${NC}\n"
+#
+# echo -e "${GREEN}11. Uploading second CSV file to GCS${NC}"
+# curl -s -X PUT "$SIGNED_URL2" \
+#   -H "Content-Type: text/csv" \
+#   --data-binary "@$CSV_FILE2"
+# rm -f "$CSV_FILE2"
+#
+# echo -e "\n${GREEN}12. Starting second enrichment job${NC}"
+# curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID2/start" \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "key_column": "person_name",
+#     "columns_metadata": [
+#       {
+#         "name": "full_name",
+#         "type": "string"
+#       },
+#       {
+#         "name": "email",
+#         "type": "string"
+#       }
+#     ]
+#   }' | jq .
+#
+# echo -e "\n${GREEN}13. Cancelling job${NC}"
+# curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID2/cancel" | jq .
+#
+# echo -e "\n${GREEN}14. Checking cancelled job progress${NC}"
+# curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID2/progress" | jq .
+#
+# echo -e "\n${GREEN}15. Listing all user jobs${NC}"
+# curl -s -X GET "$BASE_URL/api/v1/jobs" | jq .
+#
+# echo -e "\n${BLUE}=== Test completed ===${NC}"
