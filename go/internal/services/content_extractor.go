@@ -13,8 +13,6 @@ import (
 	"google.golang.org/genai"
 )
 
-// ExtractionResult represents the result of content extraction
-// Uses models.FieldConfidenceInfo for consistency across the codebase
 type ExtractionResult struct {
 	ExtractedData map[string]interface{}                  `json:"extracted_data"`
 	Confidence    map[string]*models.FieldConfidenceInfo `json:"confidence"`

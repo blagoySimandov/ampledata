@@ -235,7 +235,6 @@ func (h *EnrichHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert domain models to API DTOs using conversion function
 	summaries := make([]*models.JobSummary, len(jobs))
 	for i, job := range jobs {
 		summaries[i] = models.ToJobSummary(job)

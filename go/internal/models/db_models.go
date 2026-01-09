@@ -7,7 +7,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// JobDB represents the database model for a job (with Bun ORM tags)
 type JobDB struct {
 	bun.BaseModel `bun:"table:jobs,alias:j"`
 
@@ -24,7 +23,6 @@ type JobDB struct {
 	UpdatedAt       time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
-// ToJob converts JobDB (database model) to Job (domain model)
 func (j *JobDB) ToJob() *Job {
 	return &Job{
 		JobID:           j.JobID,
@@ -41,7 +39,6 @@ func (j *JobDB) ToJob() *Job {
 	}
 }
 
-// JobFromDomain converts Job (domain model) to JobDB (database model)
 func JobFromDomain(job *Job) *JobDB {
 	return &JobDB{
 		JobID:           job.JobID,

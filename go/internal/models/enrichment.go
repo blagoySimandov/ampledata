@@ -54,7 +54,6 @@ type JobProgressResponse struct {
 	Status      JobStatus        `json:"status"`
 }
 
-// ToJobSummary converts Job (domain model) to JobSummary (API DTO)
 func ToJobSummary(job *Job) *JobSummary {
 	return &JobSummary{
 		JobID:     job.JobID,
@@ -66,7 +65,6 @@ func ToJobSummary(job *Job) *JobSummary {
 	}
 }
 
-// ToEnrichmentResult converts RowState (domain model) to EnrichmentResult (API DTO)
 func ToEnrichmentResult(row *RowState) *EnrichmentResult {
 	sources := row.Sources
 	if sources == nil {

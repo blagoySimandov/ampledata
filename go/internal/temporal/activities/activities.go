@@ -166,20 +166,24 @@ func (a *Activities) SerpFetch(ctx context.Context, input SerpFetchInput) (*Serp
 	}, nil
 }
 
+func mergeSerpResults(results []*models.GoogleSearchResults) *models.GoogleSearchResults {
+	merged := results[0]
+	for i := 1; i < len(results); i++ {
+		merged.Organic = append(merged.Organic, results[i].Organic...)
+		if merged.KnowledgeGraph == nil {
+			merged.KnowledgeGraph = results[i].KnowledgeGraph
+		}
+		merged.PeopleAlsoAsk = append(merged.PeopleAlsoAsk, results[i].PeopleAlsoAsk...)
+	}
+	return merged
+}
+
 func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*DecisionOutput, error) {
 	if input.SerpData == nil || len(input.SerpData.Results) == 0 {
 		return nil, fmt.Errorf("no SERP data available for decision making")
 	}
 
-	mergedResults := input.SerpData.Results[0]
-	for i := 1; i < len(input.SerpData.Results); i++ {
-		mergedResults.Organic = append(mergedResults.Organic, input.SerpData.Results[i].Organic...)
-		if mergedResults.KnowledgeGraph == nil {
-			mergedResults.KnowledgeGraph = input.SerpData.Results[i].KnowledgeGraph
-		}
-		mergedResults.PeopleAlsoAsk = append(mergedResults.PeopleAlsoAsk, input.SerpData.Results[i].PeopleAlsoAsk...)
-	}
-
+	mergedResults := mergeSerpResults(input.SerpData.Results)
 	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("decision making failed: %w", err)
@@ -242,37 +246,62 @@ func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput,
 	}, nil
 }
 
+func filterMissingColumnsMetadata(missingColumns []string, allColumns []*models.ColumnMetadata) []*models.ColumnMetadata {
+	result := []*models.ColumnMetadata{}
+	for _, colName := range missingColumns {
+		for _, col := range allColumns {
+			if col.Name == colName {
+				result = append(result, col)
+				break
+			}
+		}
+	}
+	return result
+}
+
+func (a *Activities) extractFromContent(ctx context.Context, content, rowKey string, metadata []*models.ColumnMetadata) (map[string]interface{}, map[string]*models.FieldConfidenceInfo, error) {
+	result, err := a.contentExtractor.Extract(ctx, content, rowKey, metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("content extraction failed: %w", err)
+	}
+
+	confidence := result.Confidence
+	if confidence == nil {
+		confidence = make(map[string]*models.FieldConfidenceInfo)
+	}
+	return result.ExtractedData, confidence, nil
+}
+
+func mergeDecisionData(extractedData map[string]interface{}, confidence map[string]*models.FieldConfidenceInfo, decision *models.Decision) {
+	if decision == nil || decision.ExtractedData == nil {
+		return
+	}
+
+	for k, v := range decision.ExtractedData {
+		if _, exists := extractedData[k]; !exists {
+			extractedData[k] = v
+			if confidence[k] == nil {
+				confidence[k] = &models.FieldConfidenceInfo{
+					Score:  0.8,
+					Reason: "Extracted from SERP results",
+				}
+			}
+		}
+	}
+}
+
 func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractOutput, error) {
 	var extractedData map[string]interface{}
 	var confidence map[string]*models.FieldConfidenceInfo
 
 	if input.CrawlResults != nil && input.CrawlResults.Content != nil && *input.CrawlResults.Content != "" {
-		missingColsMetadata := []*models.ColumnMetadata{}
-		for _, colName := range input.Decision.MissingColumns {
-			for _, col := range input.ColumnsMetadata {
-				if col.Name == colName {
-					missingColsMetadata = append(missingColsMetadata, col)
-					break
-				}
-			}
-		}
+		missingColsMetadata := filterMissingColumnsMetadata(input.Decision.MissingColumns, input.ColumnsMetadata)
 
 		if len(missingColsMetadata) > 0 {
-			result, err := a.contentExtractor.Extract(
-				ctx,
-				*input.CrawlResults.Content,
-				input.RowKey,
-				missingColsMetadata,
-			)
+			var err error
+			extractedData, confidence, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata)
 			if err != nil {
-				return nil, fmt.Errorf("content extraction failed: %w", err)
-			}
-
-			extractedData = result.ExtractedData
-			// No conversion needed - ExtractionResult already uses models.FieldConfidenceInfo
-			confidence = result.Confidence
-			if confidence == nil {
-				confidence = make(map[string]*models.FieldConfidenceInfo)
+				return nil, err
 			}
 		} else {
 			extractedData = make(map[string]interface{})
@@ -283,19 +312,7 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 		confidence = make(map[string]*models.FieldConfidenceInfo)
 	}
 
-	if input.Decision != nil && input.Decision.ExtractedData != nil {
-		for k, v := range input.Decision.ExtractedData {
-			if _, exists := extractedData[k]; !exists {
-				extractedData[k] = v
-				if confidence[k] == nil {
-					confidence[k] = &models.FieldConfidenceInfo{
-						Score:  0.8,
-						Reason: "Extracted from SERP results",
-					}
-				}
-			}
-		}
-	}
+	mergeDecisionData(extractedData, confidence, input.Decision)
 
 	logger.Log.Info("extraction completed",
 		"job_id", input.JobID,

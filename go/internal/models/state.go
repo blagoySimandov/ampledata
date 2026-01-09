@@ -27,7 +27,6 @@ const (
 	JobStatusCompleted JobStatus = "COMPLETED"
 )
 
-// Job represents the domain model for a job (without database tags)
 type Job struct {
 	JobID           string            `json:"job_id"`
 	UserID          string            `json:"user_id"`
