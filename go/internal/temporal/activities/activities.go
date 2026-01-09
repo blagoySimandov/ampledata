@@ -305,6 +305,11 @@ func mergeDecisionData(extractedData map[string]interface{}, confidence map[stri
 	}
 
 	for k, v := range decision.ExtractedData {
+		// Skip null values - if data wasn't extracted, don't add it with false confidence
+		if v == nil {
+			continue
+		}
+
 		if _, exists := extractedData[k]; !exists {
 			extractedData[k] = v
 			if confidence[k] == nil {
