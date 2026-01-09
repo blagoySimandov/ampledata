@@ -50,16 +50,12 @@ func main() {
 		log.Fatalf("Failed to create Gemini content extractor: %v", err)
 	}
 
-	// Create Temporal client
-	log.Printf("Connecting to Temporal at %s", cfg.TemporalHostPort)
 	tc, err := temporalClient.NewClient(cfg.TemporalHostPort, cfg.TemporalNamespace)
 	if err != nil {
 		log.Fatalf("Failed to create Temporal client: %v", err)
 	}
 	defer tc.Close()
-	log.Println("Connected to Temporal successfully")
 
-	// Create activities with all dependencies
 	acts := activities.NewActivities(
 		stateManager,
 		webSearcher,
@@ -69,15 +65,12 @@ func main() {
 		patternGenerator,
 	)
 
-	// Create and start Temporal worker
-	log.Printf("Starting Temporal worker on task queue: %s", cfg.TemporalTaskQueue)
 	w := worker.NewWorker(tc, cfg.TemporalTaskQueue, acts)
 	err = w.Start()
 	if err != nil {
 		log.Fatalf("Failed to start Temporal worker: %v", err)
 	}
 	defer w.Stop()
-	log.Println("Temporal worker started successfully")
 
 	// Create Temporal-based enricher
 	enr := enricher.NewTemporalEnricher(tc, stateManager, cfg.TemporalTaskQueue)

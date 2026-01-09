@@ -129,8 +129,6 @@ func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	log.Printf("User %s (%s) created pending job %s", user.Email, user.ID, jobID)
-
 	w.Header().Set("Content-Type", "application/json")
 	response := SignedURLResponse{
 		URL:   url,
@@ -203,8 +201,6 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to start job", http.StatusInternalServerError)
 		return
 	}
-
-	log.Printf("User %s (%s) started enrichment job %s with %d rows", user.Email, user.ID, jobID, len(rowKeys))
 
 	go h.enricher.Enrich(context.Background(), jobID, rowKeys, req.ColumnsMetadata)
 
