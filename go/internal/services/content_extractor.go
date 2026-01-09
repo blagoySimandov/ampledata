@@ -14,9 +14,9 @@ import (
 )
 
 type ExtractionResult struct {
-	ExtractedData map[string]interface{}                  `json:"extracted_data"`
+	ExtractedData map[string]interface{}                 `json:"extracted_data"`
 	Confidence    map[string]*models.FieldConfidenceInfo `json:"confidence"`
-	Reasoning     string                                  `json:"reasoning"`
+	Reasoning     string                                 `json:"reasoning"`
 }
 
 type ContentExtractor interface {
@@ -39,7 +39,7 @@ type GeminiContentExtractor struct {
 func NewGeminiContentExtractor(apiKey string) (*GeminiContentExtractor, error) {
 	ctx := context.Background() // ctx used for auth/initilization, not passed to later requests
 	client, err := genai.NewClient(ctx, nil)
-	model := "gemini-2.0-flash-lite"
+	model := "gemini-2.5-flash-lite"
 	if err != nil {
 		return nil, err
 	}
