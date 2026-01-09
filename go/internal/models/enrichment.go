@@ -53,3 +53,29 @@ type JobProgressResponse struct {
 	StartedAt   string           `json:"started_at"`
 	Status      JobStatus        `json:"status"`
 }
+
+func ToJobSummary(job *Job) *JobSummary {
+	return &JobSummary{
+		JobID:     job.JobID,
+		Status:    job.Status,
+		TotalRows: job.TotalRows,
+		FilePath:  job.FilePath,
+		CreatedAt: job.CreatedAt,
+		StartedAt: job.StartedAt,
+	}
+}
+
+func ToEnrichmentResult(row *RowState) *EnrichmentResult {
+	sources := row.Sources
+	if sources == nil {
+		sources = []string{}
+	}
+
+	return &EnrichmentResult{
+		Key:           row.Key,
+		ExtractedData: row.ExtractedData,
+		Confidence:    row.Confidence,
+		Sources:       sources,
+		Error:         row.Error,
+	}
+}

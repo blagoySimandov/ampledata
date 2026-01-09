@@ -148,16 +148,16 @@ func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID, fil
 	return nil
 }
 
-func (s *PostgresStore) GetJob(ctx context.Context, jobID string) (*models.JobDB, error) {
-	var job models.JobDB
+func (s *PostgresStore) GetJob(ctx context.Context, jobID string) (*models.Job, error) {
+	var jobDB models.JobDB
 	err := s.db.NewSelect().
-		Model(&job).
+		Model(&jobDB).
 		Where("job_id = ?", jobID).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job: %w", err)
 	}
-	return &job, nil
+	return jobDB.ToJob(), nil
 }
 
 func (s *PostgresStore) UpdateJobConfiguration(ctx context.Context, jobID, keyColumn string, columnsMetadata []*models.ColumnMetadata, entityType *string) error {
@@ -192,10 +192,10 @@ func (s *PostgresStore) StartJob(ctx context.Context, jobID string, totalRows in
 	return nil
 }
 
-func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.JobDB, error) {
-	var jobs []*models.JobDB
+func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.Job, error) {
+	var jobsDB []*models.JobDB
 	query := s.db.NewSelect().
-		Model(&jobs).
+		Model(&jobsDB).
 		Where("user_id = ?", userID).
 		Order("created_at DESC")
 
@@ -209,6 +209,11 @@ func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset
 	err := query.Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs by user: %w", err)
+	}
+
+	jobs := make([]*models.Job, len(jobsDB))
+	for i, jobDB := range jobsDB {
+		jobs[i] = jobDB.ToJob()
 	}
 	return jobs, nil
 }
@@ -242,21 +247,20 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 	})
 }
 
-func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *models.RowState) error {
+func prepareDBState(jobID string, state *models.RowState) *models.RowStateDB {
 	dbState := models.RowStateFromApp(jobID, state)
-
 	now := time.Now()
 	dbState.UpdatedAt = now
 	if dbState.CreatedAt.IsZero() {
 		dbState.CreatedAt = now
 	}
+	return dbState
+}
 
-	// Start with base columns for INSERT (includes created_at)
-	insertCols := []string{"job_id", "key", "stage", "created_at", "updated_at"}
-	// Columns to UPDATE (excludes created_at and PK columns)
-	updateCols := []string{"stage", "updated_at"}
+func determineColumns(state *models.RowState) (insertCols, updateCols []string) {
+	insertCols = []string{"job_id", "key", "stage", "created_at", "updated_at"}
+	updateCols = []string{"stage", "updated_at"}
 
-	// Only include JSONB columns if they have data
 	if state.ExtractedData != nil {
 		insertCols = append(insertCols, "extracted_data")
 		updateCols = append(updateCols, "extracted_data")
@@ -273,14 +277,18 @@ func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *m
 		insertCols = append(insertCols, "error")
 		updateCols = append(updateCols, "error")
 	}
+	return
+}
 
-	// Use INSERT ... ON CONFLICT DO UPDATE with only the columns that have data
+func (s *PostgresStore) SaveRowState(ctx context.Context, jobID string, state *models.RowState) error {
+	dbState := prepareDBState(jobID, state)
+	insertCols, updateCols := determineColumns(state)
+
 	query := s.db.NewInsert().
 		Model(dbState).
 		Column(insertCols...).
 		On("CONFLICT (job_id, key) DO UPDATE")
 
-	// Set only the update columns (excludes created_at)
 	for _, col := range updateCols {
 		query = query.Set("? = EXCLUDED.?", bun.Ident(col), bun.Ident(col))
 	}
@@ -366,24 +374,14 @@ func (s *PostgresStore) GetJobStatus(ctx context.Context, jobID string) (models.
 	return job.Status, nil
 }
 
-func (s *PostgresStore) GetJobProgress(ctx context.Context, jobID string) (*models.JobProgress, error) {
-	var job models.JobDB
+type stageCount struct {
+	Stage string `bun:"stage"`
+	Count int    `bun:"count"`
+}
 
+func (s *PostgresStore) fetchStageCounts(ctx context.Context, jobID string) (map[models.RowStage]int, error) {
+	var stageCounts []stageCount
 	err := s.db.NewSelect().
-		Model(&job).
-		Where("job_id = ?", jobID).
-		Scan(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get job info: %w", err)
-	}
-
-	type StageCount struct {
-		Stage string `bun:"stage"`
-		Count int    `bun:"count"`
-	}
-
-	var stageCounts []StageCount
-	err = s.db.NewSelect().
 		Model((*models.RowStateDB)(nil)).
 		Column("stage").
 		ColumnExpr("COUNT(*) as count").
@@ -398,7 +396,10 @@ func (s *PostgresStore) GetJobProgress(ctx context.Context, jobID string) (*mode
 	for _, sc := range stageCounts {
 		rowsByStage[models.RowStage(sc.Stage)] = sc.Count
 	}
+	return rowsByStage, nil
+}
 
+func buildJobProgress(jobID string, job *models.JobDB, rowsByStage map[models.RowStage]int) *models.JobProgress {
 	progress := &models.JobProgress{
 		JobID:       jobID,
 		TotalRows:   job.TotalRows,
@@ -408,7 +409,25 @@ func (s *PostgresStore) GetJobProgress(ctx context.Context, jobID string) (*mode
 	if job.StartedAt != nil {
 		progress.StartedAt = *job.StartedAt
 	}
-	return progress, nil
+	return progress
+}
+
+func (s *PostgresStore) GetJobProgress(ctx context.Context, jobID string) (*models.JobProgress, error) {
+	var job models.JobDB
+	err := s.db.NewSelect().
+		Model(&job).
+		Where("job_id = ?", jobID).
+		Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job info: %w", err)
+	}
+
+	rowsByStage, err := s.fetchStageCounts(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildJobProgress(jobID, &job, rowsByStage), nil
 }
 
 func (s *PostgresStore) Close() error {

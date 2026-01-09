@@ -13,15 +13,10 @@ import (
 	"google.golang.org/genai"
 )
 
-type FieldConfidence struct {
-	Score  float64 `json:"score"`  // 0.0 to 1.0
-	Reason string  `json:"reason"` // Brief explanation
-}
-
 type ExtractionResult struct {
-	ExtractedData map[string]interface{}      `json:"extracted_data"`
-	Confidence    map[string]*FieldConfidence `json:"confidence"`
-	Reasoning     string                      `json:"reasoning"`
+	ExtractedData map[string]interface{}                  `json:"extracted_data"`
+	Confidence    map[string]*models.FieldConfidenceInfo `json:"confidence"`
+	Reasoning     string                                  `json:"reasoning"`
 }
 
 type ContentExtractor interface {
@@ -144,14 +139,14 @@ func parseResponse(content string) (*ExtractionResult, error) {
 	if err := json.Unmarshal([]byte(content), &result); err != nil {
 		return &ExtractionResult{
 			ExtractedData: make(map[string]interface{}),
-			Confidence:    make(map[string]*FieldConfidence),
+			Confidence:    make(map[string]*models.FieldConfidenceInfo),
 			Reasoning:     fmt.Sprintf("Failed to parse LLM response: %s", content[:min(100, len(content))]),
 		}, nil
 	}
 
 	// Initialize confidence map if nil (for backwards compatibility)
 	if result.Confidence == nil {
-		result.Confidence = make(map[string]*FieldConfidence)
+		result.Confidence = make(map[string]*models.FieldConfidenceInfo)
 	}
 
 	return &result, nil

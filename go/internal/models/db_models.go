@@ -23,6 +23,38 @@ type JobDB struct {
 	UpdatedAt       time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
+func (j *JobDB) ToJob() *Job {
+	return &Job{
+		JobID:           j.JobID,
+		UserID:          j.UserID,
+		FilePath:        j.FilePath,
+		KeyColumn:       j.KeyColumn,
+		ColumnsMetadata: j.ColumnsMetadata,
+		EntityType:      j.EntityType,
+		TotalRows:       j.TotalRows,
+		StartedAt:       j.StartedAt,
+		Status:          j.Status,
+		CreatedAt:       j.CreatedAt,
+		UpdatedAt:       j.UpdatedAt,
+	}
+}
+
+func JobFromDomain(job *Job) *JobDB {
+	return &JobDB{
+		JobID:           job.JobID,
+		UserID:          job.UserID,
+		FilePath:        job.FilePath,
+		KeyColumn:       job.KeyColumn,
+		ColumnsMetadata: job.ColumnsMetadata,
+		EntityType:      job.EntityType,
+		TotalRows:       job.TotalRows,
+		StartedAt:       job.StartedAt,
+		Status:          job.Status,
+		CreatedAt:       job.CreatedAt,
+		UpdatedAt:       job.UpdatedAt,
+	}
+}
+
 type RowStateDB struct {
 	bun.BaseModel `bun:"table:row_states,alias:rs"`
 
