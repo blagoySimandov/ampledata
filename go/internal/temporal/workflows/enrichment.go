@@ -17,6 +17,7 @@ type EnrichmentWorkflowInput struct {
 	RowKey          string
 	ColumnsMetadata []*models.ColumnMetadata
 	QueryPatterns   []string
+	EntityType      string
 	RetryCount      int
 }
 
@@ -95,6 +96,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		RowKey:          input.RowKey,
 		SerpData:        serpOutput.SerpData,
 		ColumnsMetadata: input.ColumnsMetadata,
+		EntityType:      input.EntityType,
 	}).Get(ctx, &decisionOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
@@ -165,6 +167,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Decision:        decisionOutput.Decision,
 		CrawlResults:    crawlOutput.CrawlResults,
 		ColumnsMetadata: input.ColumnsMetadata,
+		EntityType:      input.EntityType,
 	}).Get(ctx, &extractOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Extraction failed: %v", err)

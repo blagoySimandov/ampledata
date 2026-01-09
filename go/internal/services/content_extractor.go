@@ -20,7 +20,7 @@ type ExtractionResult struct {
 }
 
 type ContentExtractor interface {
-	Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata) (*ExtractionResult, error)
+	Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, entityType string) (*ExtractionResult, error)
 }
 
 type GroqContentExtractor struct {
@@ -50,8 +50,8 @@ func NewGeminiContentExtractor(apiKey string) (*GeminiContentExtractor, error) {
 	}, nil
 }
 
-func (g *GeminiContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata) (*ExtractionResult, error) {
-	prompt := g.extractionPromptBuilder.Build(content, columnsMetadata, entityKey)
+func (g *GeminiContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, entityType string) (*ExtractionResult, error) {
+	prompt := g.extractionPromptBuilder.Build(content, columnsMetadata, entityKey, entityType)
 	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content: %w", err)
@@ -76,8 +76,8 @@ func NewGroqContentExtractor(apiKey string) *GroqContentExtractor {
 	}
 }
 
-func (g *GroqContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata) (*ExtractionResult, error) {
-	prompt := g.extractionPromptBuilder.Build(content, columnsMetadata, entityKey)
+func (g *GroqContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, entityType string) (*ExtractionResult, error) {
+	prompt := g.extractionPromptBuilder.Build(content, columnsMetadata, entityKey, entityType)
 
 	reqBody := map[string]interface{}{
 		"model": g.model,
