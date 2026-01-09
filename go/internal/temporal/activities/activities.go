@@ -3,15 +3,14 @@ package activities
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 
+	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
 
-// Activities contains all the dependencies needed for enrichment activities
 type Activities struct {
 	stateManager     *state.StateManager
 	webSearcher      services.WebSearcher
@@ -21,7 +20,6 @@ type Activities struct {
 	patternGenerator services.QueryPatternGenerator
 }
 
-// NewActivities creates a new Activities instance with all required dependencies
 func NewActivities(
 	stateManager *state.StateManager,
 	webSearcher services.WebSearcher,
@@ -39,8 +37,6 @@ func NewActivities(
 		patternGenerator: patternGenerator,
 	}
 }
-
-// Activity Input/Output structures
 
 type GeneratePatternsInput struct {
 	JobID           string
@@ -105,7 +101,6 @@ type StateUpdateInput struct {
 	Data   *models.StateUpdate
 }
 
-// FeedbackAnalysisInput is used for analyzing enrichment results to determine if feedback is needed
 type FeedbackAnalysisInput struct {
 	JobID           string
 	RowKey          string
@@ -114,7 +109,6 @@ type FeedbackAnalysisInput struct {
 	ColumnsMetadata []*models.ColumnMetadata
 }
 
-// FeedbackAnalysisOutput contains feedback information
 type FeedbackAnalysisOutput struct {
 	NeedsFeedback        bool
 	LowConfidenceColumns []string
@@ -122,43 +116,36 @@ type FeedbackAnalysisOutput struct {
 	AverageConfidence    float64
 }
 
-// GeneratePatterns generates query patterns for the enrichment job
 func (a *Activities) GeneratePatterns(ctx context.Context, input GeneratePatternsInput) (*GeneratePatternsOutput, error) {
 	patterns, err := a.patternGenerator.GeneratePatterns(ctx, input.ColumnsMetadata)
 	if err != nil {
-		log.Printf("Warning: pattern generation failed: %v. Using fallback patterns.", err)
-		// Use fallback pattern
+		logger.Log.Warn("pattern generation failed, using fallback", "error", err, "job_id", input.JobID)
 		patterns = []string{"%entity"}
 	}
 
-	log.Printf("[Activity] Generated %d patterns for job %s", len(patterns), input.JobID)
+	logger.Log.Info("patterns generated", "job_id", input.JobID, "count", len(patterns))
 
 	return &GeneratePatternsOutput{
 		Patterns: patterns,
 	}, nil
 }
 
-// SerpFetch performs web search for a row
 func (a *Activities) SerpFetch(ctx context.Context, input SerpFetchInput) (*SerpFetchOutput, error) {
-	// Build queries from patterns
 	queryBuilder := services.NewPatternQueryBuilder(input.QueryPatterns, input.ColumnsMetadata)
 	queries := queryBuilder.Build(input.RowKey)
 
 	allResults := []*models.GoogleSearchResults{}
 	var lastErr error
 
-	// Execute all queries
 	for _, query := range queries {
 		serp, err := a.webSearcher.Search(ctx, query)
 		if err != nil {
-			log.Printf("[Activity] SERP fetch error for query '%s': %v", query, err)
 			lastErr = err
 			continue
 		}
 		allResults = append(allResults, serp)
 	}
 
-	// If all queries failed, return error
 	if len(allResults) == 0 {
 		return nil, fmt.Errorf("all SERP queries failed: %w", lastErr)
 	}
@@ -168,21 +155,22 @@ func (a *Activities) SerpFetch(ctx context.Context, input SerpFetchInput) (*Serp
 		Results: allResults,
 	}
 
-	log.Printf("[Activity] SERP fetch completed for job %s, row %s: %d results from %d queries",
-		input.JobID, input.RowKey, len(allResults), len(queries))
+	logger.Log.Info("serp fetch completed",
+		"job_id", input.JobID,
+		"row_key", input.RowKey,
+		"results", len(allResults),
+		"queries", len(queries))
 
 	return &SerpFetchOutput{
 		SerpData: serpData,
 	}, nil
 }
 
-// MakeDecision analyzes SERP results and decides what to crawl
 func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*DecisionOutput, error) {
 	if input.SerpData == nil || len(input.SerpData.Results) == 0 {
 		return nil, fmt.Errorf("no SERP data available for decision making")
 	}
 
-	// Merge all SERP results
 	mergedResults := input.SerpData.Results[0]
 	for i := 1; i < len(input.SerpData.Results); i++ {
 		mergedResults.Organic = append(mergedResults.Organic, input.SerpData.Results[i].Organic...)
@@ -192,13 +180,11 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 		mergedResults.PeopleAlsoAsk = append(mergedResults.PeopleAlsoAsk, input.SerpData.Results[i].PeopleAlsoAsk...)
 	}
 
-	// Use decision maker to analyze results (max 3 URLs)
 	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata)
 	if err != nil {
 		return nil, fmt.Errorf("decision making failed: %w", err)
 	}
 
-	// Convert services.CrawlDecision to models.Decision
 	decision := &models.Decision{
 		URLsToCrawl:    crawlDecision.URLsToCrawl,
 		ExtractedData:  crawlDecision.ExtractedData,
@@ -206,38 +192,36 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 		MissingColumns: crawlDecision.MissingColumns,
 	}
 
-	log.Printf("[Activity] Decision made for job %s, row %s: %d URLs to crawl, %d missing columns",
-		input.JobID, input.RowKey, len(decision.URLsToCrawl), len(decision.MissingColumns))
+	logger.Log.Info("decision made",
+		"job_id", input.JobID,
+		"row_key", input.RowKey,
+		"urls_to_crawl", len(decision.URLsToCrawl),
+		"missing_columns", len(decision.MissingColumns))
 
 	return &DecisionOutput{
 		Decision: decision,
 	}, nil
 }
 
-// Crawl fetches content from selected URLs
 func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput, error) {
 	if input.Decision == nil {
 		return nil, fmt.Errorf("no decision data available for crawling")
 	}
 
-	// If no URLs to crawl, return empty result
 	if len(input.Decision.URLsToCrawl) == 0 {
-		log.Printf("[Activity] No URLs to crawl for job %s, row %s", input.JobID, input.RowKey)
 		return &CrawlOutput{
 			CrawlResults: &models.CrawlResults{
 				Content: nil,
-				Sources: nil, // Use nil instead of empty slice to avoid storing JSON []
+				Sources: nil,
 			},
 		}, nil
 	}
 
-	// Build query string from SERP queries
 	query := ""
 	if input.SerpData != nil && len(input.SerpData.Queries) > 0 {
 		query = strings.Join(input.SerpData.Queries, " ")
 	}
 
-	// Crawl the URLs
 	content, err := a.crawler.Crawl(ctx, input.Decision.URLsToCrawl, query)
 	if err != nil {
 		return nil, fmt.Errorf("crawling failed: %w", err)
@@ -248,22 +232,21 @@ func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput,
 		Sources: input.Decision.URLsToCrawl,
 	}
 
-	log.Printf("[Activity] Crawling completed for job %s, row %s: %d sources",
-		input.JobID, input.RowKey, len(input.Decision.URLsToCrawl))
+	logger.Log.Info("crawl completed",
+		"job_id", input.JobID,
+		"row_key", input.RowKey,
+		"sources", len(input.Decision.URLsToCrawl))
 
 	return &CrawlOutput{
 		CrawlResults: crawlResults,
 	}, nil
 }
 
-// Extract extracts structured data from crawled content
 func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractOutput, error) {
 	var extractedData map[string]interface{}
 	var confidence map[string]*models.FieldConfidenceInfo
 
-	// If we have crawled content, extract from it
 	if input.CrawlResults != nil && input.CrawlResults.Content != nil && *input.CrawlResults.Content != "" {
-		// Build metadata for missing columns
 		missingColsMetadata := []*models.ColumnMetadata{}
 		for _, colName := range input.Decision.MissingColumns {
 			for _, col := range input.ColumnsMetadata {
@@ -287,7 +270,6 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 
 			extractedData = result.ExtractedData
 
-			// Convert services.FieldConfidence to models.FieldConfidenceInfo
 			confidence = make(map[string]*models.FieldConfidenceInfo)
 			if result.Confidence != nil {
 				for k, v := range result.Confidence {
@@ -302,20 +284,17 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 			confidence = make(map[string]*models.FieldConfidenceInfo)
 		}
 	} else {
-		// No crawled content, use only decision stage data
 		extractedData = make(map[string]interface{})
 		confidence = make(map[string]*models.FieldConfidenceInfo)
 	}
 
-	// Merge with data extracted during decision stage
 	if input.Decision != nil && input.Decision.ExtractedData != nil {
 		for k, v := range input.Decision.ExtractedData {
 			if _, exists := extractedData[k]; !exists {
 				extractedData[k] = v
-				// Add confidence score for decision-stage extracted data
 				if confidence[k] == nil {
 					confidence[k] = &models.FieldConfidenceInfo{
-						Score:  0.8, // Decision stage extraction gets 0.8 confidence
+						Score:  0.8,
 						Reason: "Extracted from SERP results",
 					}
 				}
@@ -323,10 +302,11 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 		}
 	}
 
-	log.Printf("[Activity] Extraction completed for job %s, row %s: %d fields extracted",
-		input.JobID, input.RowKey, len(extractedData))
+	logger.Log.Info("extraction completed",
+		"job_id", input.JobID,
+		"row_key", input.RowKey,
+		"fields_extracted", len(extractedData))
 
-	// Return nil for empty maps to avoid storing JSON {} in database
 	var finalExtractedData map[string]interface{}
 	if len(extractedData) > 0 {
 		finalExtractedData = extractedData
@@ -343,7 +323,6 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 	}, nil
 }
 
-// UpdateState updates the row state in the database
 func (a *Activities) UpdateState(ctx context.Context, input StateUpdateInput) error {
 	err := a.stateManager.Transition(ctx, input.JobID, input.RowKey, input.Stage, input.Data)
 	if err != nil {
@@ -353,8 +332,6 @@ func (a *Activities) UpdateState(ctx context.Context, input StateUpdateInput) er
 	return nil
 }
 
-// AnalyzeFeedback analyzes the enrichment results to determine if feedback is needed
-// This supports the future feedback loop capability
 func (a *Activities) AnalyzeFeedback(ctx context.Context, input FeedbackAnalysisInput) (*FeedbackAnalysisOutput, error) {
 	output := &FeedbackAnalysisOutput{
 		NeedsFeedback:        false,
@@ -363,14 +340,12 @@ func (a *Activities) AnalyzeFeedback(ctx context.Context, input FeedbackAnalysis
 		AverageConfidence:    1.0,
 	}
 
-	// Check for missing columns
 	for _, col := range input.ColumnsMetadata {
 		if _, exists := input.ExtractedData[col.Name]; !exists {
 			output.MissingColumns = append(output.MissingColumns, col.Name)
 		}
 	}
 
-	// Check confidence scores
 	confidenceThreshold := 0.6
 	var totalConfidence float64
 	var confidenceCount int
@@ -388,22 +363,15 @@ func (a *Activities) AnalyzeFeedback(ctx context.Context, input FeedbackAnalysis
 		output.AverageConfidence = totalConfidence / float64(confidenceCount)
 	}
 
-	// Determine if feedback is needed
-	// Feedback is needed if there are missing columns or low confidence columns
 	if len(output.MissingColumns) > 0 || len(output.LowConfidenceColumns) > 0 {
 		output.NeedsFeedback = true
 	}
 
-	log.Printf("[Activity] Feedback analysis for job %s, row %s: needs_feedback=%v, avg_confidence=%.2f, missing=%d, low_confidence=%d",
-		input.JobID, input.RowKey, output.NeedsFeedback, output.AverageConfidence,
-		len(output.MissingColumns), len(output.LowConfidenceColumns))
-
 	return output, nil
 }
 
-// InitializeJob creates initial row states in the database
 func (a *Activities) InitializeJob(ctx context.Context, jobID string, rowKeys []string) error {
-	log.Printf("[Activity] Initializing job %s with %d rows", jobID, len(rowKeys))
+	logger.Log.Info("initializing job", "job_id", jobID, "rows", len(rowKeys))
 
 	err := a.stateManager.InitializeJob(ctx, jobID, rowKeys)
 	if err != nil {
@@ -413,9 +381,8 @@ func (a *Activities) InitializeJob(ctx context.Context, jobID string, rowKeys []
 	return nil
 }
 
-// CompleteJob marks the job as completed
 func (a *Activities) CompleteJob(ctx context.Context, jobID string) error {
-	log.Printf("[Activity] Completing job %s", jobID)
+	logger.Log.Info("completing job", "job_id", jobID)
 
 	err := a.stateManager.Complete(ctx, jobID)
 	if err != nil {
