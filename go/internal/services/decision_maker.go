@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"google.golang.org/genai"
 )
 
 type CrawlDecision struct {
@@ -230,6 +231,187 @@ func (g *GroqDecisionMaker) parseResponse(content string, serp *models.GoogleSea
 }
 
 func (g *GroqDecisionMaker) getMissingColumns(extractedData map[string]interface{}, columnsMetadata []*models.ColumnMetadata) []string {
+	if extractedData == nil {
+		missing := make([]string, len(columnsMetadata))
+		for i, col := range columnsMetadata {
+			missing[i] = col.Name
+		}
+		return missing
+	}
+
+	var missing []string
+	for _, col := range columnsMetadata {
+		if val, ok := extractedData[col.Name]; !ok || val == nil {
+			missing = append(missing, col.Name)
+		}
+	}
+
+	return missing
+}
+
+// GeminiDecisionMaker implements DecisionMaker using Google's Gemini API
+type GeminiDecisionMaker struct {
+	model  string
+	client *genai.Client
+}
+
+func NewGeminiDecisionMaker(apiKey string) (*GeminiDecisionMaker, error) {
+	ctx := context.Background() // ctx used for auth/initialization, not passed to later requests
+	client, err := genai.NewClient(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+	}
+	return &GeminiDecisionMaker{
+		model:  "gemini-2.0-flash-lite",
+		client: client,
+	}, nil
+}
+
+func (g *GeminiDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, entityType string) (*CrawlDecision, error) {
+	prompt := g.buildPrompt(serp, rowKey, maxURLs, columnsMetadata, entityType)
+
+	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate content: %w", err)
+	}
+
+	return g.parseResponse(result.Text(), serp, columnsMetadata)
+}
+
+func (g *GeminiDecisionMaker) buildPrompt(serp *models.GoogleSearchResults, entity string, maxURLs int, columnsMetadata []*models.ColumnMetadata, entityType string) string {
+	var columnsInfo []string
+	for _, col := range columnsMetadata {
+		desc := ""
+		if col.Description != nil {
+			desc = fmt.Sprintf(" (%s)", *col.Description)
+		}
+		columnsInfo = append(columnsInfo, fmt.Sprintf("- %s [type: %s]%s", col.Name, col.Type, desc))
+	}
+	columnsText := strings.Join(columnsInfo, "\n")
+
+	organicResults := ""
+	for i, result := range serp.Organic {
+		if i >= 10 {
+			break
+		}
+		title := ""
+		if result.Title != nil {
+			title = *result.Title
+		}
+		link := ""
+		if result.Link != nil {
+			link = *result.Link
+		}
+		snippet := ""
+		if result.Snippet != nil {
+			snippet = *result.Snippet
+		}
+		pos := i + 1
+		if result.Position != nil {
+			pos = *result.Position
+		}
+		organicResults += fmt.Sprintf("\nPosition %d: %s\nURL: %s\nSnippet: %s\n---", pos, title, link, snippet)
+	}
+
+	peopleAlsoAsk := ""
+	for i, item := range serp.PeopleAlsoAsk {
+		if i >= 3 {
+			break
+		}
+		peopleAlsoAsk += fmt.Sprintf("Q: %s A: %s\n", item.Question, item.Snippet)
+	}
+
+	return fmt.Sprintf(`You are a data extraction assistant. Analyze these search results for the %s "%s" and decide how to proceed.
+
+## CRITICAL: Entity Extraction Rules
+
+You are analyzing results for TARGET ENTITY: %s "%s"
+
+ALL extracted data must be about THIS SPECIFIC ENTITY - not about related or mentioned entities.
+
+When search results contain information about MULTIPLE entities:
+- ✓ Extract ONLY data clearly about the target entity "%s"
+- ✗ Do NOT extract data about related/mentioned entities
+- ✗ Do NOT select URLs primarily about different entities for crawling
+
+## Columns We Need to Extract
+%s
+
+## Search Results
+%s
+
+## People Also Ask
+%s
+
+## Your Task
+
+1. Extract ALL data you can see in the answer box and snippets that is about "%s" (%s):
+   - CRITICAL: Verify each piece of data is about the TARGET ENTITY, not related entities
+   - IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata
+   - For number types: use numeric values without quotes (e.g., 1000)
+   - For string types: use quoted strings
+   - For boolean types: use true/false without quotes
+   - For date types: use ISO 8601 format (YYYY-MM-DD)
+   - If unsure whether data applies to target entity, do NOT extract it
+
+2. Check if you extracted ALL the columns we need:
+   - If YES: Return empty urls_to_crawl array
+   - If NO: Select up to %d URLs to crawl for missing data, prioritizing:
+     * Official or authoritative sources about the TARGET ENTITY specifically
+     * URLs whose titles/snippets clearly reference the target entity "%s"
+     * Wikipedia pages specifically about the target entity
+     * Reliable data sources (official sites, registries, databases)
+     * Avoid: URLs primarily about related entities, SEO aggregators, third-party profiles
+
+   ⚠️  CRITICAL URL Selection:
+     - Verify URL titles and snippets are about "%s" (%s), not related entities
+     - Skip URLs that focus on different entities, even if they mention the target
+     - Prioritize direct/primary sources over indirect mentions
+
+## Entity Consistency Check
+
+Before responding:
+1. Review ALL extracted data - does it ALL refer to the same entity ("%s")?
+2. Review ALL selected URLs - are they primarily about "%s" (%s)?
+3. If you find mixed entity data, extract ONLY the data about the target entity
+4. In your reasoning, note any entity ambiguity you encountered
+
+## Response Format (JSON only, no markdown)
+{
+    "urls_to_crawl": ["url1", "url2"] or [],
+    "extracted_data": {"column_name": value_with_correct_type} or null,
+    "reasoning": "Explanation of what was extracted, what needs crawling, and any entity disambiguation performed"
+}`, entityType, entity, entityType, entity, entity, columnsText, organicResults, peopleAlsoAsk, entity, entityType, maxURLs, entity, entity, entityType, entity, entity, entityType)
+}
+
+func (g *GeminiDecisionMaker) parseResponse(content string, serp *models.GoogleSearchResults, columnsMetadata []*models.ColumnMetadata) (*CrawlDecision, error) {
+	content = cleanJSONMarkdown(content)
+
+	var decision CrawlDecision
+	if err := json.Unmarshal([]byte(content), &decision); err != nil {
+		fallbackURLs := []string{}
+		for i, result := range serp.Organic {
+			if i >= 3 {
+				break
+			}
+			if result.Link != nil {
+				fallbackURLs = append(fallbackURLs, *result.Link)
+			}
+		}
+
+		return &CrawlDecision{
+			URLsToCrawl:   fallbackURLs,
+			ExtractedData: nil,
+			Reasoning:     fmt.Sprintf("Failed to parse LLM response: %s. Falling back to top URLs.", content[:min(100, len(content))]),
+		}, nil
+	}
+
+	decision.MissingColumns = g.getMissingColumns(decision.ExtractedData, columnsMetadata)
+
+	return &decision, nil
+}
+
+func (g *GeminiDecisionMaker) getMissingColumns(extractedData map[string]interface{}, columnsMetadata []*models.ColumnMetadata) []string {
 	if extractedData == nil {
 		missing := make([]string, len(columnsMetadata))
 		for i, col := range columnsMetadata {

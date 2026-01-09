@@ -43,7 +43,10 @@ func main() {
 		log.Fatalf("Failed to create Gemini pattern generator: %v", err)
 	}
 	webSearcher := services.NewSerperClient(cfg.SerperAPIKey)
-	decisionMaker := services.NewGroqDecisionMaker(cfg.GroqAPIKey)
+	decisionMaker, err := services.NewGeminiDecisionMaker(cfg.GeminiAPIKey)
+	if err != nil {
+		log.Fatalf("Failed to create Gemini decision maker: %v", err)
+	}
 	crawler := services.NewCrawl4aiClient(cfg.Crawl4aiURL)
 	extractor, err := services.NewGeminiContentExtractor(cfg.GeminiAPIKey)
 	if err != nil {
