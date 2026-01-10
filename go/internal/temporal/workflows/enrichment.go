@@ -250,9 +250,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &feedbackOutput)
 
-	// Check if retry is needed and allowed
 	if feedbackOutput.NeedsFeedback && input.RetryCount < input.MaxRetries {
-		// Record this attempt
 		currentAttempt := &models.EnrichmentAttempt{
 			AttemptNumber:        input.RetryCount + 1,
 			QueryPatterns:        queryPatterns,
@@ -262,19 +260,61 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 
 		previousAttempts := append(input.PreviousAttempts, currentAttempt)
 
-		// Trigger retry with feedback
+		problematicColumns := make(map[string]bool)
+		for _, col := range feedbackOutput.LowConfidenceColumns {
+			problematicColumns[col] = true
+		}
+		for _, col := range feedbackOutput.MissingColumns {
+			problematicColumns[col] = true
+		}
+
+		filteredMetadata := []*models.ColumnMetadata{}
+		for _, col := range input.ColumnsMetadata {
+			if problematicColumns[col.Name] {
+				filteredMetadata = append(filteredMetadata, col)
+			}
+		}
+
 		retryInput := EnrichmentWorkflowInput{
 			JobID:            input.JobID,
 			RowKey:           input.RowKey,
-			ColumnsMetadata:  input.ColumnsMetadata,
-			QueryPatterns:    input.QueryPatterns, // Original patterns, will be regenerated
+			ColumnsMetadata:  filteredMetadata,
+			QueryPatterns:    input.QueryPatterns,
 			EntityType:       input.EntityType,
 			RetryCount:       input.RetryCount + 1,
 			PreviousAttempts: previousAttempts,
 			MaxRetries:       input.MaxRetries,
 		}
 
-		return EnrichmentWorkflow(ctx, retryInput)
+		retryOutput, err := EnrichmentWorkflow(ctx, retryInput)
+		if err != nil {
+			return output, err
+		}
+
+		if output.ExtractedData == nil {
+			output.ExtractedData = make(map[string]interface{})
+		}
+		if output.Confidence == nil {
+			output.Confidence = make(map[string]*models.FieldConfidenceInfo)
+		}
+
+		if retryOutput.ExtractedData != nil {
+			for k, v := range retryOutput.ExtractedData {
+				output.ExtractedData[k] = v
+			}
+		}
+		if retryOutput.Confidence != nil {
+			for k, v := range retryOutput.Confidence {
+				output.Confidence[k] = v
+			}
+		}
+		if retryOutput.Sources != nil {
+			output.Sources = append(output.Sources, retryOutput.Sources...)
+		}
+
+		output.IterationCount = retryOutput.IterationCount
+
+		return output, nil
 	}
 
 	workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
