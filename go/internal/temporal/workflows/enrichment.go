@@ -67,7 +67,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			PreviousAttempts: input.PreviousAttempts,
 		}).Get(ctx, &patternsOutput)
 		if err != nil {
-			// Fallback to original patterns if regeneration fails
+			// TODO: maybe stop the workflow if pattern generation fails ?
 			event.FailStage("PATTERN_REGENERATION", err)
 		} else {
 			queryPatterns = patternsOutput.Patterns

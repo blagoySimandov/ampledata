@@ -10,6 +10,7 @@ NC='\033[0m'
 
 echo -e "${BLUE}=== Testing Enrichment API (GCS File-Based Workflow) ===${NC}\n"
 
+rm -f /tmp/test_enrichment_*.csv 2>/dev/null
 CSV_FILE=$(mktemp /tmp/test_enrichment_XXXXXX.csv)
 cat >"$CSV_FILE" <<'EOF'
 company_name,industry,country
