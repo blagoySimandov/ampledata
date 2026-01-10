@@ -16,6 +16,7 @@ import (
 
 type QueryPatternGenerator interface {
 	GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error)
+	GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error)
 }
 
 type GeminiPatternGenerator struct {
@@ -37,6 +38,17 @@ func NewGeminiPatternGenerator(apiKey string) (*GeminiPatternGenerator, error) {
 
 func (g *GeminiPatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	prompt := g.buildPrompt(columnsMetadata)
+
+	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
+	if err != nil {
+		return g.getFallbackPatterns(columnsMetadata), fmt.Errorf("failed to generate content: %w", err)
+	}
+
+	return g.parseResponse(result.Text(), columnsMetadata)
+}
+
+func (g *GeminiPatternGenerator) GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error) {
+	prompt := g.buildPromptWithFeedback(columnsMetadata, previousAttempts)
 
 	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
 	if err != nil {
@@ -101,6 +113,77 @@ Output: [
 Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText)
 }
 
+func (g *GeminiPatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) string {
+	var columnsInfo []string
+	for _, col := range columnsMetadata {
+		desc := ""
+		if col.Description != nil {
+			desc = fmt.Sprintf(": %s", *col.Description)
+		}
+		columnsInfo = append(columnsInfo, fmt.Sprintf("- %s (type: %s)%s", col.Name, col.Type, desc))
+	}
+	columnsText := strings.Join(columnsInfo, "\n")
+
+	feedbackText := ""
+	if len(previousAttempts) > 0 {
+		feedbackText = "\n\nPREVIOUS ATTEMPTS THAT FAILED:\n"
+		for _, attempt := range previousAttempts {
+			feedbackText += fmt.Sprintf("\nAttempt %d:\n", attempt.AttemptNumber)
+			feedbackText += fmt.Sprintf("  Patterns tried: %s\n", strings.Join(attempt.QueryPatterns, ", "))
+			if len(attempt.MissingColumns) > 0 {
+				feedbackText += fmt.Sprintf("  Missing columns: %s\n", strings.Join(attempt.MissingColumns, ", "))
+			}
+			if len(attempt.LowConfidenceColumns) > 0 {
+				feedbackText += fmt.Sprintf("  Low confidence columns: %s\n", strings.Join(attempt.LowConfidenceColumns, ", "))
+			}
+		}
+		feedbackText += "\nYOUR TASK: Generate DIFFERENT query patterns that will help find the missing or low-confidence columns. Try alternative phrasings and search angles.\n"
+	}
+
+	return fmt.Sprintf(`You are a Google search query optimization expert. Your task is to create query PATTERNS
+for finding information about entities and their attributes.
+
+ENTITY FORMAT EXAMPLES:
+- company:openai
+- company:stripe
+- company:anthropic
+
+COLUMNS TO FIND (%d columns):
+%s%s
+
+YOUR TASK:
+1. Analyze the columns and determine the optimal number of search queries (1-3 patterns)
+2. Group related columns together in the same query pattern
+3. Write queries in natural language that a human would type into Google
+4. Use ONLY the %%entity placeholder - everything else should be natural language
+5. Balance thoroughness vs SERP API costs:
+   - Use 1 pattern if columns are closely related (1-5 columns)
+   - Use 2-3 patterns if columns are diverse or many (6-15 columns)
+
+CRITICAL RULES:
+- Only use %%entity as a placeholder (replaced with entity value at runtime)
+- Do NOT create placeholders from column names
+- Write realistic Google search queries in natural language
+- Return ONLY valid JSON array of pattern strings
+- Each pattern max 150 characters
+- Prioritize search accuracy over minimizing queries
+
+CORRECT EXAMPLES:
+Input: Columns=[founder, founder_picture_url, website, employee_count]
+Output: ["%%entity founder picture", "%%entity company website employee count"]
+
+Input: Columns=[CEO, Revenue, Founded, Employees]
+Output: ["%%entity company CEO revenue founded employees"]
+
+Input: Columns=[CEO, Industry, Revenue, Market_Cap, Headquarters]
+Output: [
+  "%%entity company CEO headquarters founded",
+  "%%entity industry revenue market cap financials"
+]
+
+Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText, feedbackText)
+}
+
 func (g *GeminiPatternGenerator) parseResponse(content string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	content = cleanJSONMarkdown(content)
 	content = strings.TrimSpace(content)
@@ -148,8 +231,14 @@ func NewGroqPatternGenerator(apiKey string) *GroqPatternGenerator {
 }
 
 func (g *GroqPatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
-	prompt := g.buildPrompt(columnsMetadata)
+	return g.generateWithPrompt(ctx, columnsMetadata, g.buildPrompt(columnsMetadata))
+}
 
+func (g *GroqPatternGenerator) GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error) {
+	return g.generateWithPrompt(ctx, columnsMetadata, g.buildPromptWithFeedback(columnsMetadata, previousAttempts))
+}
+
+func (g *GroqPatternGenerator) generateWithPrompt(ctx context.Context, columnsMetadata []*models.ColumnMetadata, prompt string) ([]string, error) {
 	reqBody := map[string]interface{}{
 		"model": g.model,
 		"messages": []map[string]string{
@@ -248,6 +337,70 @@ Output: [
 ]
 
 Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText)
+}
+
+func (g *GroqPatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) string {
+	var columnsInfo []string
+	for _, col := range columnsMetadata {
+		desc := ""
+		if col.Description != nil {
+			desc = fmt.Sprintf(": %s", *col.Description)
+		}
+		columnsInfo = append(columnsInfo, fmt.Sprintf("- %%%s (type: %s)%s", col.Name, col.Type, desc))
+	}
+	columnsText := strings.Join(columnsInfo, "\n")
+
+	feedbackText := ""
+	if len(previousAttempts) > 0 {
+		feedbackText = "\n\nPREVIOUS ATTEMPTS THAT FAILED:\n"
+		for _, attempt := range previousAttempts {
+			feedbackText += fmt.Sprintf("\nAttempt %d:\n", attempt.AttemptNumber)
+			feedbackText += fmt.Sprintf("  Patterns tried: %s\n", strings.Join(attempt.QueryPatterns, ", "))
+			if len(attempt.MissingColumns) > 0 {
+				feedbackText += fmt.Sprintf("  Missing columns: %s\n", strings.Join(attempt.MissingColumns, ", "))
+			}
+			if len(attempt.LowConfidenceColumns) > 0 {
+				feedbackText += fmt.Sprintf("  Low confidence columns: %s\n", strings.Join(attempt.LowConfidenceColumns, ", "))
+			}
+		}
+		feedbackText += "\nYOUR TASK: Generate DIFFERENT query patterns that will help find the missing or low-confidence columns. Try alternative phrasings and search angles.\n"
+	}
+
+	return fmt.Sprintf(`You are a Google search query optimization expert. Your task is to create query PATTERNS
+(templates) for finding information about entities and their attributes.
+
+COLUMNS TO FIND (%d columns):
+%s%s
+
+YOUR TASK:
+1. Analyze the columns and determine the optimal number of search queries (1-3 patterns)
+2. Group related columns together in the same query pattern
+3. Create patterns using placeholders:
+   - %%entity = the entity being searched (e.g., company name, person name)
+   - %%ColumnName = column name placeholders (e.g., %%CEO, %%Revenue)
+4. Balance thoroughness vs SERP API costs:
+   - Use 1 pattern if columns are closely related (1-5 columns)
+   - Use 2-3 patterns if columns are diverse or many (6-15 columns)
+5. Include strategic keywords (e.g., "company", "financials", "founded")
+
+RULES:
+- Return ONLY valid JSON array of pattern strings
+- Each pattern max 150 characters
+- Use quotes strategically for exact phrases
+- Prioritize search accuracy over minimizing queries
+
+EXAMPLES:
+Input: Columns=[CEO, Revenue, Founded, Employees]
+Output: ["%%entity company %%CEO %%Revenue %%Founded %%Employees"]
+
+Input: Columns=[CEO, Founded, Industry, Revenue, Market_Cap, Headquarters, Website, Description]
+Output: [
+  "%%entity company %%CEO %%Founded %%Headquarters",
+  "%%entity %%Industry %%Revenue %%Market_Cap financials",
+  "%%entity %%Website %%Description about"
+]
+
+Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText, feedbackText)
 }
 
 func (g *GroqPatternGenerator) parseResponse(content string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {

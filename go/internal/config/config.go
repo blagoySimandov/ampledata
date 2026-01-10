@@ -22,6 +22,9 @@ type Config struct {
 	TemporalHostPort  string
 	TemporalNamespace string
 	TemporalTaskQueue string
+
+	// Enrichment configuration
+	MaxEnrichmentRetries int
 }
 
 func Load() *Config {
@@ -42,6 +45,9 @@ func Load() *Config {
 		TemporalHostPort:  getEnv("TEMPORAL_HOST_PORT", "localhost:7233"),
 		TemporalNamespace: getEnv("TEMPORAL_NAMESPACE", "default"),
 		TemporalTaskQueue: getEnv("TEMPORAL_TASK_QUEUE", "ampledata-enrichment"),
+
+		// Enrichment settings
+		MaxEnrichmentRetries: getEnvInt("MAX_ENRICHMENT_RETRIES", 1),
 	}
 }
 

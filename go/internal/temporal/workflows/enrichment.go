@@ -13,12 +13,14 @@ import (
 )
 
 type EnrichmentWorkflowInput struct {
-	JobID           string
-	RowKey          string
-	ColumnsMetadata []*models.ColumnMetadata
-	QueryPatterns   []string
-	EntityType      string
-	RetryCount      int
+	JobID            string
+	RowKey           string
+	ColumnsMetadata  []*models.ColumnMetadata
+	QueryPatterns    []string
+	EntityType       string
+	RetryCount       int
+	PreviousAttempts []*models.EnrichmentAttempt
+	MaxRetries       int
 }
 
 type EnrichmentWorkflowOutput struct {
@@ -54,13 +56,34 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		IterationCount: input.RetryCount + 1,
 	}
 
+	// Generate patterns if this is a retry with feedback
+	queryPatterns := input.QueryPatterns
+	if input.RetryCount > 0 && len(input.PreviousAttempts) > 0 {
+		event.StartStage("PATTERN_REGENERATION")
+		var patternsOutput activities.GeneratePatternsOutput
+		err := workflow.ExecuteActivity(ctx, "GeneratePatternsWithFeedback", activities.GeneratePatternsWithFeedbackInput{
+			JobID:            input.JobID,
+			ColumnsMetadata:  input.ColumnsMetadata,
+			PreviousAttempts: input.PreviousAttempts,
+		}).Get(ctx, &patternsOutput)
+		if err != nil {
+			// TODO: maybe stop the workflow if pattern generation fails ?
+			event.FailStage("PATTERN_REGENERATION", err)
+		} else {
+			queryPatterns = patternsOutput.Patterns
+			event.CompleteStage("PATTERN_REGENERATION", map[string]interface{}{
+				"pattern_count": len(patternsOutput.Patterns),
+			})
+		}
+	}
+
 	event.StartStage(models.StageSerpFetched)
 	var serpOutput activities.SerpFetchOutput
 	err := workflow.ExecuteActivity(ctx, "SerpFetch", activities.SerpFetchInput{
 		JobID:           input.JobID,
 		RowKey:          input.RowKey,
 		ColumnsMetadata: input.ColumnsMetadata,
-		QueryPatterns:   input.QueryPatterns,
+		QueryPatterns:   queryPatterns,
 	}).Get(ctx, &serpOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("SERP fetch failed: %v", err)
@@ -226,6 +249,73 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Confidence:      extractOutput.Confidence,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &feedbackOutput)
+
+	if feedbackOutput.NeedsFeedback && input.RetryCount < input.MaxRetries {
+		currentAttempt := &models.EnrichmentAttempt{
+			AttemptNumber:        input.RetryCount + 1,
+			QueryPatterns:        queryPatterns,
+			LowConfidenceColumns: feedbackOutput.LowConfidenceColumns,
+			MissingColumns:       feedbackOutput.MissingColumns,
+		}
+
+		previousAttempts := append(input.PreviousAttempts, currentAttempt)
+
+		problematicColumns := make(map[string]bool)
+		for _, col := range feedbackOutput.LowConfidenceColumns {
+			problematicColumns[col] = true
+		}
+		for _, col := range feedbackOutput.MissingColumns {
+			problematicColumns[col] = true
+		}
+
+		filteredMetadata := []*models.ColumnMetadata{}
+		for _, col := range input.ColumnsMetadata {
+			if problematicColumns[col.Name] {
+				filteredMetadata = append(filteredMetadata, col)
+			}
+		}
+
+		retryInput := EnrichmentWorkflowInput{
+			JobID:            input.JobID,
+			RowKey:           input.RowKey,
+			ColumnsMetadata:  filteredMetadata,
+			QueryPatterns:    input.QueryPatterns,
+			EntityType:       input.EntityType,
+			RetryCount:       input.RetryCount + 1,
+			PreviousAttempts: previousAttempts,
+			MaxRetries:       input.MaxRetries,
+		}
+
+		retryOutput, err := EnrichmentWorkflow(ctx, retryInput)
+		if err != nil {
+			return output, err
+		}
+
+		if output.ExtractedData == nil {
+			output.ExtractedData = make(map[string]interface{})
+		}
+		if output.Confidence == nil {
+			output.Confidence = make(map[string]*models.FieldConfidenceInfo)
+		}
+
+		if retryOutput.ExtractedData != nil {
+			for k, v := range retryOutput.ExtractedData {
+				output.ExtractedData[k] = v
+			}
+		}
+		if retryOutput.Confidence != nil {
+			for k, v := range retryOutput.Confidence {
+				output.Confidence[k] = v
+			}
+		}
+		if retryOutput.Sources != nil {
+			output.Sources = append(output.Sources, retryOutput.Sources...)
+		}
+
+		output.IterationCount = retryOutput.IterationCount
+
+		return output, nil
+	}
 
 	workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 		JobID:  input.JobID,

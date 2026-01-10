@@ -76,7 +76,7 @@ func main() {
 	defer w.Stop()
 
 	// Create Temporal-based enricher
-	enr := enricher.NewTemporalEnricher(tc, stateManager, cfg.TemporalTaskQueue)
+	enr := enricher.NewTemporalEnricher(tc, stateManager, cfg.TemporalTaskQueue, cfg.MaxEnrichmentRetries)
 
 	jwtVerifier, err := auth.NewJWTVerifier(cfg.WorkOSClientID, cfg.DebugAuthBypass)
 	if err != nil {

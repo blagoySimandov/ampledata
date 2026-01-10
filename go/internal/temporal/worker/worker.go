@@ -25,6 +25,9 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 	w.RegisterActivityWithOptions(activities.GeneratePatterns, activity.RegisterOptions{
 		Name: "GeneratePatterns",
 	})
+	w.RegisterActivityWithOptions(activities.GeneratePatternsWithFeedback, activity.RegisterOptions{
+		Name: "GeneratePatternsWithFeedback",
+	})
 	w.RegisterActivityWithOptions(activities.SerpFetch, activity.RegisterOptions{
 		Name: "SerpFetch",
 	})
