@@ -5,7 +5,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(enrHandler *EnrichHandler, jwtVerifier *auth.JWTVerifier) *mux.Router {
+func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandler, jwtVerifier *auth.JWTVerifier) *mux.Router {
 	r := mux.NewRouter()
 
 	r.Use(LoggingMiddleware)
@@ -18,6 +18,9 @@ func SetupRoutes(enrHandler *EnrichHandler, jwtVerifier *auth.JWTVerifier) *mux.
 	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET")
 	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST")
 	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET")
+
+	// Key selection endpoint - separate from enrichment
+	r.HandleFunc("/api/v1/select-key", keySelectorHandler.SelectKey).Methods("POST")
 
 	return r
 }

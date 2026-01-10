@@ -65,6 +65,17 @@ func ToJobSummary(job *Job) *JobSummary {
 	}
 }
 
+type SelectKeyRequest struct {
+	JobID           string            `json:"job_id"`
+	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata,omitempty"`
+}
+
+type SelectKeyResponse struct {
+	SelectedKey string   `json:"selected_key"`
+	AllKeys     []string `json:"all_keys"`
+	Reasoning   string   `json:"reasoning"`
+}
+
 func ToEnrichmentResult(row *RowState) *EnrichmentResult {
 	sources := row.Sources
 	if sources == nil {
