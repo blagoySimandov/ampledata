@@ -164,28 +164,31 @@ When search results contain information about MULTIPLE entities:
 
 ## Your Task
 
-1. Extract ALL data you can see in the answer box and snippets that is about "%s" (%s):
+1. Extract data from snippets that is about "%s" (%s):
    - CRITICAL: Verify each piece of data is about the TARGET ENTITY, not related entities
    - IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata
-   - For number types: use numeric values without quotes (e.g., 1000)
+   - For number types: use numeric values without quotes (e.g., 1000, 228000)
    - For string types: use quoted strings
    - For boolean types: use true/false without quotes
    - For date types: use ISO 8601 format (YYYY-MM-DD)
    - If unsure whether data applies to target entity, do NOT extract it
 
-2. Check if you extracted ALL the columns we need:
-   - If YES: Return empty urls_to_crawl array
-   - If NO: Select up to %d URLs to crawl for missing data, prioritizing:
+2. For columns you CANNOT extract from snippets:
+   - ALWAYS select URLs to crawl that are likely to contain the missing data
+   - Even if snippets don't contain the exact value, if they reference or link to where the data exists, SELECT THOSE URLs
+   - Select up to %d URLs to crawl for missing data, prioritizing:
      * Official or authoritative sources about the TARGET ENTITY specifically
      * URLs whose titles/snippets clearly reference the target entity "%s"
      * Wikipedia pages specifically about the target entity
      * Reliable data sources (official sites, registries, databases)
-     * Avoid: URLs primarily about related entities, SEO aggregators, third-party profiles
+     * Image hosting sites (Getty, Shutterstock, etc.) for image URLs
+     * Avoid: URLs primarily about related entities, SEO aggregators
 
-   ⚠️  CRITICAL URL Selection:
+   ⚠️  CRITICAL:
+     - If you cannot extract a column's data from snippets BUT the search results contain relevant URLs, YOU MUST SELECT URLs TO CRAWL
+     - Do NOT return empty urls_to_crawl when relevant URLs exist in the results
      - Verify URL titles and snippets are about "%s" (%s), not related entities
      - Skip URLs that focus on different entities, even if they mention the target
-     - Prioritize direct/primary sources over indirect mentions
 
 ## Entity Consistency Check
 
@@ -194,6 +197,23 @@ Before responding:
 2. Review ALL selected URLs - are they primarily about "%s" (%s)?
 3. If you find mixed entity data, extract ONLY the data about the target entity
 4. In your reasoning, note any entity ambiguity you encountered
+
+## Examples
+
+Example 1 - Data visible in snippets:
+- Column needed: employee_count (number)
+- Snippet: "Microsoft had 228,000 employees as of June 2025"
+- Response: {"urls_to_crawl": [], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count directly from snippet"}
+
+Example 2 - Data not in snippets but URLs available:
+- Column needed: founder_picture_url (string)
+- Snippets: "Getty Images has photos of Microsoft founder", "Shutterstock Microsoft founder images"
+- Response: {"urls_to_crawl": ["https://www.gettyimages.com/photos/microsoft-founder", "https://news.microsoft.com/..."], "extracted_data": null, "reasoning": "Cannot extract image URL from snippets, but Getty Images and official Microsoft site likely contain founder photos"}
+
+Example 3 - Mixed scenario:
+- Columns needed: employee_count, founder_picture_url
+- Snippets show employee count but not picture URL
+- Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
 
 ## Response Format (JSON only, no markdown)
 {
@@ -345,28 +365,31 @@ When search results contain information about MULTIPLE entities:
 
 ## Your Task
 
-1. Extract ALL data you can see in the answer box and snippets that is about "%s" (%s):
+1. Extract data from snippets that is about "%s" (%s):
    - CRITICAL: Verify each piece of data is about the TARGET ENTITY, not related entities
    - IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata
-   - For number types: use numeric values without quotes (e.g., 1000)
+   - For number types: use numeric values without quotes (e.g., 1000, 228000)
    - For string types: use quoted strings
    - For boolean types: use true/false without quotes
    - For date types: use ISO 8601 format (YYYY-MM-DD)
    - If unsure whether data applies to target entity, do NOT extract it
 
-2. Check if you extracted ALL the columns we need:
-   - If YES: Return empty urls_to_crawl array
-   - If NO: Select up to %d URLs to crawl for missing data, prioritizing:
+2. For columns you CANNOT extract from snippets:
+   - ALWAYS select URLs to crawl that are likely to contain the missing data
+   - Even if snippets don't contain the exact value, if they reference or link to where the data exists, SELECT THOSE URLs
+   - Select up to %d URLs to crawl for missing data, prioritizing:
      * Official or authoritative sources about the TARGET ENTITY specifically
      * URLs whose titles/snippets clearly reference the target entity "%s"
      * Wikipedia pages specifically about the target entity
      * Reliable data sources (official sites, registries, databases)
-     * Avoid: URLs primarily about related entities, SEO aggregators, third-party profiles
+     * Image hosting sites (Getty, Shutterstock, etc.) for image URLs
+     * Avoid: URLs primarily about related entities, SEO aggregators
 
-   ⚠️  CRITICAL URL Selection:
+   ⚠️  CRITICAL:
+     - If you cannot extract a column's data from snippets BUT the search results contain relevant URLs, YOU MUST SELECT URLs TO CRAWL
+     - Do NOT return empty urls_to_crawl when relevant URLs exist in the results
      - Verify URL titles and snippets are about "%s" (%s), not related entities
      - Skip URLs that focus on different entities, even if they mention the target
-     - Prioritize direct/primary sources over indirect mentions
 
 ## Entity Consistency Check
 
@@ -375,6 +398,23 @@ Before responding:
 2. Review ALL selected URLs - are they primarily about "%s" (%s)?
 3. If you find mixed entity data, extract ONLY the data about the target entity
 4. In your reasoning, note any entity ambiguity you encountered
+
+## Examples
+
+Example 1 - Data visible in snippets:
+- Column needed: employee_count (number)
+- Snippet: "Microsoft had 228,000 employees as of June 2025"
+- Response: {"urls_to_crawl": [], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count directly from snippet"}
+
+Example 2 - Data not in snippets but URLs available:
+- Column needed: founder_picture_url (string)
+- Snippets: "Getty Images has photos of Microsoft founder", "Shutterstock Microsoft founder images"
+- Response: {"urls_to_crawl": ["https://www.gettyimages.com/photos/microsoft-founder", "https://news.microsoft.com/..."], "extracted_data": null, "reasoning": "Cannot extract image URL from snippets, but Getty Images and official Microsoft site likely contain founder photos"}
+
+Example 3 - Mixed scenario:
+- Columns needed: employee_count, founder_picture_url
+- Snippets show employee count but not picture URL
+- Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
 
 ## Response Format (JSON only, no markdown)
 {
