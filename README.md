@@ -7,7 +7,7 @@ A service for enriching data using web search, crawling, and LLM extraction.
 AmpleData takes a dataset with key columns (e.g., company names) and columns to enrich (e.g., revenue, employee count), then:
 
 1. Builds search queries from keys + target columns
-2. Searches the web 
+2. Searches the web
 3. Decides whether to crawl — skips crawling if SERP snippets contain the answer
 4. Crawls selected URL with if needed
-5. Extracts structured data using LLM 
+5. Extracts structured data using LLM
