@@ -18,8 +18,10 @@ type CostTracker struct {
 
 func NewCostTracker(tknInCost, tknOutCost int, searchQueryCost int, creditExchange int) *CostTracker {
 	return &CostTracker{
-		tknInCost:  tknInCost,
-		tknOutCost: tknOutCost,
+		tknInCost:       tknInCost,
+		tknOutCost:      tknOutCost,
+		searchQueryCost: searchQueryCost,
+		creditExchange:  creditExchange,
 	}
 }
 

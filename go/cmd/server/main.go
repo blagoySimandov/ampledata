@@ -58,6 +58,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Gemini content extractor: %v", err)
 	}
+	keySelector, err := services.NewGeminiKeySelector(cfg.GeminiAPIKey)
+	if err != nil {
+		log.Fatalf("Failed to create Gemini key selector: %v", err)
+	}
 
 	tc, err := temporalClient.NewClient(cfg.TemporalHostPort, cfg.TemporalNamespace)
 	if err != nil {
@@ -90,7 +94,8 @@ func main() {
 	}
 
 	handler := api.NewEnrichHandler(enr, gcsReader, store)
-	router := api.SetupRoutes(handler, jwtVerifier)
+	keySelectorHandler := api.NewKeySelectorHandler(keySelector, gcsReader, store)
+	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,
