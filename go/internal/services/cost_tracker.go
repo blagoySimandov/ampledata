@@ -1,5 +1,12 @@
 package services
 
+type ICostTracker interface {
+	AddTokenCost(tknIn, tknOut int)
+	AddSearchQueryCost(searchQueryCost int)
+	CostDollars() int
+	CostCredits() int
+}
+
 // All prices are in 1/10 cents
 type CostTracker struct {
 	cost            int
@@ -9,7 +16,7 @@ type CostTracker struct {
 	creditExchange  int
 }
 
-func NewCostTracker(tknInCost, tknOutCost int) *CostTracker {
+func NewCostTracker(tknInCost, tknOutCost int, searchQueryCost int, creditExchange int) *CostTracker {
 	return &CostTracker{
 		tknInCost:  tknInCost,
 		tknOutCost: tknOutCost,

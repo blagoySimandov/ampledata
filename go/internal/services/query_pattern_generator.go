@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"google.golang.org/genai"
 )
 
 type QueryPatternGenerator interface {
@@ -19,46 +18,39 @@ type QueryPatternGenerator interface {
 	GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error)
 }
 
-type GeminiPatternGenerator struct {
-	model  string
-	client *genai.Client
+type PatternGenerator struct {
+	client IAIClient
 }
 
-func NewGeminiPatternGenerator(apiKey string) (*GeminiPatternGenerator, error) {
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	return &GeminiPatternGenerator{
-		model:  "gemini-2.5-flash-lite",
-		client: client,
+func NewPatternGenerator(aiClient IAIClient) (*PatternGenerator, error) {
+	return &PatternGenerator{
+		client: aiClient,
 	}, nil
 }
 
-func (g *GeminiPatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
+func (g *PatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	prompt := g.buildPrompt(columnsMetadata)
 
-	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
+	result, err := g.client.GenerateContent(ctx, prompt)
 	if err != nil {
 		return g.getFallbackPatterns(columnsMetadata), fmt.Errorf("failed to generate content: %w", err)
 	}
 
-	return g.parseResponse(result.Text(), columnsMetadata)
+	return g.parseResponse(result, columnsMetadata)
 }
 
-func (g *GeminiPatternGenerator) GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error) {
+func (g *PatternGenerator) GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error) {
 	prompt := g.buildPromptWithFeedback(columnsMetadata, previousAttempts)
 
-	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
+	result, err := g.client.GenerateContent(ctx, prompt)
 	if err != nil {
 		return g.getFallbackPatterns(columnsMetadata), fmt.Errorf("failed to generate content: %w", err)
 	}
 
-	return g.parseResponse(result.Text(), columnsMetadata)
+	return g.parseResponse(result, columnsMetadata)
 }
 
-func (g *GeminiPatternGenerator) buildPrompt(columnsMetadata []*models.ColumnMetadata) string {
+func (g *PatternGenerator) buildPrompt(columnsMetadata []*models.ColumnMetadata) string {
 	var columnsInfo []string
 	for _, col := range columnsMetadata {
 		desc := ""
@@ -113,7 +105,7 @@ Output: [
 Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText)
 }
 
-func (g *GeminiPatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) string {
+func (g *PatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) string {
 	var columnsInfo []string
 	for _, col := range columnsMetadata {
 		desc := ""
@@ -184,7 +176,7 @@ Output: [
 Respond with JSON only, no markdown:`, len(columnsMetadata), columnsText, feedbackText)
 }
 
-func (g *GeminiPatternGenerator) parseResponse(content string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
+func (g *PatternGenerator) parseResponse(content string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	content = cleanJSONMarkdown(content)
 	content = strings.TrimSpace(content)
 
@@ -206,7 +198,7 @@ func (g *GeminiPatternGenerator) parseResponse(content string, columnsMetadata [
 	return patterns, nil
 }
 
-func (g *GeminiPatternGenerator) getFallbackPatterns(columnsMetadata []*models.ColumnMetadata) []string {
+func (g *PatternGenerator) getFallbackPatterns(columnsMetadata []*models.ColumnMetadata) []string {
 	parts := []string{"%entity"}
 	for _, col := range columnsMetadata {
 		parts = append(parts, col.Name)
