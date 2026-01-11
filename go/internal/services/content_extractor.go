@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"google.golang.org/genai"
 )
 
 type ExtractionResult struct {
@@ -19,7 +18,7 @@ type ExtractionResult struct {
 	Reasoning     string                                 `json:"reasoning"`
 }
 
-type ContentExtractor interface {
+type IContentExtractor interface {
 	Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, entityType string) (*ExtractionResult, error)
 }
 
@@ -30,34 +29,26 @@ type GroqContentExtractor struct {
 	extractionPromptBuilder IExtractionPromptBuilder
 }
 
-type GeminiContentExtractor struct {
-	model                   string
-	client                  *genai.Client
+type AIContentExtractor struct {
+	client                  IAIClient
 	extractionPromptBuilder IExtractionPromptBuilder
 }
 
-func NewGeminiContentExtractor(apiKey string) (*GeminiContentExtractor, error) {
-	ctx := context.Background() // ctx used for auth/initilization, not passed to later requests
-	client, err := genai.NewClient(ctx, nil)
-	model := "gemini-2.5-flash-lite"
-	if err != nil {
-		return nil, err
-	}
-	return &GeminiContentExtractor{
-		model:                   model,
+func NewAIContentExtractor(client IAIClient) (*AIContentExtractor, error) {
+	return &AIContentExtractor{
 		client:                  client,
 		extractionPromptBuilder: NewExtractionPromptBuilder(),
 	}, nil
 }
 
-func (g *GeminiContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, entityType string) (*ExtractionResult, error) {
+func (g *AIContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, entityType string) (*ExtractionResult, error) {
 	prompt := g.extractionPromptBuilder.Build(content, columnsMetadata, entityKey, entityType)
-	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
+	result, err := g.client.GenerateContent(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}
 
-	er, err := parseResponse(result.Text())
+	er, err := parseResponse(result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}

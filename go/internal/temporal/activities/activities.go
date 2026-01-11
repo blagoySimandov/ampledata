@@ -16,7 +16,7 @@ type Activities struct {
 	webSearcher      services.WebSearcher
 	decisionMaker    services.DecisionMaker
 	crawler          services.WebCrawler
-	contentExtractor services.ContentExtractor
+	contentExtractor services.IContentExtractor
 	patternGenerator services.QueryPatternGenerator
 }
 
@@ -25,7 +25,7 @@ func NewActivities(
 	webSearcher services.WebSearcher,
 	decisionMaker services.DecisionMaker,
 	crawler services.WebCrawler,
-	contentExtractor services.ContentExtractor,
+	contentExtractor services.IContentExtractor,
 	patternGenerator services.QueryPatternGenerator,
 ) *Activities {
 	return &Activities{
