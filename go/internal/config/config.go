@@ -25,6 +25,11 @@ type Config struct {
 
 	// Enrichment configuration
 	MaxEnrichmentRetries int
+	// CostTracking
+	SerperCost         int
+	TknInCost          int
+	TknOutCost         int
+	CreditExchangeRate int
 }
 
 func Load() *Config {
@@ -48,6 +53,12 @@ func Load() *Config {
 
 		// Enrichment settings
 		MaxEnrichmentRetries: getEnvInt("MAX_ENRICHMENT_RETRIES", 1),
+
+		// CostTracking
+		SerperCost:         getEnvInt("SERPER_COST", 0),
+		TknInCost:          getEnvInt("TKN_INGESTION_COST", 0),
+		TknOutCost:         getEnvInt("TKN_ENRICHMENT_COST", 0),
+		CreditExchangeRate: getEnvInt("CREDIT_EXCHANGE_RATE", 0),
 	}
 }
 

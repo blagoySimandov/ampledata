@@ -1,6 +1,8 @@
 package services
 
-import "strings"
+import (
+	"strings"
+)
 
 func cleanJSONMarkdown(content string) string {
 	content = strings.TrimSpace(content)
@@ -23,4 +25,14 @@ func cleanJSONMarkdown(content string) string {
 	}
 
 	return strings.TrimSpace(inner)
+}
+
+func applyFuncOptions[T any](entity T, opts ...func(entity T) error) error {
+	for _, opt := range opts {
+		err := opt(entity)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

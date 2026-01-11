@@ -24,6 +24,8 @@ import (
 func main() {
 	cfg := config.Load()
 
+	costTracker := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate)
+
 	store, err := state.NewPostgresStore(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to create PostgreSQL store: %v", err)
@@ -38,7 +40,11 @@ func main() {
 
 	stateManager := state.NewStateManager(store)
 
-	patternGenerator, err := services.NewGeminiPatternGenerator(cfg.GeminiAPIKey)
+	aiClient, err := services.NewGeminiAIClient(services.WithCostTracker(costTracker))
+	if err != nil {
+		log.Fatalf("Failed to create AI client: %v", err)
+	}
+	patternGenerator, err := services.NewPatternGenerator(aiClient)
 	if err != nil {
 		log.Fatalf("Failed to create Gemini pattern generator: %v", err)
 	}
