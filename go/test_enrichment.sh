@@ -73,11 +73,6 @@ START_RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID/start" \
     "key_column": "company_name",
     "columns_metadata": [
       {
-        "name": "founder_picture_url",
-        "type": "string",
-        "description": "picture of the founder in url format"
-      },
-      {
         "name": "founder",
         "type": "string",
         "description": "Founder name"
@@ -101,8 +96,8 @@ echo "$START_RESPONSE" | jq .
 echo -e "\n${GREEN}6. Checking job progress${NC}"
 curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress" | jq .
 
-echo -e "\n${GREEN}7. Waiting 10 seconds before checking progress again...${NC}"
-sleep 10
+echo -e "\n${GREEN}7. Waiting 20 seconds before checking progress again...${NC}"
+sleep 20
 
 echo -e "${GREEN}8. Checking job progress again${NC}"
 curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress" | jq .

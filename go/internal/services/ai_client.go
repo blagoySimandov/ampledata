@@ -47,8 +47,17 @@ func (g *GeminiAIClient) GenerateContent(ctx context.Context, prompt string) (st
 	if err != nil {
 		return "", fmt.Errorf("failed to generate content: %w", err)
 	}
+	um := Deref(result.UsageMetadata)
+	g.TrackCost(um)
 
 	return result.Text(), nil
+}
+
+func (g *GeminiAIClient) TrackCost(um genai.GenerateContentResponseUsageMetadata) {
+	tknIn := um.PromptTokenCount
+	totalTknCount := um.TotalTokenCount
+	tknOut := totalTknCount - tknIn
+	g.tracker.AddTokenCost(int(tknIn), int(tknOut))
 }
 
 func WithCostTracker(tracker ICostTracker) GeminiAIClientFuncOptions {

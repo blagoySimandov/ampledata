@@ -37,7 +37,6 @@ func main() {
 		log.Fatalf("Failed to create GCS reader: %v", err)
 	}
 	defer gcsReader.Close()
-
 	stateManager := state.NewStateManager(store)
 
 	aiClient, err := services.NewGeminiAIClient(services.WithCostTracker(costTracker))
@@ -62,7 +61,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create Gemini key selector: %v", err)
 	}
-
 	tc, err := temporalClient.NewClient(cfg.TemporalHostPort, cfg.TemporalNamespace)
 	if err != nil {
 		log.Fatalf("Failed to create Temporal client: %v", err)

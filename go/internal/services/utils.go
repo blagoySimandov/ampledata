@@ -36,3 +36,10 @@ func applyFuncOptions[T any](entity T, opts ...func(entity T) error) error {
 	}
 	return nil
 }
+
+func Deref[P ~*T, T any](ptr P) (v T) {
+	if ptr != nil {
+		v = *ptr
+	}
+	return
+}
