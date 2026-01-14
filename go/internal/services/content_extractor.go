@@ -53,6 +53,9 @@ func (g *AIContentExtractor) Extract(ctx context.Context, content string, entity
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
+	// TODO: make this cleaner in some way.
+	coercedData := ValidateAndCoerceTypes(er.ExtractedData, columnsMetadata, er.Confidence)
+	er.ExtractedData = coercedData
 	return er, nil
 }
 
