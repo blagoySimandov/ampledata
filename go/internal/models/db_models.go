@@ -19,6 +19,8 @@ type JobDB struct {
 	TotalRows       int               `bun:"total_rows,notnull" json:"total_rows"`
 	StartedAt       *time.Time        `bun:"started_at" json:"started_at"`
 	Status          JobStatus         `bun:"status,notnull,default:'PENDING'" json:"status"`
+	CostDollars     int               `bun:"cost_dollars,notnull,default:0" json:"cost_dollars"`
+	CostCredits     int               `bun:"cost_credits,notnull,default:0" json:"cost_credits"`
 	CreatedAt       time.Time         `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt       time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }

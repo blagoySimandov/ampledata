@@ -405,6 +405,8 @@ func buildJobProgress(jobID string, job *models.JobDB, rowsByStage map[models.Ro
 		TotalRows:   job.TotalRows,
 		RowsByStage: rowsByStage,
 		Status:      job.Status,
+		CostDollars: job.CostDollars,
+		CostCredits: job.CostCredits,
 	}
 	if job.StartedAt != nil {
 		progress.StartedAt = *job.StartedAt
@@ -428,6 +430,20 @@ func (s *PostgresStore) GetJobProgress(ctx context.Context, jobID string) (*mode
 	}
 
 	return buildJobProgress(jobID, &job, rowsByStage), nil
+}
+
+func (s *PostgresStore) IncrementJobCost(ctx context.Context, jobID string, costDollars, costCredits int) error {
+	_, err := s.db.NewUpdate().
+		Model((*models.JobDB)(nil)).
+		Set("cost_dollars = cost_dollars + ?", costDollars).
+		Set("cost_credits = cost_credits + ?", costCredits).
+		Set("updated_at = ?", time.Now()).
+		Where("job_id = ?", jobID).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to increment job cost: %w", err)
+	}
+	return nil
 }
 
 func (s *PostgresStore) Close() error {

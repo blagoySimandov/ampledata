@@ -125,6 +125,7 @@ type FeedbackAnalysisOutput struct {
 }
 
 func (a *Activities) GeneratePatterns(ctx context.Context, input GeneratePatternsInput) (*GeneratePatternsOutput, error) {
+	ctx = services.ContextWithJobID(ctx, input.JobID)
 	event := logger.NewActivityEvent("generate_patterns", input.JobID)
 
 	patterns, err := a.patternGenerator.GeneratePatterns(ctx, input.ColumnsMetadata)
@@ -144,6 +145,7 @@ func (a *Activities) GeneratePatterns(ctx context.Context, input GeneratePattern
 }
 
 func (a *Activities) GeneratePatternsWithFeedback(ctx context.Context, input GeneratePatternsWithFeedbackInput) (*GeneratePatternsOutput, error) {
+	ctx = services.ContextWithJobID(ctx, input.JobID)
 	event := logger.NewActivityEvent("generate_patterns_with_feedback", input.JobID)
 	event.SetMetadata("attempt_count", len(input.PreviousAttempts))
 
@@ -349,6 +351,7 @@ func mergeDecisionData(extractedData map[string]interface{}, confidence map[stri
 }
 
 func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractOutput, error) {
+	ctx = services.ContextWithJobID(ctx, input.JobID)
 	event := logger.NewActivityEvent("extract", input.JobID)
 	event.RowKey = input.RowKey
 

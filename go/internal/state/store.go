@@ -22,6 +22,7 @@ type Store interface {
 	SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) error
 	GetJobStatus(ctx context.Context, jobID string) (models.JobStatus, error)
 	GetJobProgress(ctx context.Context, jobID string) (*models.JobProgress, error)
+	IncrementJobCost(ctx context.Context, jobID string, costDollars, costCredits int) error
 
 	Close() error
 }

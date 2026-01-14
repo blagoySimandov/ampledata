@@ -56,8 +56,8 @@ func Load() *Config {
 
 		// CostTracking
 		SerperCost:         getEnvInt("SERPER_COST", 0),
-		TknInCost:          getEnvInt("TKN_INGESTION_COST", 0),
-		TknOutCost:         getEnvInt("TKN_ENRICHMENT_COST", 0),
+		TknInCost:          getEnvInt("TKN_INGESTION_COST", 500),
+		TknOutCost:         getEnvInt("TKN_ENRICHMENT_COST", 30000),
 		CreditExchangeRate: getEnvInt("CREDIT_EXCHANGE_RATE", 0),
 	}
 }

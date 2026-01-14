@@ -110,4 +110,6 @@ type JobProgress struct {
 	RowsByStage map[RowStage]int `json:"rows_by_stage"`
 	StartedAt   time.Time        `json:"started_at"`
 	Status      JobStatus        `json:"status"`
+	CostDollars int              `json:"cost_dollars"`
+	CostCredits int              `json:"cost_credits"`
 }

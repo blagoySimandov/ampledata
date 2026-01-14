@@ -24,13 +24,16 @@ import (
 func main() {
 	cfg := config.Load()
 
-	costTracker := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate)
-
 	store, err := state.NewPostgresStore(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to create PostgreSQL store: %v", err)
 	}
 	defer store.Close()
+
+	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate, services.WithStore(store))
+	if err != nil {
+		log.Fatalf("Failed to create cost tracker: %v", err)
+	}
 
 	gcsReader, err := gcs.NewCSVReader("ampledata-enrichment-uploads")
 	if err != nil {
