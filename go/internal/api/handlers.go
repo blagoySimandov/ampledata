@@ -115,7 +115,11 @@ func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.R
 	}
 
 	ext, _ := mime.ExtensionsByType(reqBody.ContentType)
-	jobID := generateJobId(ext[0])
+	extension := ".csv" // assume csv
+	if len(ext) > 0 {
+		extension = ext[0]
+	}
+	jobID := generateJobId(extension)
 
 	if err := h.store.CreatePendingJob(r.Context(), jobID, user.ID, jobID); err != nil {
 		log.Printf("Failed to create pending job: %v", err)

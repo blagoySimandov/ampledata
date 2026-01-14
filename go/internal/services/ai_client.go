@@ -26,7 +26,7 @@ func NewGeminiAIClient(opts ...GeminiAIClientFuncOptions) (*GeminiAIClient, erro
 	}
 	geminiai := GeminiAIClient{
 		client: client,
-		model:  "gemini-2.5-flash-lite",
+		model:  "gemini-3-flash-preview",
 	}
 	err = applyFuncOptions(&geminiai, opts...)
 	if err != nil {
