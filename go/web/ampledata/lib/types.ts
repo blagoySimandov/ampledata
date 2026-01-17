@@ -1,2 +1,1 @@
-export type DataRow = Record<string, string | number | boolean | null>
-
+export type DataRow = Record<string, string | number | boolean | null>;
