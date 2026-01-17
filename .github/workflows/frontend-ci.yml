@@ -1,4 +1,4 @@
-name: Frontend CI
+name: Frontend Lint and Typecheck
 
 on:
     push:
@@ -11,7 +11,7 @@ on:
             - "go/web/ampledata/**"
 
 jobs:
-    lint-and-typecheck:
+    check:
         runs-on: ubuntu-latest
 
         defaults:
