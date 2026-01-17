@@ -1,21 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileUpload } from "@/components/file-upload";
 import { DataGrid } from "@/components/data-grid";
 import { EnrichmentDrawer } from "@/components/enrichment-drawer";
 import { useUser } from "@/hooks";
 import type { DataRow } from "@/lib/types";
 import { Header } from "./components";
+import {
+	useRequestSignedURL,
+	useUploadFile,
+	useStartJob,
+	useJobProgress,
+	useJobResults,
+	type ColumnType,
+	type ColumnMetadata,
+} from "@/api";
+
+function mapDataTypeToColumnType(dataType: string): ColumnType {
+	switch (dataType) {
+		case "email":
+		case "phone":
+		case "company":
+		case "location":
+		case "text":
+			return "string";
+		case "number":
+			return "number";
+		case "boolean":
+			return "boolean";
+		default:
+			return "string";
+	}
+}
 
 export default function DataEnrichmentPage() {
 	const user = useUser();
 	const [data, setData] = useState<DataRow[]>([]);
 	const [columns, setColumns] = useState<string[]>([]);
 	const [fileName, setFileName] = useState<string>("");
+	const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 	const [isEnriching, setIsEnriching] = useState(false);
 	const [enrichmentProgress, setEnrichmentProgress] = useState(0);
 	const [drawerOpen, setDrawerOpen] = useState(false);
+
+	const requestSignedURL = useRequestSignedURL();
+	const uploadFile = useUploadFile();
+	const startJob = useStartJob();
 
 	if (!user) {
 		return (
@@ -25,14 +56,31 @@ export default function DataEnrichmentPage() {
 		);
 	}
 
-	const handleFileUpload = (
+	const handleFileUpload = async (
 		uploadedData: DataRow[],
 		uploadedColumns: string[],
-		name: string
+		name: string,
+		file: File
 	) => {
 		setData(uploadedData);
 		setColumns(uploadedColumns);
 		setFileName(name);
+
+		try {
+			const signedURLResponse = await requestSignedURL.mutateAsync({
+				contentType: file.type || "text/csv",
+				length: file.size,
+			});
+
+			await uploadFile.mutateAsync({
+				signedUrl: signedURLResponse.url,
+				file: file,
+			});
+
+			setCurrentJobId(signedURLResponse.jobId);
+		} catch (error) {
+			console.error("Failed to upload file:", error);
+		}
 	};
 
 	const handleAddColumn = (columnName: string) => {
@@ -77,60 +125,126 @@ export default function DataEnrichmentPage() {
 		setData([...data, newRow]);
 	};
 
-	const handleEnrich = async (columnName: string, dataType: string) => {
+	const [enrichmentJobId, setEnrichmentJobId] = useState<string | null>(null);
+	const [enrichmentKeyColumn, setEnrichmentKeyColumn] = useState<
+		string | null
+	>(null);
+	const [enrichmentColumnName, setEnrichmentColumnName] = useState<
+		string | null
+	>(null);
+	const [resultsFetched, setResultsFetched] = useState(false);
+	const [shouldPollProgress, setShouldPollProgress] = useState(true);
+
+	const jobProgress = useJobProgress(enrichmentJobId || "", {
+		enabled: !!enrichmentJobId && isEnriching,
+		refetchInterval: shouldPollProgress ? 2000 : undefined,
+	});
+
+	const jobResults = useJobResults(enrichmentJobId || "", undefined, {
+		enabled:
+			!!enrichmentJobId &&
+			jobProgress.data?.status === "COMPLETED" &&
+			!resultsFetched,
+	});
+
+	useEffect(() => {
+		if (jobProgress.data) {
+			const completedRows = jobProgress.data.rows_by_stage.COMPLETED || 0;
+			const totalRows = jobProgress.data.total_rows;
+			const progress =
+				totalRows > 0 ? (completedRows / totalRows) * 100 : 0;
+			setEnrichmentProgress(progress);
+
+			if (
+				jobProgress.data.status === "COMPLETED" ||
+				jobProgress.data.status === "CANCELLED"
+			) {
+				setShouldPollProgress(false);
+				setIsEnriching(false);
+			}
+		}
+	}, [jobProgress.data]);
+
+	useEffect(() => {
+		if (
+			jobResults.data &&
+			jobResults.data.length > 0 &&
+			enrichmentKeyColumn &&
+			enrichmentColumnName &&
+			!resultsFetched
+		) {
+			const enrichedData = [...data];
+			jobResults.data.forEach((result) => {
+				const rowIndex = enrichedData.findIndex(
+					(row) => String(row[enrichmentKeyColumn]) === result.key
+				);
+				if (rowIndex !== -1) {
+					const extractedValue =
+						result.extracted_data[enrichmentColumnName];
+					if (extractedValue !== undefined) {
+						enrichedData[rowIndex][enrichmentColumnName] =
+							extractedValue as string | number | boolean | null;
+					}
+				}
+			});
+			setData(enrichedData);
+			setResultsFetched(true);
+			setEnrichmentKeyColumn(null);
+			setEnrichmentColumnName(null);
+		}
+	}, [
+		jobResults.data,
+		enrichmentKeyColumn,
+		enrichmentColumnName,
+		resultsFetched,
+		data,
+		columns,
+	]);
+
+	const handleEnrich = async (
+		keyColumn: string,
+		columnName: string,
+		dataType: string
+	) => {
+		if (!currentJobId) {
+			console.error("No job ID available");
+			return;
+		}
+
 		setIsEnriching(true);
 		setEnrichmentProgress(0);
 		setDrawerOpen(true);
+		setEnrichmentKeyColumn(keyColumn);
+		setEnrichmentColumnName(columnName);
+		setResultsFetched(false);
+		setShouldPollProgress(true);
 
-		const totalRows = data.length;
-		const enrichedData = [...data];
+		const columnType = mapDataTypeToColumnType(dataType);
+		const columnsMetadata: ColumnMetadata[] = [
+			{
+				name: columnName,
+				type: columnType,
+				description: `Enriched ${dataType} data`,
+			},
+		];
 
-		for (let i = 0; i < totalRows; i++) {
-			await new Promise((resolve) => setTimeout(resolve, 100));
+		try {
+			const startResponse = await startJob.mutateAsync({
+				jobId: currentJobId,
+				data: {
+					key_column: keyColumn,
+					columns_metadata: columnsMetadata,
+				},
+			});
 
-			let enrichedValue: string | number | boolean;
-			switch (dataType) {
-				case "email":
-					enrichedValue = `enriched${i}@example.com`;
-					break;
-				case "phone":
-					enrichedValue = `+1-555-${String(Math.floor(Math.random() * 9000) + 1000)}`;
-					break;
-				case "company":
-					enrichedValue = [
-						"Acme Corp",
-						"TechStart Inc",
-						"Global Industries",
-						"Innovation Labs",
-					][Math.floor(Math.random() * 4)];
-					break;
-				case "location":
-					enrichedValue = [
-						"New York, NY",
-						"San Francisco, CA",
-						"Austin, TX",
-						"Seattle, WA",
-					][Math.floor(Math.random() * 4)];
-					break;
-				case "number":
-					enrichedValue = Math.floor(Math.random() * 1000);
-					break;
-				case "boolean":
-					enrichedValue = Math.random() > 0.5;
-					break;
-				default:
-					enrichedValue = `Enriched ${dataType} ${i + 1}`;
-			}
-
-			enrichedData[i] = {
-				...enrichedData[i],
-				[columnName]: enrichedValue,
-			};
-			setEnrichmentProgress(((i + 1) / totalRows) * 100);
+			setEnrichmentJobId(startResponse.job_id);
+		} catch (error) {
+			console.error("Failed to start enrichment job:", error);
+			setIsEnriching(false);
+			setDrawerOpen(false);
+			setEnrichmentKeyColumn(null);
+			setEnrichmentColumnName(null);
 		}
-
-		setData(enrichedData);
-		setIsEnriching(false);
 	};
 
 	const handleExport = () => {

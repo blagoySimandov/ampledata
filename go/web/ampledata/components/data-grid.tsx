@@ -28,7 +28,7 @@ interface DataGridProps {
 	data: DataRow[];
 	columns: string[];
 	onAddColumn: (columnName: string) => void;
-	onEnrich: (columnName: string, dataType: string) => void;
+	onEnrich: (keyColumn: string, columnName: string, dataType: string) => void;
 	onColumnNameChange: (oldName: string, newName: string) => void;
 	onCellChange: (rowIndex: number, columnName: string, value: string) => void;
 	onAddRow: () => void;
@@ -46,6 +46,7 @@ export function DataGrid({
 	isEnriching,
 }: DataGridProps) {
 	const [newColumnName, setNewColumnName] = useState("");
+	const [selectedKeyColumn, setSelectedKeyColumn] = useState("");
 	const [selectedColumn, setSelectedColumn] = useState("");
 	const [selectedDataType, setSelectedDataType] = useState("");
 	const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -62,9 +63,10 @@ export function DataGrid({
 	};
 
 	const handleEnrich = () => {
-		if (selectedColumn && selectedDataType) {
-			onEnrich(selectedColumn, selectedDataType);
+		if (selectedKeyColumn && selectedColumn && selectedDataType) {
+			onEnrich(selectedKeyColumn, selectedColumn, selectedDataType);
 			setEnrichDialogOpen(false);
+			setSelectedKeyColumn("");
 			setSelectedColumn("");
 			setSelectedDataType("");
 		}
@@ -87,6 +89,13 @@ export function DataGrid({
 		data.every(
 			(row) =>
 				row[col] === null || row[col] === undefined || row[col] === ""
+		)
+	);
+
+	const columnsWithData = columns.filter((col) =>
+		data.some(
+			(row) =>
+				row[col] !== null && row[col] !== undefined && row[col] !== ""
 		)
 	);
 
@@ -170,7 +179,9 @@ export function DataGrid({
 								size="sm"
 								className="gap-2"
 								disabled={
-									isEnriching || emptyColumns.length === 0
+									isEnriching ||
+									emptyColumns.length === 0 ||
+									columnsWithData.length === 0
 								}
 							>
 								<Sparkles className="h-4 w-4" />
@@ -185,6 +196,29 @@ export function DataGrid({
 								</DialogDescription>
 							</DialogHeader>
 							<div className="space-y-4 py-4">
+								<div className="space-y-2">
+									<Label htmlFor="key-column-select">
+										Key Column
+									</Label>
+									<Select
+										value={selectedKeyColumn}
+										onValueChange={setSelectedKeyColumn}
+									>
+										<SelectTrigger id="key-column-select">
+											<SelectValue placeholder="Select key column" />
+										</SelectTrigger>
+										<SelectContent>
+											{columnsWithData.map((col) => (
+												<SelectItem
+													key={col}
+													value={col}
+												>
+													{col}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
 								<div className="space-y-2">
 									<Label htmlFor="column-select">
 										Column to Enrich
@@ -249,7 +283,9 @@ export function DataGrid({
 								<Button
 									onClick={handleEnrich}
 									disabled={
-										!selectedColumn || !selectedDataType
+										!selectedKeyColumn ||
+										!selectedColumn ||
+										!selectedDataType
 									}
 								>
 									Start Enrichment
