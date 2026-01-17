@@ -4,11 +4,9 @@ import { useState } from "react"
 import { FileUpload } from "@/components/file-upload"
 import { DataGrid } from "@/components/data-grid"
 import { EnrichmentDrawer } from "@/components/enrichment-drawer"
-import { Button } from "@/components/ui/button"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { useUser } from "@/hooks"
 import type { DataRow } from "@/lib/types"
-import { Download, Table } from "lucide-react"
+import { Header } from "./components"
 
 export default function DataEnrichmentPage() {
   const user = useUser()
@@ -71,14 +69,12 @@ export default function DataEnrichmentPage() {
     setEnrichmentProgress(0)
     setDrawerOpen(true)
 
-    // Simulate enrichment process
     const totalRows = data.length
     const enrichedData = [...data]
 
     for (let i = 0; i < totalRows; i++) {
       await new Promise((resolve) => setTimeout(resolve, 100))
 
-      // Simulate enrichment based on data type
       let enrichedValue: string | number | boolean
       switch (dataType) {
         case "email":
@@ -116,7 +112,6 @@ export default function DataEnrichmentPage() {
   }
 
   const handleExport = () => {
-    // Convert data to CSV
     const csv = [
       columns.join(","),
       ...data.map((row) =>
@@ -130,7 +125,6 @@ export default function DataEnrichmentPage() {
       ),
     ].join("\n")
 
-    // Download CSV
     const blob = new Blob([csv], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -144,30 +138,7 @@ export default function DataEnrichmentPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-                <Table className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Data Enrichment</h1>
-                <p className="text-sm text-muted-foreground">Upload, enrich, and export your data</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-              {data.length > 0 && (
-                <Button onClick={handleExport} size="sm" className="gap-2">
-                  <Download className="h-4 w-4" />
-                  <span className="hidden sm:inline">Export</span>
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header hasData={data.length > 0} onExport={handleExport} />
 
       <main className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
         {data.length === 0 ? (
