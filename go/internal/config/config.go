@@ -52,7 +52,7 @@ func Load() *Config {
 		TemporalTaskQueue: getEnv("TEMPORAL_TASK_QUEUE", "ampledata-enrichment"),
 
 		// Enrichment settings
-		MaxEnrichmentRetries: getEnvInt("MAX_ENRICHMENT_RETRIES", 1),
+		MaxEnrichmentRetries: getEnvInt("MAX_ENRICHMENT_RETRIES", 2),
 
 		// CostTracking
 		SerperCost:         getEnvInt("SERPER_COST", 0),
