@@ -96,6 +96,7 @@ async function fetchAPI<T>(
 ): Promise<T> {
 	const headers: Record<string, string> = {
 		"Content-Type": "application/json",
+		Origin: "http://localhost:3000", //TODO: use env
 		...(options?.headers as Record<string, string>),
 	};
 
