@@ -14,14 +14,13 @@ func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandl
 	r.Use(auth.Middleware(jwtVerifier))
 
 	r.HandleFunc("/api/v1/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/jobs", enrHandler.ListJobs).Methods("GET")
-	r.HandleFunc("/api/v1/jobs/{jobID}/start", enrHandler.StartJob).Methods("POST")
-	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET")
-	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST")
-	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET")
+	r.HandleFunc("/api/v1/jobs", enrHandler.ListJobs).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/jobs/{jobID}/start", enrHandler.StartJob).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET", "OPTIONS")
 
-	// Key selection endpoint - separate from enrichment
-	r.HandleFunc("/api/v1/select-key", keySelectorHandler.SelectKey).Methods("POST")
+	r.HandleFunc("/api/v1/select-key", keySelectorHandler.SelectKey).Methods("POST", "OPTIONS")
 
 	return r
 }
