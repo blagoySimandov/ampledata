@@ -4,6 +4,7 @@ import { Geist } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { Providers } from "./providers";
 import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
 
 const geist = Geist({ subsets: ["latin"] });
 
@@ -39,6 +40,7 @@ export default function RootLayout({
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<body className={`${geist.className} antialiased`}>
+				<Toaster position="top-right" />
 				<Providers>{children}</Providers>
 				<Analytics />
 			</body>

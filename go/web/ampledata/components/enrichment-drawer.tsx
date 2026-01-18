@@ -39,7 +39,7 @@ export function EnrichmentDrawer({
 					</SheetDescription>
 				</SheetHeader>
 
-				<div className="mt-8 space-y-6">
+				<div className="px-4 mt-8 space-y-6">
 					<div className="space-y-3">
 						<div className="flex items-center justify-between text-sm">
 							<span className="text-muted-foreground">
