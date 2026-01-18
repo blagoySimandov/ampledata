@@ -71,9 +71,15 @@ export function DataGrid({
 
 	const handleEnrich = () => {
 		if (selectedKeyColumn && selectedColumn) {
-			const columnToEnrich = columns.find((col) => col.name === selectedColumn);
+			const columnToEnrich = columns.find(
+				(col) => col.name === selectedColumn
+			);
 			if (columnToEnrich) {
-				onEnrich(selectedKeyColumn, selectedColumn, columnToEnrich.dataType);
+				onEnrich(
+					selectedKeyColumn,
+					selectedColumn,
+					columnToEnrich.dataType
+				);
 				setEnrichDialogOpen(false);
 				setSelectedKeyColumn("");
 				setSelectedColumn("");
@@ -122,14 +128,18 @@ export function DataGrid({
 			!col.isEnriching &&
 			data.every(
 				(row) =>
-					row[col.name] === null || row[col.name] === undefined || row[col.name] === ""
+					row[col.name] === null ||
+					row[col.name] === undefined ||
+					row[col.name] === ""
 			)
 	);
 
 	const columnsWithData = columns.filter((col) =>
 		data.some(
 			(row) =>
-				row[col.name] !== null && row[col.name] !== undefined && row[col.name] !== ""
+				row[col.name] !== null &&
+				row[col.name] !== undefined &&
+				row[col.name] !== ""
 		)
 	);
 
@@ -223,7 +233,10 @@ export function DataGrid({
 							<DialogFooter>
 								<Button
 									onClick={handleAddColumn}
-									disabled={!newColumnName.trim() || !newColumnDataType}
+									disabled={
+										!newColumnName.trim() ||
+										!newColumnDataType
+									}
 								>
 									Add Column
 								</Button>
@@ -308,8 +321,7 @@ export function DataGrid({
 								<Button
 									onClick={handleEnrich}
 									disabled={
-										!selectedKeyColumn ||
-										!selectedColumn
+										!selectedKeyColumn || !selectedColumn
 									}
 								>
 									Start Enrichment
@@ -318,12 +330,18 @@ export function DataGrid({
 						</DialogContent>
 					</Dialog>
 
-					<Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+					<Dialog
+						open={deleteDialogOpen}
+						onOpenChange={setDeleteDialogOpen}
+					>
 						<DialogContent>
 							<DialogHeader>
 								<DialogTitle>Delete Column</DialogTitle>
 								<DialogDescription>
-									Are you sure you want to delete the column &quot;{columnToDelete}&quot;? This action cannot be undone and will remove all data in this column.
+									Are you sure you want to delete the column
+									&quot;{columnToDelete}&quot;? This action
+									cannot be undone and will remove all data in
+									this column.
 								</DialogDescription>
 							</DialogHeader>
 							<DialogFooter>
@@ -343,12 +361,19 @@ export function DataGrid({
 						</DialogContent>
 					</Dialog>
 
-					<Dialog open={deleteRowDialogOpen} onOpenChange={setDeleteRowDialogOpen}>
+					<Dialog
+						open={deleteRowDialogOpen}
+						onOpenChange={setDeleteRowDialogOpen}
+					>
 						<DialogContent>
 							<DialogHeader>
 								<DialogTitle>Delete Row</DialogTitle>
 								<DialogDescription>
-									Are you sure you want to delete row {rowToDelete !== null ? rowToDelete + 1 : ""}? This action cannot be undone.
+									Are you sure you want to delete row{" "}
+									{rowToDelete !== null
+										? rowToDelete + 1
+										: ""}
+									? This action cannot be undone.
 								</DialogDescription>
 							</DialogHeader>
 							<DialogFooter>
@@ -375,7 +400,7 @@ export function DataGrid({
 					<table className="w-full">
 						<thead>
 							<tr className="border-b bg-muted/50">
-									{columns.map((col, index) => (
+								{columns.map((col, index) => (
 									<th
 										key={index}
 										className="px-2 py-3 text-left w-10"
@@ -385,11 +410,19 @@ export function DataGrid({
 												defaultValue={col.name}
 												disabled={col.isEnriching}
 												onBlur={(e) => {
-													const newName = e.target.value.trim();
-													if (newName && newName !== col.name) {
-														onColumnNameChange(col.name, newName);
+													const newName =
+														e.target.value.trim();
+													if (
+														newName &&
+														newName !== col.name
+													) {
+														onColumnNameChange(
+															col.name,
+															newName
+														);
 													} else {
-														e.target.value = col.name;
+														e.target.value =
+															col.name;
 													}
 												}}
 												onKeyDown={(e) => {
@@ -402,7 +435,9 @@ export function DataGrid({
 											<Button
 												variant="ghost"
 												size="icon"
-												onClick={() => handleDeleteClick(col.name)}
+												onClick={() =>
+													handleDeleteClick(col.name)
+												}
 												disabled={col.isEnriching}
 												className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
 											>
@@ -446,14 +481,16 @@ export function DataGrid({
 										</td>
 									))}
 									<td className="text-center w-4">
-											<Button
-												variant="ghost"
-												size="icon"
-												onClick={() => handleDeleteRowClick(rowIndex)}
-												className="h-8 shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
-											>
-												<CircleMinus className="h-4 w-4 text-destructive" />
-											</Button>
+										<Button
+											variant="ghost"
+											size="icon"
+											onClick={() =>
+												handleDeleteRowClick(rowIndex)
+											}
+											className="h-8 shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
+										>
+											<CircleMinus className="h-4 w-4 text-destructive" />
+										</Button>
 									</td>
 								</tr>
 							))}

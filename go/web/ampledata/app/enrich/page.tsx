@@ -44,8 +44,6 @@ export default function DataEnrichmentPage() {
 	const uploadFile = useUploadFile();
 	const startJob = useStartJob();
 
-
-
 	const handleFileUpload = async (
 		uploadedData: DataRow[],
 		uploadedColumns: string[],
@@ -224,7 +222,8 @@ export default function DataEnrichmentPage() {
 		}
 
 		if (!drawerOpen && isEnrichmentInProgress) {
-			const completedRows = jobProgress.data?.rows_by_stage.COMPLETED || 0;
+			const completedRows =
+				jobProgress.data?.rows_by_stage.COMPLETED || 0;
 			const totalRows = jobProgress.data?.total_rows || data.length;
 			const progress =
 				totalRows > 0 ? (completedRows / totalRows) * 100 : 0;
@@ -251,7 +250,12 @@ export default function DataEnrichmentPage() {
 					},
 				});
 			}
-		} else if (!drawerOpen && isEnriching && enrichmentJobId && !jobProgress.data) {
+		} else if (
+			!drawerOpen &&
+			isEnriching &&
+			enrichmentJobId &&
+			!jobProgress.data
+		) {
 			if (!toastIdRef.current) {
 				const toastId = toast.loading(
 					`Enriching data... Starting enrichment process...`,
@@ -407,7 +411,9 @@ export default function DataEnrichmentPage() {
 			}
 			setColumns(
 				columns.map((col) =>
-					col.name === columnName ? { ...col, isEnriching: false } : col
+					col.name === columnName
+						? { ...col, isEnriching: false }
+						: col
 				)
 			);
 			setIsEnriching(false);
