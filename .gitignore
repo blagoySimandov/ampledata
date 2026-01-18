@@ -4,3 +4,6 @@ python/.claude
 __pycache__
 go/.claude/settings.local.json
 go/web/ampledata/.env
+go/web/ampledata-next/.next
+go/web/ampledata-next/.env
+go/web/ampledata-next/next-env.d.ts

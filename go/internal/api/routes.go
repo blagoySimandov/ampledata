@@ -8,6 +8,7 @@ import (
 func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandler, jwtVerifier *auth.JWTVerifier) *mux.Router {
 	r := mux.NewRouter()
 
+	r.Use(CORSMiddleware().Handler)
 	r.Use(LoggingMiddleware)
 	r.Use(RecoveryMiddleware)
 	r.Use(auth.Middleware(jwtVerifier))
