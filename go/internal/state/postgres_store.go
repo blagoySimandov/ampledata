@@ -446,6 +446,66 @@ func (s *PostgresStore) IncrementJobCost(ctx context.Context, jobID string, cost
 	return nil
 }
 
+func (s *PostgresStore) GetRowsPaginated(ctx context.Context, jobID string, params RowsQueryParams) (*PaginatedRows, error) {
+	var dbStates []models.RowStateDB
+	var total int
+	var err error
+
+	countQuery := s.db.NewSelect().
+		Model((*models.RowStateDB)(nil)).
+		Where("job_id = ?", jobID)
+
+	if params.Stage != "" && params.Stage != "all" {
+		countQuery = countQuery.Where("stage = ?", params.Stage)
+	}
+
+	total, err = countQuery.Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count rows: %w", err)
+	}
+
+	query := s.db.NewSelect().
+		Model(&dbStates).
+		Where("job_id = ?", jobID)
+
+	if params.Stage != "" && params.Stage != "all" {
+		query = query.Where("stage = ?", params.Stage)
+	}
+
+	switch params.Sort {
+	case "updated_at_asc":
+		query = query.Order("updated_at ASC")
+	case "key_asc":
+		query = query.Order("key ASC")
+	case "key_desc":
+		query = query.Order("key DESC")
+	default:
+		query = query.Order("updated_at DESC")
+	}
+
+	if params.Offset > 0 {
+		query = query.Offset(params.Offset)
+	}
+	if params.Limit > 0 {
+		query = query.Limit(params.Limit)
+	}
+
+	err = query.Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query rows: %w", err)
+	}
+
+	states := make([]*models.RowState, len(dbStates))
+	for i := range dbStates {
+		states[i] = dbStates[i].ToRowState()
+	}
+
+	return &PaginatedRows{
+		Rows:  states,
+		Total: total,
+	}, nil
+}
+
 func (s *PostgresStore) Close() error {
 	return s.db.Close()
 }

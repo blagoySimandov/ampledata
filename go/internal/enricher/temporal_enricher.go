@@ -7,7 +7,6 @@ import (
 	"go.temporal.io/sdk/client"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/workflows"
 )
@@ -18,7 +17,6 @@ type TemporalEnricher struct {
 	stateManager   *state.StateManager
 	taskQueue      string
 	maxRetries     int
-	costTracker    services.ICostTracker
 }
 
 // NewTemporalEnricher creates a new enricher that uses Temporal
@@ -79,7 +77,6 @@ func (e *TemporalEnricher) Cancel(ctx context.Context, jobID string) error {
 	return e.stateManager.Cancel(ctx, jobID)
 }
 
-// GetResults returns the enrichment results for a job
 func (e *TemporalEnricher) GetResults(ctx context.Context, jobID string, offset, limit int) ([]*models.EnrichmentResult, error) {
 	completedRows, err := e.stateManager.Store().GetRowsAtStage(ctx, jobID, models.StageCompleted, offset, limit)
 	if err != nil {
@@ -92,4 +89,28 @@ func (e *TemporalEnricher) GetResults(ctx context.Context, jobID string, offset,
 	}
 
 	return results, nil
+}
+
+func (e *TemporalEnricher) GetRowsProgress(ctx context.Context, jobID string, params state.RowsQueryParams) (*models.RowsProgressResponse, error) {
+	paginatedRows, err := e.stateManager.Store().GetRowsPaginated(ctx, jobID, params)
+	if err != nil {
+		return nil, err
+	}
+
+	rows := make([]*models.RowProgressItem, len(paginatedRows.Rows))
+	for i, row := range paginatedRows.Rows {
+		rows[i] = models.ToRowProgressItem(row)
+	}
+
+	hasMore := params.Offset+len(rows) < paginatedRows.Total
+
+	return &models.RowsProgressResponse{
+		Rows: rows,
+		Pagination: &models.PaginationInfo{
+			Total:   paginatedRows.Total,
+			Offset:  params.Offset,
+			Limit:   params.Limit,
+			HasMore: hasMore,
+		},
+	}, nil
 }
