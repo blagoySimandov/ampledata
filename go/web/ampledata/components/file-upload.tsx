@@ -12,7 +12,8 @@ interface FileUploadProps {
 	onFileUpload: (
 		data: DataRow[],
 		columns: string[],
-		fileName: string
+		fileName: string,
+		file: File
 	) => void;
 }
 
@@ -60,7 +61,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 				}
 			}
 
-			onFileUpload(parsedData.data, parsedData.columns, file.name);
+			onFileUpload(parsedData.data, parsedData.columns, file.name, file);
 		},
 		[onFileUpload]
 	);
