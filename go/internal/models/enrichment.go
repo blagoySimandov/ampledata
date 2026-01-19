@@ -90,3 +90,42 @@ func ToEnrichmentResult(row *RowState) *EnrichmentResult {
 		Error:         row.Error,
 	}
 }
+
+type RowProgressItem struct {
+	Key           string                          `json:"key"`
+	Stage         RowStage                        `json:"stage"`
+	ExtractedData map[string]interface{}          `json:"extracted_data,omitempty"`
+	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources       []string                        `json:"sources,omitempty"`
+	Error         *string                         `json:"error,omitempty"`
+	UpdatedAt     time.Time                       `json:"updated_at"`
+}
+
+type PaginationInfo struct {
+	Total   int  `json:"total"`
+	Offset  int  `json:"offset"`
+	Limit   int  `json:"limit"`
+	HasMore bool `json:"has_more"`
+}
+
+type RowsProgressResponse struct {
+	Rows       []*RowProgressItem `json:"rows"`
+	Pagination *PaginationInfo    `json:"pagination"`
+}
+
+func ToRowProgressItem(row *RowState) *RowProgressItem {
+	sources := row.Sources
+	if sources == nil {
+		sources = []string{}
+	}
+
+	return &RowProgressItem{
+		Key:           row.Key,
+		Stage:         row.Stage,
+		ExtractedData: row.ExtractedData,
+		Confidence:    row.Confidence,
+		Sources:       sources,
+		Error:         row.Error,
+		UpdatedAt:     row.UpdatedAt,
+	}
+}

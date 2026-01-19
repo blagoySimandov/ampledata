@@ -250,3 +250,60 @@ func (h *EnrichHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 		TotalCount: len(summaries),
 	})
 }
+
+func (h *EnrichHandler) GetRowsProgress(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	jobID := vars["jobID"]
+
+	offset := 0
+	limit := 50
+	stageFilter := "all"
+	sort := "updated_at_desc"
+
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		_, err := fmt.Sscanf(offsetStr, "%d", &offset)
+		if err != nil {
+			http.Error(w, "invalid offset parameter", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		_, err := fmt.Sscanf(limitStr, "%d", &limit)
+		if err != nil {
+			http.Error(w, "invalid limit parameter", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if limit > 100 {
+		limit = 100
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+
+	if stage := r.URL.Query().Get("stage"); stage != "" {
+		stageFilter = stage
+	}
+
+	if sortParam := r.URL.Query().Get("sort"); sortParam != "" {
+		sort = sortParam
+	}
+
+	params := state.RowsQueryParams{
+		Offset: offset,
+		Limit:  limit,
+		Stage:  stageFilter,
+		Sort:   sort,
+	}
+
+	response, err := h.enricher.GetRowsProgress(r.Context(), jobID, params)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

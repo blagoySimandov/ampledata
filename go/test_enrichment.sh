@@ -93,16 +93,39 @@ START_RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID/start" \
 
 echo "$START_RESPONSE" | jq .
 
-echo -e "\n${GREEN}6. Checking job progress${NC}"
-curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress" | jq .
+echo -e "\n${GREEN}6. Polling job progress and row status...${NC}"
 
-echo -e "\n${GREEN}7. Waiting 20 seconds before checking progress again...${NC}"
-sleep 20
+POLL_INTERVAL=5
+MAX_POLLS=60
 
-echo -e "${GREEN}8. Checking job progress again${NC}"
-curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress" | jq .
+for i in $(seq 1 $MAX_POLLS); do
+  echo -e "\n${YELLOW}--- Poll $i ---${NC}"
 
-echo -e "\n${GREEN}9. Getting job results${NC}"
+  PROGRESS=$(curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/progress")
+  STATUS=$(echo "$PROGRESS" | jq -r '.status')
+
+  echo -e "${BLUE}Job Progress:${NC}"
+  echo "$PROGRESS" | jq '{status, total_rows, rows_by_stage}'
+
+  echo -e "\n${BLUE}Row Details:${NC}"
+  ROWS_RESPONSE=$(curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/rows?limit=10&sort=updated_at_desc")
+  echo "$ROWS_RESPONSE" | jq '{
+    pagination,
+    rows: [.rows[] | {key, stage, extracted_data, error}]
+  }'
+
+  if [ "$STATUS" = "COMPLETED" ] || [ "$STATUS" = "CANCELLED" ]; then
+    echo -e "\n${GREEN}Job finished with status: $STATUS${NC}"
+    break
+  fi
+
+  if [ $i -lt $MAX_POLLS ]; then
+    echo -e "\n${YELLOW}Waiting ${POLL_INTERVAL}s...${NC}"
+    sleep $POLL_INTERVAL
+  fi
+done
+
+echo -e "\n${GREEN}7. Getting final job results${NC}"
 curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/results" | jq .
 
 # echo -e "\n${BLUE}=== Starting another job for cancellation test ===${NC}\n"

@@ -19,6 +19,7 @@ func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandl
 	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/jobs/{jobID}/rows", enrHandler.GetRowsProgress).Methods("GET", "OPTIONS")
 
 	r.HandleFunc("/api/v1/select-key", keySelectorHandler.SelectKey).Methods("POST", "OPTIONS")
 
