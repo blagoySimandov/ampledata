@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"google.golang.org/genai"
 )
@@ -226,11 +227,12 @@ Example 3 - Mixed scenario:
 func (g *GroqDecisionMaker) parseResponse(content string, serp *models.GoogleSearchResults, columnsMetadata []*models.ColumnMetadata) (*CrawlDecision, error) {
 	content = cleanJSONMarkdown(content)
 
+	cfg := config.Load()
 	var decision CrawlDecision
 	if err := json.Unmarshal([]byte(content), &decision); err != nil {
 		fallbackURLs := []string{}
 		for i, result := range serp.Organic {
-			if i >= 3 {
+			if i >= cfg.MaxOrganicResults {
 				break
 			}
 			if result.Link != nil {
@@ -282,7 +284,7 @@ func NewGeminiDecisionMaker(apiKey string) (*GeminiDecisionMaker, error) {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 	return &GeminiDecisionMaker{
-		model:  "gemini-2.5-flash-lite",
+		model:  "gemini-3-flash-preview",
 		client: client,
 	}, nil
 }
