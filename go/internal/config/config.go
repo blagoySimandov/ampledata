@@ -28,10 +28,12 @@ type Config struct {
 	MaxOrganicResults    int
 
 	// CostTracking
-	SerperCost         int
-	TknInCost          int
-	TknOutCost         int
-	CreditExchangeRate int
+	SerperCost              int
+	TknInCost               int
+	TknOutCost              int
+	CreditExchangeRate      int
+	StripeSecretKey         string
+	EnrichmentCostMeterName string
 }
 
 var cfg Config = Config{
@@ -57,10 +59,12 @@ var cfg Config = Config{
 	MaxOrganicResults:    getEnvInt("MAX_ORGANIC_RESULTS", 4),
 
 	// CostTracking
-	SerperCost:         getEnvInt("SERPER_COST", 1), // 0.001$ usd
-	TknInCost:          getEnvInt("TKN_INGESTION_COST", 500),
-	TknOutCost:         getEnvInt("TKN_ENRICHMENT_COST", 3000),
-	CreditExchangeRate: getEnvInt("CREDIT_EXCHANGE_RATE", 0),
+	SerperCost:              getEnvInt("SERPER_COST", 1), // 0.001$ usd
+	TknInCost:               getEnvInt("TKN_INGESTION_COST", 500),
+	TknOutCost:              getEnvInt("TKN_ENRICHMENT_COST", 3000),
+	CreditExchangeRate:      getEnvInt("CREDIT_EXCHANGE_RATE", 5), // 5 usd per 1 real world dollar
+	StripeSecretKey:         getEnv("STRIPE_SECRET_KEY", ""),
+	EnrichmentCostMeterName: getEnv("ENRICHMENT_COST_METER_NAME", "enrichment_credits"),
 }
 
 func Load() *Config {
