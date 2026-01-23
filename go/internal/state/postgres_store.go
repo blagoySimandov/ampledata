@@ -2,28 +2,18 @@ package state
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/pgdialect"
-	"github.com/uptrace/bun/driver/pgdriver"
 )
 
 type PostgresStore struct {
 	db *bun.DB
 }
 
-func NewPostgresStore(connectionString string) (*PostgresStore, error) {
-	sqldb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(connectionString)))
-
-	db := bun.NewDB(sqldb, pgdialect.New())
-
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(2)
-
+func NewPostgresStore(db *bun.DB) (*PostgresStore, error) {
 	store := &PostgresStore{db: db}
 
 	ctx := context.Background()
