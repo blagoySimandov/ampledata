@@ -105,3 +105,13 @@ func (r *UserRepository) GetOrCreate(ctx context.Context, userID, email, firstNa
 
 	return newUser, nil
 }
+
+func (r *UserRepository) UpdateStripeCustomerID(ctx context.Context, userID, stripeCustomerID string) error {
+	_, err := r.db.NewUpdate().
+		Model((*models.UserDB)(nil)).
+		Set("stripe_customer_id = ?", stripeCustomerID).
+		Set("updated_at = ?", time.Now()).
+		Where("user_id = ?", userID).
+		Exec(ctx)
+	return err
+}
