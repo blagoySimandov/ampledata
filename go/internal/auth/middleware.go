@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -104,7 +103,7 @@ func (v *JWTVerifier) VerifyToken(tokenString string) (jwt.Token, error) {
 	return token, nil
 }
 
-func Middleware(verifier *JWTVerifier, userService user.Service) func(http.Handler) http.Handler {
+func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var workosUser *WorkOSUser
@@ -150,21 +149,7 @@ func Middleware(verifier *JWTVerifier, userService user.Service) func(http.Handl
 				}
 			}
 
-			dbUser, err := userService.GetOrCreate(
-				r.Context(),
-				workosUser.ID,
-				workosUser.Email,
-				workosUser.FirstName,
-				workosUser.LastName,
-			)
-			if err != nil {
-				// TODO: better log
-				log.Printf("Failed to get or create user: %v", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				return
-			}
-
-			ctx := context.WithValue(r.Context(), userContextKey, dbUser)
+			ctx := context.WithValue(r.Context(), userContextKey, workosUser)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -180,16 +165,16 @@ func getStringClaim(claims map[string]interface{}, key string) string {
 	return ""
 }
 
-func GetUserFromContext(ctx context.Context) (*models.User, bool) {
-	user, ok := ctx.Value(userContextKey).(*models.User)
+func GetUserFromContext(ctx context.Context) (*WorkOSUser, bool) {
+	user, ok := ctx.Value(userContextKey).(*WorkOSUser)
 	return user, ok
 }
 
-func GetUserFromRequest(r *http.Request) (*models.User, bool) {
+func GetUserFromRequest(r *http.Request) (*WorkOSUser, bool) {
 	return GetUserFromContext(r.Context())
 }
 
-func RequireUser(w http.ResponseWriter, r *http.Request) (*models.User, bool) {
+func RequireUser(w http.ResponseWriter, r *http.Request) (*WorkOSUser, bool) {
 	user, ok := GetUserFromRequest(r)
 	if !ok {
 		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)

@@ -12,13 +12,15 @@ func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandl
 	r.Use(CORSMiddleware().Handler)
 	r.Use(LoggingMiddleware)
 	r.Use(RecoveryMiddleware)
-	r.Use(auth.Middleware(jwtVerifier, userService))
+	r.Use(auth.Middleware(jwtVerifier))
+	r.Use(user.UserMiddleware(userService))
 
 	r.HandleFunc("/api/v1/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs", enrHandler.ListJobs).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs/{jobID}/start", enrHandler.StartJob).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST", "OPTIONS")
+
+	r.HandleFunc("/api/v1/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs/{jobID}/rows", enrHandler.GetRowsProgress).Methods("GET", "OPTIONS")
 
