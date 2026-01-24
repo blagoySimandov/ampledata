@@ -11,6 +11,7 @@ import (
 
 	"github.com/blagoySimandov/ampledata/go/internal/api"
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
+	"github.com/blagoySimandov/ampledata/go/internal/billing"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/db"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
@@ -39,6 +40,9 @@ func main() {
 	if err := userRepo.InitializeDatabase(context.Background()); err != nil {
 		log.Fatalf("Failed to initialize user database: %v", err)
 	}
+
+	billingService := billing.NewBilling()
+	userService := user.NewUserService(userRepo, billingService)
 
 	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate, services.WithStore(store))
 	if err != nil {
@@ -106,7 +110,7 @@ func main() {
 
 	handler := api.NewEnrichHandler(enr, gcsReader, store)
 	keySelectorHandler := api.NewKeySelectorHandler(keySelector, gcsReader, store)
-	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier)
+	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier, userService)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

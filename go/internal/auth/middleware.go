@@ -104,7 +104,7 @@ func (v *JWTVerifier) VerifyToken(tokenString string) (jwt.Token, error) {
 	return token, nil
 }
 
-func Middleware(verifier *JWTVerifier, userRepo user.Repository) func(http.Handler) http.Handler {
+func Middleware(verifier *JWTVerifier, userService user.Service) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var workosUser *WorkOSUser
@@ -112,7 +112,7 @@ func Middleware(verifier *JWTVerifier, userRepo user.Repository) func(http.Handl
 			if verifier.debugBypass {
 				workosUser = &WorkOSUser{
 					ID:        "debug-user-id",
-					Email:     "debug@localhost",
+					Email:     "debug@localhost.com",
 					FirstName: "Debug",
 					LastName:  "User",
 				}
@@ -150,7 +150,7 @@ func Middleware(verifier *JWTVerifier, userRepo user.Repository) func(http.Handl
 				}
 			}
 
-			dbUser, err := userRepo.GetOrCreate(
+			dbUser, err := userService.GetOrCreate(
 				r.Context(),
 				workosUser.ID,
 				workosUser.Email,
@@ -158,14 +158,13 @@ func Middleware(verifier *JWTVerifier, userRepo user.Repository) func(http.Handl
 				workosUser.LastName,
 			)
 			if err != nil {
+				// TODO: better log
 				log.Printf("Failed to get or create user: %v", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}
 
 			ctx := context.WithValue(r.Context(), userContextKey, dbUser)
-
-			log.Printf("User authenticated: %s (%s)", dbUser.Email, dbUser.ID)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

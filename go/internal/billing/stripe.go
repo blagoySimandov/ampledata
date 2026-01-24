@@ -1,6 +1,8 @@
 package billing
 
 import (
+	"context"
+
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/stripe/stripe-go/v84"
 )
@@ -23,8 +25,10 @@ func (b *Billing) AddEnrichmentCost(cost int) error {
 	return nil
 }
 
-func (b *Billing) CreateCustomer(userID string) (*stripe.Customer, error) {
-	///
-	//retunr customer, err
-	return nil, nil
+func (b *Billing) CreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error) {
+	params := &stripe.CustomerCreateParams{
+		Email:    stripe.String(email),
+		Metadata: map[string]string{"user_id": userID},
+	}
+	return b.sc.V1Customers.Create(ctx, params)
 }
