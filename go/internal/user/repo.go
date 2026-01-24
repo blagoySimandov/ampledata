@@ -15,8 +15,6 @@ type Repository interface {
 	Update(ctx context.Context, user *models.User) error
 	GetOrCreate(ctx context.Context, userID, email, firstName, lastName string) (*models.User, error)
 	UpdateStripeCustomerID(ctx context.Context, userID, stripeCustomerID string) error
-	AddCredits(ctx context.Context, userID string, amount int) error
-	DeductCredits(ctx context.Context, userID string, amount int) error
 }
 
 type UserRepository struct {
@@ -59,7 +57,7 @@ func (r *UserRepository) GetByID(ctx context.Context, userID string) (*models.Us
 	userDB := new(models.UserDB)
 	err := r.db.NewSelect().
 		Model(userDB).
-		Where("user_id = ?", userID).
+		Where("id = ?", userID).
 		Scan(ctx)
 	if err != nil {
 		return nil, err
@@ -92,11 +90,10 @@ func (r *UserRepository) GetOrCreate(ctx context.Context, userID, email, firstNa
 	}
 
 	newUser := &models.User{
-		UserID:    userID,
+		ID:        userID,
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
-		Credits:   0,
 	}
 
 	if err := r.Create(ctx, newUser); err != nil {
@@ -111,7 +108,7 @@ func (r *UserRepository) UpdateStripeCustomerID(ctx context.Context, userID, str
 		Model((*models.UserDB)(nil)).
 		Set("stripe_customer_id = ?", stripeCustomerID).
 		Set("updated_at = ?", time.Now()).
-		Where("user_id = ?", userID).
+		Where("id = ?", userID).
 		Exec(ctx)
 	return err
 }

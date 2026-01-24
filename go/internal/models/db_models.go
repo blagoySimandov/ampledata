@@ -103,24 +103,22 @@ func RowStateFromApp(jobID string, state *RowState) *RowStateDB {
 type UserDB struct {
 	bun.BaseModel `bun:"table:users,alias:u"`
 
-	UserID           string    `bun:"user_id,pk" json:"user_id"`
+	ID               string    `bun:"id,pk" json:"user_id"`
 	Email            string    `bun:"email,notnull" json:"email"`
 	FirstName        string    `bun:"first_name" json:"first_name"`
 	LastName         string    `bun:"last_name" json:"last_name"`
 	StripeCustomerID *string   `bun:"stripe_customer_id" json:"stripe_customer_id"`
-	Credits          int       `bun:"credits,notnull,default:0" json:"credits"`
 	CreatedAt        time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt        time.Time `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
 func (u *UserDB) ToUser() *User {
 	return &User{
-		UserID:           u.UserID,
+		ID:               u.ID,
 		Email:            u.Email,
 		FirstName:        u.FirstName,
 		LastName:         u.LastName,
 		StripeCustomerID: u.StripeCustomerID,
-		Credits:          u.Credits,
 		CreatedAt:        u.CreatedAt,
 		UpdatedAt:        u.UpdatedAt,
 	}
@@ -128,12 +126,11 @@ func (u *UserDB) ToUser() *User {
 
 func UserFromDomain(user *User) *UserDB {
 	return &UserDB{
-		UserID:           user.UserID,
+		ID:               user.ID,
 		Email:            user.Email,
 		FirstName:        user.FirstName,
 		LastName:         user.LastName,
 		StripeCustomerID: user.StripeCustomerID,
-		Credits:          user.Credits,
 		CreatedAt:        user.CreatedAt,
 		UpdatedAt:        user.UpdatedAt,
 	}

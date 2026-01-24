@@ -2,16 +2,17 @@ package api
 
 import (
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
+	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandler, jwtVerifier *auth.JWTVerifier) *mux.Router {
+func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandler, jwtVerifier *auth.JWTVerifier, userRepo user.Repository) *mux.Router {
 	r := mux.NewRouter()
 
 	r.Use(CORSMiddleware().Handler)
 	r.Use(LoggingMiddleware)
 	r.Use(RecoveryMiddleware)
-	r.Use(auth.Middleware(jwtVerifier))
+	r.Use(auth.Middleware(jwtVerifier, userRepo))
 
 	r.HandleFunc("/api/v1/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/jobs", enrHandler.ListJobs).Methods("GET", "OPTIONS")
