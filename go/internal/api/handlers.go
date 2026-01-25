@@ -206,7 +206,7 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go h.enricher.Enrich(context.Background(), jobID, rowKeys, req.ColumnsMetadata)
+	go h.enricher.Enrich(context.Background(), jobID, user.ID, rowKeys, req.ColumnsMetadata)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.StartJobResponse{

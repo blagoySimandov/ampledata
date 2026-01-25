@@ -15,6 +15,7 @@ import (
 
 type JobWorkflowInput struct {
 	JobID           string
+	UserID          string
 	RowKeys         []string
 	ColumnsMetadata []*models.ColumnMetadata
 	EntityType      *string
@@ -90,6 +91,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 
 		childInput := EnrichmentWorkflowInput{
 			JobID:            input.JobID,
+			UserID:           input.UserID,
 			RowKey:           rowKey,
 			ColumnsMetadata:  input.ColumnsMetadata,
 			QueryPatterns:    patternsOutput.Patterns,

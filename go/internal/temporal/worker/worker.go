@@ -52,6 +52,9 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 	w.RegisterActivityWithOptions(activities.CompleteJob, activity.RegisterOptions{
 		Name: "CompleteJob",
 	})
+	w.RegisterActivityWithOptions(activities.ReportUsage, activity.RegisterOptions{
+		Name: "ReportUsage",
+	})
 
 	return &Worker{
 		temporalWorker: w,

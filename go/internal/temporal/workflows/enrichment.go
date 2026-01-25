@@ -14,6 +14,7 @@ import (
 
 type EnrichmentWorkflowInput struct {
 	JobID            string
+	UserID           string
 	RowKey           string
 	ColumnsMetadata  []*models.ColumnMetadata
 	QueryPatterns    []string
@@ -277,6 +278,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 
 		retryInput := EnrichmentWorkflowInput{
 			JobID:            input.JobID,
+			UserID:           input.UserID,
 			RowKey:           input.RowKey,
 			ColumnsMetadata:  filteredMetadata,
 			QueryPatterns:    input.QueryPatterns,
@@ -314,6 +316,13 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 
 		output.IterationCount = retryOutput.IterationCount
 
+		if input.RetryCount == 0 {
+			workflow.ExecuteActivity(ctx, "ReportUsage", activities.ReportUsageInput{
+				UserID:  input.UserID,
+				Credits: len(output.ExtractedData),
+			}).Get(ctx, nil)
+		}
+
 		return output, nil
 	}
 
@@ -325,6 +334,13 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}).Get(ctx, nil)
 
 	event.EmitSuccess(ctx)
+
+	if input.RetryCount == 0 {
+		workflow.ExecuteActivity(ctx, "ReportUsage", activities.ReportUsageInput{
+			UserID:  input.UserID,
+			Credits: len(output.ExtractedData),
+		}).Get(ctx, nil)
+	}
 
 	return output, nil
 }

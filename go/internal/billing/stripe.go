@@ -2,26 +2,62 @@ package billing
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/config"
+	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/stripe/stripe-go/v84"
 )
 
+type UserLookup interface {
+	GetByID(ctx context.Context, userID string) (*models.User, error)
+}
+
 type Billing struct {
 	sc                      *stripe.Client
+	userLookup              UserLookup
 	enrichmentCostMeterName string
 }
 
-func NewBilling() *Billing {
+func NewBilling(userLookup UserLookup) *Billing {
 	cfg := config.Load()
 	sc := stripe.NewClient(cfg.StripeSecretKey)
 	return &Billing{
 		sc:                      sc,
+		userLookup:              userLookup,
 		enrichmentCostMeterName: cfg.EnrichmentCostMeterName,
 	}
 }
 
-func (b *Billing) AddEnrichmentCost(cost int) error {
+func (b *Billing) ReportUsage(ctx context.Context, userID string, credits int) error {
+	if userID == "" || credits <= 0 {
+		return nil
+	}
+
+	u, err := b.userLookup.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if u.StripeCustomerID == nil || *u.StripeCustomerID == "" {
+		return nil
+	}
+
+	params := &stripe.BillingMeterEventCreateParams{
+		EventName: stripe.String(b.enrichmentCostMeterName),
+		Payload: map[string]string{
+			"stripe_customer_id": *u.StripeCustomerID,
+			"value":              fmt.Sprintf("%d", credits),
+		},
+		Timestamp: stripe.Int64(time.Now().Unix()),
+	}
+
+	_, err = b.sc.V1BillingMeterEvents.Create(ctx, params)
+	if err != nil {
+		return fmt.Errorf("failed to report meter event: %w", err)
+	}
+
 	return nil
 }
 
