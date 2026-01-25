@@ -7,3 +7,5 @@ go/web/ampledata/.env
 go/web/ampledata-next/.next
 go/web/ampledata-next/.env
 go/web/ampledata-next/next-env.d.ts
+go/tmp
+.claude

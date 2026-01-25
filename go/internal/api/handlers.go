@@ -14,6 +14,7 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
+	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/gorilla/mux"
 )
 
@@ -142,9 +143,15 @@ func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.R
 }
 
 func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.GetUserFromRequest(r)
+	authUser, ok := auth.GetUserFromRequest(r)
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	dbUser, ok := user.GetDBUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "User not found", http.StatusInternalServerError)
 		return
 	}
 
@@ -157,7 +164,7 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if job.UserID != user.ID {
+	if job.UserID != authUser.ID {
 		http.Error(w, "Forbidden: You do not own this job", http.StatusForbidden)
 		return
 	}
@@ -206,7 +213,12 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go h.enricher.Enrich(context.Background(), jobID, rowKeys, req.ColumnsMetadata)
+	stripeCustomerID := ""
+	if dbUser.StripeCustomerID != nil {
+		stripeCustomerID = *dbUser.StripeCustomerID
+	}
+
+	go h.enricher.Enrich(context.Background(), jobID, dbUser.ID, stripeCustomerID, rowKeys, req.ColumnsMetadata)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.StartJobResponse{

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -24,6 +25,18 @@ type WorkOSUser struct {
 	Email     string `json:"email"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+}
+
+func (w *WorkOSUser) ToUser() *models.User {
+	return &models.User{
+		ID:               w.ID,
+		Email:            w.Email,
+		FirstName:        w.FirstName,
+		LastName:         w.LastName,
+		StripeCustomerID: nil,
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	}
 }
 
 type JWTVerifier struct {
@@ -93,55 +106,50 @@ func (v *JWTVerifier) VerifyToken(tokenString string) (jwt.Token, error) {
 func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Debug bypass: inject a fake user and skip all auth checks
+			var workosUser *WorkOSUser
+
 			if verifier.debugBypass {
-				debugUser := &WorkOSUser{
+				workosUser = &WorkOSUser{
 					ID:        "debug-user-id",
-					Email:     "debug@localhost",
+					Email:     "debug@localhost.com",
 					FirstName: "Debug",
 					LastName:  "User",
 				}
-				ctx := context.WithValue(r.Context(), userContextKey, debugUser)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
+			} else {
+				authHeader := r.Header.Get("Authorization")
+				if authHeader == "" {
+					log.Printf("Missing Authorization header")
+					http.Error(w, "Unauthorized: Missing Authorization header", http.StatusUnauthorized)
+					return
+				}
+
+				parts := strings.SplitN(authHeader, " ", 2)
+				if len(parts) != 2 || parts[0] != "Bearer" {
+					log.Printf("Invalid Authorization header format")
+					http.Error(w, "Unauthorized: Invalid Authorization header format", http.StatusUnauthorized)
+					return
+				}
+
+				accessToken := parts[1]
+
+				token, err := verifier.VerifyToken(accessToken)
+				if err != nil {
+					log.Printf("Failed to verify token: %v", err)
+					http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
+					return
+				}
+
+				claims := token.PrivateClaims()
+
+				workosUser = &WorkOSUser{
+					ID:        getStringClaim(claims, "sid"),
+					Email:     getStringClaim(claims, "email"),
+					FirstName: getStringClaim(claims, "first_name"),
+					LastName:  getStringClaim(claims, "last_name"),
+				}
 			}
 
-			// Normal auth flow
-			authHeader := r.Header.Get("Authorization")
-			if authHeader == "" {
-				log.Printf("Missing Authorization header")
-				http.Error(w, "Unauthorized: Missing Authorization header", http.StatusUnauthorized)
-				return
-			}
-
-			parts := strings.SplitN(authHeader, " ", 2)
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				log.Printf("Invalid Authorization header format")
-				http.Error(w, "Unauthorized: Invalid Authorization header format", http.StatusUnauthorized)
-				return
-			}
-
-			accessToken := parts[1]
-
-			token, err := verifier.VerifyToken(accessToken)
-			if err != nil {
-				log.Printf("Failed to verify token: %v", err)
-				http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
-				return
-			}
-
-			claims := token.PrivateClaims()
-
-			user := &WorkOSUser{
-				ID:        getStringClaim(claims, "sid"),
-				Email:     getStringClaim(claims, "email"),
-				FirstName: getStringClaim(claims, "first_name"),
-				LastName:  getStringClaim(claims, "last_name"),
-			}
-
-			ctx := context.WithValue(r.Context(), userContextKey, user)
-
-			log.Printf("User authenticated: %s (%s)", user.Email, user.ID)
+			ctx := context.WithValue(r.Context(), userContextKey, workosUser)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -172,5 +180,6 @@ func RequireUser(w http.ResponseWriter, r *http.Request) (*WorkOSUser, bool) {
 		http.Error(w, "Unauthorized: User not found in context", http.StatusUnauthorized)
 		return nil, false
 	}
+
 	return user, true
 }

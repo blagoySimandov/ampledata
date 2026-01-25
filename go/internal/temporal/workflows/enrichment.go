@@ -14,6 +14,8 @@ import (
 
 type EnrichmentWorkflowInput struct {
 	JobID            string
+	UserID           string
+	StripeCustomerID string
 	RowKey           string
 	ColumnsMetadata  []*models.ColumnMetadata
 	QueryPatterns    []string
@@ -277,6 +279,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 
 		retryInput := EnrichmentWorkflowInput{
 			JobID:            input.JobID,
+			UserID:           input.UserID,
+			StripeCustomerID: input.StripeCustomerID,
 			RowKey:           input.RowKey,
 			ColumnsMetadata:  filteredMetadata,
 			QueryPatterns:    input.QueryPatterns,
@@ -314,6 +318,17 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 
 		output.IterationCount = retryOutput.IterationCount
 
+		if input.RetryCount == 0 {
+			var reportErr error
+			workflow.ExecuteActivity(ctx, "ReportUsage", activities.ReportUsageInput{
+				StripeCustomerID: input.StripeCustomerID,
+				Credits:          len(output.ExtractedData),
+			}).Get(ctx, &reportErr)
+			if reportErr != nil {
+				event.SetMetadata("billing_error", reportErr.Error())
+			}
+		}
+
 		return output, nil
 	}
 
@@ -325,6 +340,17 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}).Get(ctx, nil)
 
 	event.EmitSuccess(ctx)
+
+	if input.RetryCount == 0 {
+		var reportErr error
+		workflow.ExecuteActivity(ctx, "ReportUsage", activities.ReportUsageInput{
+			StripeCustomerID: input.StripeCustomerID,
+			Credits:          len(output.ExtractedData),
+		}).Get(ctx, &reportErr)
+		if reportErr != nil {
+			event.SetMetadata("billing_error", reportErr.Error())
+		}
+	}
 
 	return output, nil
 }

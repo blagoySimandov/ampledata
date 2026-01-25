@@ -18,6 +18,7 @@ type Activities struct {
 	crawler          services.WebCrawler
 	contentExtractor services.IContentExtractor
 	patternGenerator services.QueryPatternGenerator
+	billingService   services.BillingService
 }
 
 func NewActivities(
@@ -27,6 +28,7 @@ func NewActivities(
 	crawler services.WebCrawler,
 	contentExtractor services.IContentExtractor,
 	patternGenerator services.QueryPatternGenerator,
+	billingService services.BillingService,
 ) *Activities {
 	return &Activities{
 		stateManager:     stateManager,
@@ -35,6 +37,7 @@ func NewActivities(
 		crawler:          crawler,
 		contentExtractor: contentExtractor,
 		patternGenerator: patternGenerator,
+		billingService:   billingService,
 	}
 }
 
@@ -486,4 +489,13 @@ func (a *Activities) CompleteJob(ctx context.Context, jobID string) error {
 	event.EmitActivitySuccess(ctx, nil)
 
 	return nil
+}
+
+type ReportUsageInput struct {
+	StripeCustomerID string
+	Credits          int
+}
+
+func (a *Activities) ReportUsage(ctx context.Context, input ReportUsageInput) error {
+	return a.billingService.ReportUsage(ctx, input.StripeCustomerID, input.Credits)
 }

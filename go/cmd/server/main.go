@@ -11,7 +11,9 @@ import (
 
 	"github.com/blagoySimandov/ampledata/go/internal/api"
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
+	"github.com/blagoySimandov/ampledata/go/internal/billing"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
+	"github.com/blagoySimandov/ampledata/go/internal/db"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
@@ -19,16 +21,28 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
 	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/worker"
+	"github.com/blagoySimandov/ampledata/go/internal/user"
 )
 
 func main() {
 	cfg := config.Load()
 
-	store, err := state.NewPostgresStore(cfg.DatabaseURL)
+	//_ := stripe.NewClient(cfg.StripeSecretKey)
+
+	db := db.NewBunPostgresClient(cfg.DatabaseURL)
+	store, err := state.NewPostgresStore(db)
 	if err != nil {
 		log.Fatalf("Failed to create PostgreSQL store: %v", err)
 	}
 	defer store.Close()
+
+	userRepo := user.NewUserRepository(db)
+	if err := userRepo.InitializeDatabase(context.Background()); err != nil {
+		log.Fatalf("Failed to initialize user database: %v", err)
+	}
+
+	billingService := billing.NewBilling()
+	userService := user.NewUserService(userRepo, billingService)
 
 	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate, services.WithStore(store))
 	if err != nil {
@@ -77,6 +91,7 @@ func main() {
 		crawler,
 		extractor,
 		patternGenerator,
+		billingService,
 	)
 
 	w := worker.NewWorker(tc, cfg.TemporalTaskQueue, acts)
@@ -96,7 +111,7 @@ func main() {
 
 	handler := api.NewEnrichHandler(enr, gcsReader, store)
 	keySelectorHandler := api.NewKeySelectorHandler(keySelector, gcsReader, store)
-	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier)
+	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier, userService)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

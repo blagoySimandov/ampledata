@@ -99,3 +99,39 @@ func RowStateFromApp(jobID string, state *RowState) *RowStateDB {
 		UpdatedAt:     state.UpdatedAt,
 	}
 }
+
+type UserDB struct {
+	bun.BaseModel `bun:"table:users,alias:u"`
+
+	ID               string    `bun:"id,pk" json:"user_id"`
+	Email            string    `bun:"email,notnull" json:"email"`
+	FirstName        string    `bun:"first_name" json:"first_name"`
+	LastName         string    `bun:"last_name" json:"last_name"`
+	StripeCustomerID *string   `bun:"stripe_customer_id" json:"stripe_customer_id"`
+	CreatedAt        time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt        time.Time `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+}
+
+func (u *UserDB) ToUser() *User {
+	return &User{
+		ID:               u.ID,
+		Email:            u.Email,
+		FirstName:        u.FirstName,
+		LastName:         u.LastName,
+		StripeCustomerID: u.StripeCustomerID,
+		CreatedAt:        u.CreatedAt,
+		UpdatedAt:        u.UpdatedAt,
+	}
+}
+
+func UserFromDomain(user *User) *UserDB {
+	return &UserDB{
+		ID:               user.ID,
+		Email:            user.Email,
+		FirstName:        user.FirstName,
+		LastName:         user.LastName,
+		StripeCustomerID: user.StripeCustomerID,
+		CreatedAt:        user.CreatedAt,
+		UpdatedAt:        user.UpdatedAt,
+	}
+}
