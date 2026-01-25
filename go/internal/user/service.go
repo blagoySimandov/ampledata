@@ -3,8 +3,8 @@ package user
 import (
 	"context"
 
-	"github.com/blagoySimandov/ampledata/go/internal/billing"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/blagoySimandov/ampledata/go/internal/services"
 )
 
 type Service interface {
@@ -13,16 +13,13 @@ type Service interface {
 
 type UserService struct {
 	repo    Repository
-	billing *billing.Billing
-	// cache   *cache.Cache
+	billing services.BillingService
 }
 
-func NewUserService(repo Repository, billing *billing.Billing) *UserService {
+func NewUserService(repo Repository, billing services.BillingService) *UserService {
 	return &UserService{
 		repo:    repo,
 		billing: billing,
-		// TODO: maybe cache ?
-		//		cache:   cache.New(5*time.Minute, 10*time.Minute),
 	}
 }
 

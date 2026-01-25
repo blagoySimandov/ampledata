@@ -14,12 +14,13 @@ import (
 )
 
 type JobWorkflowInput struct {
-	JobID           string
-	UserID          string
-	RowKeys         []string
-	ColumnsMetadata []*models.ColumnMetadata
-	EntityType      *string
-	MaxRetries      int
+	JobID            string
+	UserID           string
+	StripeCustomerID string
+	RowKeys          []string
+	ColumnsMetadata  []*models.ColumnMetadata
+	EntityType       *string
+	MaxRetries       int
 }
 
 type JobWorkflowOutput struct {
@@ -92,6 +93,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 		childInput := EnrichmentWorkflowInput{
 			JobID:            input.JobID,
 			UserID:           input.UserID,
+			StripeCustomerID: input.StripeCustomerID,
 			RowKey:           rowKey,
 			ColumnsMetadata:  input.ColumnsMetadata,
 			QueryPatterns:    patternsOutput.Patterns,

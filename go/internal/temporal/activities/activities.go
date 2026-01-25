@@ -492,10 +492,10 @@ func (a *Activities) CompleteJob(ctx context.Context, jobID string) error {
 }
 
 type ReportUsageInput struct {
-	UserID  string
-	Credits int
+	StripeCustomerID string
+	Credits          int
 }
 
 func (a *Activities) ReportUsage(ctx context.Context, input ReportUsageInput) error {
-	return a.billingService.ReportUsage(ctx, input.UserID, input.Credits)
+	return a.billingService.ReportUsage(ctx, input.StripeCustomerID, input.Credits)
 }

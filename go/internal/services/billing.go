@@ -1,7 +1,12 @@
 package services
 
-import "context"
+import (
+	"context"
+
+	"github.com/stripe/stripe-go/v84"
+)
 
 type BillingService interface {
-	ReportUsage(ctx context.Context, userID string, credits int) error
+	ReportUsage(ctx context.Context, stripeCustomerID string, credits int) error
+	CreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error)
 }

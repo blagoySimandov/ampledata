@@ -41,7 +41,7 @@ func main() {
 		log.Fatalf("Failed to initialize user database: %v", err)
 	}
 
-	billingService := billing.NewBilling(userRepo)
+	billingService := billing.NewBilling()
 	userService := user.NewUserService(userRepo, billingService)
 
 	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate, services.WithStore(store))
