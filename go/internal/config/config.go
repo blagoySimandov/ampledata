@@ -33,6 +33,7 @@ type Config struct {
 	TknOutCost              int
 	CreditExchangeRate      int
 	StripeSecretKey         string
+	StripeWebhookSecret     string
 	EnrichmentCostMeterName string
 }
 
@@ -64,6 +65,7 @@ var cfg Config = Config{
 	TknOutCost:              getEnvInt("TKN_ENRICHMENT_COST", 1250),
 	CreditExchangeRate:      getEnvInt("CREDIT_EXCHANGE_RATE", 5), // 5 usd per 1 real world dollar
 	StripeSecretKey:         getEnv("STRIPE_SECRET", ""),
+	StripeWebhookSecret:     getEnv("STRIPE_WEBHOOK_SECRET", ""),
 	EnrichmentCostMeterName: getEnv("ENRICHMENT_COST_METER_NAME", "enrichment_credits"),
 }
 

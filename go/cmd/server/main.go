@@ -111,7 +111,7 @@ func main() {
 
 	handler := api.NewEnrichHandler(enr, gcsReader, store)
 	keySelectorHandler := api.NewKeySelectorHandler(keySelector, gcsReader, store)
-	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier, userService)
+	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier, userService, billingService)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,
