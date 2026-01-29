@@ -41,7 +41,7 @@ func main() {
 		log.Fatalf("Failed to initialize user database: %v", err)
 	}
 
-	billingService := billing.NewBilling()
+	billingService := billing.NewBilling(userRepo)
 	userService := user.NewUserService(userRepo, billingService)
 
 	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate, services.WithStore(store))
@@ -109,9 +109,9 @@ func main() {
 		log.Fatalf("Failed to create JWT verifier: %v", err)
 	}
 
-	handler := api.NewEnrichHandler(enr, gcsReader, store)
+	handler := api.NewEnrichHandler(enr, gcsReader, store, userRepo)
 	keySelectorHandler := api.NewKeySelectorHandler(keySelector, gcsReader, store)
-	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier, userService, billingService)
+	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier, userService, billingService, userRepo)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

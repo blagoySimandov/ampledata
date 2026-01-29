@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
+	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -22,13 +23,15 @@ type EnrichHandler struct {
 	enricher  enricher.IEnricher
 	gcsReader *gcs.CSVReader
 	store     state.Store
+	userRepo  user.Repository
 }
 
-func NewEnrichHandler(enr enricher.IEnricher, gcsReader *gcs.CSVReader, store state.Store) *EnrichHandler {
+func NewEnrichHandler(enr enricher.IEnricher, gcsReader *gcs.CSVReader, store state.Store, userRepo user.Repository) *EnrichHandler {
 	return &EnrichHandler{
 		enricher:  enr,
 		gcsReader: gcsReader,
 		store:     store,
+		userRepo:  userRepo,
 	}
 }
 
@@ -198,6 +201,19 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 
 	if len(rowKeys) == 0 {
 		http.Error(w, "No rows found in the specified key column", http.StatusBadRequest)
+		return
+	}
+	cfg := config.Load()
+	totalCells := len(rowKeys) * len(req.ColumnsMetadata)
+	requiredCredits := int64(totalCells * cfg.CreditsPerCell)
+	availableCredits, err := h.userRepo.GetAvailableCredits(r.Context(), dbUser.ID)
+	if err != nil {
+		log.Printf("Failed to get available credits: %v", err)
+		http.Error(w, "Failed to check credit balance", http.StatusInternalServerError)
+		return
+	}
+	if availableCredits < requiredCredits {
+		http.Error(w, fmt.Sprintf("Insufficient credits. Required: %d, Available: %d", requiredCredits, availableCredits), http.StatusPaymentRequired)
 		return
 	}
 

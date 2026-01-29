@@ -7,14 +7,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandler, jwtVerifier *auth.JWTVerifier, userService user.Service, billing services.BillingService) *mux.Router {
+func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandler, jwtVerifier *auth.JWTVerifier, userService user.Service, billing services.BillingService, userRepo user.Repository) *mux.Router {
 	r := mux.NewRouter()
 
 	r.Use(CORSMiddleware().Handler)
 	r.Use(LoggingMiddleware)
 	r.Use(RecoveryMiddleware)
 
-	checkoutHandler := NewCheckoutHandler(billing)
+	checkoutHandler := NewCheckoutHandler(billing, userRepo)
 	r.HandleFunc("/api/v1/webhooks/stripe", checkoutHandler.HandleWebhook).Methods("POST")
 
 	authenticated := r.PathPrefix("/api/v1").Subrouter()
