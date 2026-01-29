@@ -108,6 +108,8 @@ type UserDB struct {
 	FirstName        string    `bun:"first_name" json:"first_name"`
 	LastName         string    `bun:"last_name" json:"last_name"`
 	StripeCustomerID *string   `bun:"stripe_customer_id" json:"stripe_customer_id"`
+	TokensUsed       int64     `bun:"tokens_used,notnull,default:0" json:"tokens_used"`
+	TokensPurchased  int64     `bun:"tokens_purchased,notnull,default:0" json:"tokens_purchased"`
 	CreatedAt        time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt        time.Time `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
@@ -119,6 +121,8 @@ func (u *UserDB) ToUser() *User {
 		FirstName:        u.FirstName,
 		LastName:         u.LastName,
 		StripeCustomerID: u.StripeCustomerID,
+		TokensUsed:       u.TokensUsed,
+		TokensPurchased:  u.TokensPurchased,
 		CreatedAt:        u.CreatedAt,
 		UpdatedAt:        u.UpdatedAt,
 	}
@@ -131,6 +135,8 @@ func UserFromDomain(user *User) *UserDB {
 		FirstName:        user.FirstName,
 		LastName:         user.LastName,
 		StripeCustomerID: user.StripeCustomerID,
+		TokensUsed:       user.TokensUsed,
+		TokensPurchased:  user.TokensPurchased,
 		CreatedAt:        user.CreatedAt,
 		UpdatedAt:        user.UpdatedAt,
 	}

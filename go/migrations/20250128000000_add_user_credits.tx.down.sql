@@ -1,0 +1,2 @@
+ALTER TABLE users DROP COLUMN IF EXISTS tokens_used;
+ALTER TABLE users DROP COLUMN IF EXISTS tokens_purchased;

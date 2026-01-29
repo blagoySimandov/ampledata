@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/config"
+	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/stripe/stripe-go/v84"
 	"github.com/stripe/stripe-go/v84/webhook"
 )
@@ -14,20 +15,32 @@ type Billing struct {
 	sc                      *stripe.Client
 	enrichmentCostMeterName string
 	webhookSecret           string
+	userRepo                user.Repository
 }
 
-func NewBilling() *Billing {
+func NewBilling(userRepo user.Repository) *Billing {
 	cfg := config.Load()
 	sc := stripe.NewClient(cfg.StripeSecretKey)
 	return &Billing{
 		sc:                      sc,
 		enrichmentCostMeterName: cfg.EnrichmentCostMeterName,
 		webhookSecret:           cfg.StripeWebhookSecret,
+		userRepo:                userRepo,
 	}
 }
 
 func (b *Billing) ReportUsage(ctx context.Context, stripeCustomerID string, credits int) error {
-	if stripeCustomerID == "" || credits <= 0 {
+	if credits <= 0 {
+		return nil
+	}
+
+	if stripeCustomerID != "" && b.userRepo != nil {
+		if err := b.userRepo.IncrementTokensUsed(ctx, stripeCustomerID, int64(credits)); err != nil {
+			return fmt.Errorf("failed to increment tokens used: %w", err)
+		}
+	}
+
+	if stripeCustomerID == "" {
 		return nil
 	}
 

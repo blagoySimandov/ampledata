@@ -12,11 +12,12 @@ import (
 )
 
 type CheckoutHandler struct {
-	billing services.BillingService
+	billing  services.BillingService
+	userRepo user.Repository
 }
 
-func NewCheckoutHandler(billing services.BillingService) *CheckoutHandler {
-	return &CheckoutHandler{billing: billing}
+func NewCheckoutHandler(billing services.BillingService, userRepo user.Repository) *CheckoutHandler {
+	return &CheckoutHandler{billing: billing, userRepo: userRepo}
 }
 
 type CreateCheckoutRequest struct {
@@ -86,7 +87,7 @@ func (h *CheckoutHandler) GetCreditBalance(w http.ResponseWriter, r *http.Reques
 	}
 
 	var balanceCents int64
-	if balance.Balances != nil && len(balance.Balances) > 0 {
+	if len(balance.Balances) > 0 {
 		if balance.Balances[0].AvailableBalance != nil {
 			balanceCents = balance.Balances[0].AvailableBalance.Monetary.Value
 		}
@@ -99,6 +100,7 @@ func (h *CheckoutHandler) GetCreditBalance(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *CheckoutHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
+	// TODO: better logging using span/wide event logg.
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Failed to read webhook body: %v", err)
@@ -143,6 +145,17 @@ func (h *CheckoutHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 				log.Printf("Failed to create credit grant for customer %s: %v", session.Customer, err)
 				http.Error(w, "Failed to grant credits", http.StatusInternalServerError)
 				return
+			}
+
+			if h.userRepo != nil {
+				usr, err := h.userRepo.GetByStripeCustomerID(r.Context(), session.Customer)
+				if err != nil {
+					log.Printf("Failed to find user for stripe customer %s: %v", session.Customer, err)
+				} else {
+					if err := h.userRepo.IncrementTokensPurchased(r.Context(), usr.ID, amountCents); err != nil {
+						log.Printf("Failed to increment tokens purchased for user %s: %v", usr.ID, err)
+					}
+				}
 			}
 
 			log.Printf("Granted %d cents in credits to customer %s", amountCents, session.Customer)

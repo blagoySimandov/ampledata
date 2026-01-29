@@ -27,7 +27,8 @@ type Config struct {
 	MaxEnrichmentRetries int
 	MaxOrganicResults    int
 
-	// CostTracking
+	CreditsPerCell int
+
 	SerperCost              int
 	TknInCost               int
 	TknOutCost              int
@@ -59,7 +60,8 @@ var cfg Config = Config{
 	MaxEnrichmentRetries: getEnvInt("MAX_ENRICHMENT_RETRIES", 2),
 	MaxOrganicResults:    getEnvInt("MAX_ORGANIC_RESULTS", 4),
 
-	// CostTracking
+	CreditsPerCell: getEnvInt("CREDITS_PER_CELL", 1),
+
 	SerperCost:              getEnvInt("SERPER_COST", 1),
 	TknInCost:               getEnvInt("TKN_INGESTION_COST", 150),
 	TknOutCost:              getEnvInt("TKN_ENRICHMENT_COST", 1250),

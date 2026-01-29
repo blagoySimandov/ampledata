@@ -11,10 +11,14 @@ import (
 type Repository interface {
 	InitializeDatabase(ctx context.Context) error
 	GetByID(ctx context.Context, userID string) (*models.User, error)
+	GetByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*models.User, error)
 	Create(ctx context.Context, user *models.User) error
 	Update(ctx context.Context, user *models.User) error
 	GetOrCreate(ctx context.Context, userID, email, firstName, lastName string) (*models.User, error)
 	UpdateStripeCustomerID(ctx context.Context, userID, stripeCustomerID string) error
+	GetAvailableCredits(ctx context.Context, userID string) (int64, error)
+	IncrementTokensUsed(ctx context.Context, stripeCustomerID string, amount int64) error
+	IncrementTokensPurchased(ctx context.Context, stripeCustomerID string, amount int64) error
 }
 
 type UserRepository struct {
@@ -109,6 +113,51 @@ func (r *UserRepository) UpdateStripeCustomerID(ctx context.Context, userID, str
 		Set("stripe_customer_id = ?", stripeCustomerID).
 		Set("updated_at = ?", time.Now()).
 		Where("id = ?", userID).
+		Exec(ctx)
+	return err
+}
+
+func (r *UserRepository) GetByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*models.User, error) {
+	userDB := new(models.UserDB)
+	err := r.db.NewSelect().
+		Model(userDB).
+		Where("stripe_customer_id = ?", stripeCustomerID).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return userDB.ToUser(), nil
+}
+
+func (r *UserRepository) GetAvailableCredits(ctx context.Context, userID string) (int64, error) {
+	userDB := new(models.UserDB)
+	err := r.db.NewSelect().
+		Model(userDB).
+		Column("tokens_purchased", "tokens_used").
+		Where("id = ?", userID).
+		Scan(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return userDB.TokensPurchased - userDB.TokensUsed, nil
+}
+
+func (r *UserRepository) IncrementTokensUsed(ctx context.Context, stripeCustomerID string, amount int64) error {
+	_, err := r.db.NewUpdate().
+		Model((*models.UserDB)(nil)).
+		Set("tokens_used = tokens_used + ?", amount).
+		Set("updated_at = ?", time.Now()).
+		Where("stripe_customer_id = ?", stripeCustomerID).
+		Exec(ctx)
+	return err
+}
+
+func (r *UserRepository) IncrementTokensPurchased(ctx context.Context, stripeCustomerID string, amount int64) error {
+	_, err := r.db.NewUpdate().
+		Model((*models.UserDB)(nil)).
+		Set("tokens_purchased = tokens_purchased + ?", amount).
+		Set("updated_at = ?", time.Now()).
+		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)
 	return err
 }
