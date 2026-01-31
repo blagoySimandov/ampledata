@@ -183,8 +183,8 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.KeyColumn == "" {
-		http.Error(w, "key_column is required", http.StatusBadRequest)
+	if len(req.KeyColumns) == 0 {
+		http.Error(w, "key_columns is required", http.StatusBadRequest)
 		return
 	}
 
@@ -193,7 +193,7 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rowKeys, err := h.gcsReader.ReadColumnFromFile(r.Context(), job.FilePath, req.KeyColumn)
+	rowKeys, err := h.gcsReader.ReadCompositeKeyFromFile(r.Context(), job.FilePath, req.KeyColumns)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read CSV file: %v", err), http.StatusBadRequest)
 		return
@@ -217,7 +217,7 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.UpdateJobConfiguration(r.Context(), jobID, req.KeyColumn, req.ColumnsMetadata, req.EntityType); err != nil {
+	if err := h.store.UpdateJobConfiguration(r.Context(), jobID, req.KeyColumns, req.ColumnsMetadata, req.EntityType); err != nil {
 		log.Printf("Failed to update job configuration: %v", err)
 		http.Error(w, "Failed to update job configuration", http.StatusInternalServerError)
 		return

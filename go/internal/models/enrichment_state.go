@@ -31,7 +31,7 @@ type Job struct {
 	JobID           string            `json:"job_id"`
 	UserID          string            `json:"user_id"`
 	FilePath        string            `json:"file_path"`
-	KeyColumn       *string           `json:"key_column"`
+	KeyColumns      []string          `json:"key_columns"`
 	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
 	EntityType      *string           `json:"entity_type"`
 	TotalRows       int               `json:"total_rows"`
