@@ -70,7 +70,7 @@ echo -e "\n${GREEN}5. Starting enrichment job${NC}"
 START_RESPONSE=$(curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID/start" \
   -H "Content-Type: application/json" \
   -d '{
-    "key_column": "company_name",
+    "key_columns": ["company_name"],
     "columns_metadata": [
       {
         "name": "founder",
@@ -162,7 +162,7 @@ curl -s -X GET "$BASE_URL/api/v1/jobs/$JOB_ID/results" | jq .
 # curl -s -X POST "$BASE_URL/api/v1/jobs/$JOB_ID2/start" \
 #   -H "Content-Type: application/json" \
 #   -d '{
-#     "key_column": "person_name",
+#     "key_columns": ["person_name"],
 #     "columns_metadata": [
 #       {
 #         "name": "full_name",
