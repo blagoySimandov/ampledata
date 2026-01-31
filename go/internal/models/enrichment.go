@@ -9,7 +9,7 @@ type EnrichmentRequest struct {
 }
 
 type StartJobRequest struct {
-	KeyColumn       string            `json:"key_column"`
+	KeyColumns      []string          `json:"key_columns"`
 	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
 	EntityType      *string           `json:"entity_type,omitempty"`
 }

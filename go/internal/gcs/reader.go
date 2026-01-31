@@ -100,3 +100,65 @@ func (r *CSVReader) ReadColumnFromFile(ctx context.Context, objectName string, c
 	}
 	return r.ExtractColumn(result, columnName)
 }
+
+// CompositeKeyDelimiter is used to join multiple column values into a single composite key
+const CompositeKeyDelimiter = "||"
+
+// ExtractCompositeKey extracts and combines values from multiple columns to form composite keys
+func (r *CSVReader) ExtractCompositeKey(result *CSVResult, columnNames []string) ([]string, error) {
+	if len(columnNames) == 0 {
+		return nil, fmt.Errorf("at least one column name is required")
+	}
+
+	// Find column indices
+	columnIndices := make([]int, len(columnNames))
+	for i, columnName := range columnNames {
+		columnIndex := -1
+		for j, header := range result.Headers {
+			if header == columnName {
+				columnIndex = j
+				break
+			}
+		}
+		if columnIndex == -1 {
+			return nil, fmt.Errorf("column '%s' not found in CSV headers: %v", columnName, result.Headers)
+		}
+		columnIndices[i] = columnIndex
+	}
+
+	// Build composite keys
+	values := make([]string, 0, len(result.Rows))
+	for _, row := range result.Rows {
+		keyParts := make([]string, len(columnIndices))
+		for i, columnIndex := range columnIndices {
+			if columnIndex < len(row) {
+				keyParts[i] = row[columnIndex]
+			}
+		}
+		compositeKey := joinKeyParts(keyParts)
+		values = append(values, compositeKey)
+	}
+
+	return values, nil
+}
+
+// joinKeyParts joins key parts with the delimiter
+func joinKeyParts(parts []string) string {
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	result := parts[0]
+	for i := 1; i < len(parts); i++ {
+		result += CompositeKeyDelimiter + parts[i]
+	}
+	return result
+}
+
+// ReadCompositeKeyFromFile reads a CSV file and extracts composite keys from multiple columns
+func (r *CSVReader) ReadCompositeKeyFromFile(ctx context.Context, objectName string, columnNames []string) ([]string, error) {
+	result, err := r.ReadCSV(ctx, objectName)
+	if err != nil {
+		return nil, err
+	}
+	return r.ExtractCompositeKey(result, columnNames)
+}
