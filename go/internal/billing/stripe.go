@@ -16,6 +16,7 @@ type Billing struct {
 	enrichmentCostMeterName string
 	webhookSecret           string
 	userRepo                user.Repository
+	meterID                 string
 }
 
 func NewBilling(userRepo user.Repository) *Billing {
@@ -69,38 +70,52 @@ func (b *Billing) CreateCustomer(ctx context.Context, userID, email string) (*st
 	return b.sc.V1Customers.Create(ctx, params)
 }
 
-func (b *Billing) CreateCheckoutSession(ctx context.Context, customerID string, amountCents int64, successURL, cancelURL string) (*stripe.CheckoutSession, error) {
+func (b *Billing) CreateSubscriptionCheckout(ctx context.Context, customerID, tierID, successURL, cancelURL string) (*stripe.CheckoutSession, error) {
+	tier := GetTier(tierID)
+	if tier == nil {
+		return nil, fmt.Errorf("unknown tier: %s", tierID)
+	}
+
+	if tier.BasePriceID == "" || tier.MeteredPriceID == "" {
+		return nil, fmt.Errorf("tier %s not synced with Stripe (missing price IDs)", tierID)
+	}
+
 	params := &stripe.CheckoutSessionCreateParams{
 		Customer:           stripe.String(customerID),
 		PaymentMethodTypes: []*string{stripe.String("card")},
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{
 			{
-				PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{
-					Currency: stripe.String(string(stripe.CurrencyUSD)),
-					ProductData: &stripe.CheckoutSessionCreateLineItemPriceDataProductDataParams{
-						Name:        stripe.String("Credit Package"),
-						Description: stripe.String(fmt.Sprintf("$%.2f credits", float64(amountCents)/100)),
-					},
-					UnitAmount: stripe.Int64(amountCents),
-				},
+				Price:    stripe.String(tier.BasePriceID),
 				Quantity: stripe.Int64(1),
 			},
+			{
+				Price: stripe.String(tier.MeteredPriceID),
+			},
 		},
-		Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
+		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		SuccessURL: stripe.String(successURL),
 		CancelURL:  stripe.String(cancelURL),
-		Metadata: map[string]string{
-			"type":         "credit_purchase",
-			"amount_cents": fmt.Sprintf("%d", amountCents),
+		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
+			Metadata: map[string]string{
+				config.StripeTierIDKey: tierID,
+			},
 		},
 	}
 	return b.sc.V1CheckoutSessions.Create(ctx, params)
 }
 
-func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amountCents int64) (*stripe.BillingCreditGrant, error) {
+func (b *Billing) GetSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error) {
+	return b.sc.V1Subscriptions.Retrieve(ctx, subscriptionID, nil)
+}
+
+func (b *Billing) CancelSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error) {
+	return b.sc.V1Subscriptions.Cancel(ctx, subscriptionID, nil)
+}
+
+func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amountCents int64, idempotencyKey string) (*stripe.BillingCreditGrant, error) {
 	params := &stripe.BillingCreditGrantCreateParams{
 		Customer: stripe.String(customerID),
-		Name:     stripe.String("Prepaid Credits"),
+		Name:     stripe.String("Subscription Credits"),
 		Category: stripe.String(string(stripe.BillingCreditGrantCategoryPaid)),
 		ApplicabilityConfig: &stripe.BillingCreditGrantCreateApplicabilityConfigParams{
 			Scope: &stripe.BillingCreditGrantCreateApplicabilityConfigScopeParams{
@@ -115,20 +130,10 @@ func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amou
 			},
 		},
 	}
-	return b.sc.V1BillingCreditGrants.Create(ctx, params)
-}
-
-func (b *Billing) GetCreditBalance(ctx context.Context, customerID string) (*stripe.BillingCreditBalanceSummary, error) {
-	params := &stripe.BillingCreditBalanceSummaryRetrieveParams{
-		Customer: stripe.String(customerID),
-		Filter: &stripe.BillingCreditBalanceSummaryRetrieveFilterParams{
-			Type: stripe.String("applicability_scope"),
-			ApplicabilityScope: &stripe.BillingCreditBalanceSummaryRetrieveFilterApplicabilityScopeParams{
-				PriceType: stripe.String(string(stripe.BillingCreditGrantApplicabilityConfigScopePriceTypeMetered)),
-			},
-		},
+	if idempotencyKey != "" {
+		params.SetIdempotencyKey(idempotencyKey)
 	}
-	return b.sc.V1BillingCreditBalanceSummary.Retrieve(ctx, params)
+	return b.sc.V1BillingCreditGrants.Create(ctx, params)
 }
 
 func (b *Billing) VerifyWebhookSignature(payload []byte, signature string) (*stripe.Event, error) {

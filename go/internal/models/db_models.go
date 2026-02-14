@@ -103,41 +103,53 @@ func RowStateFromApp(jobID string, state *RowState) *RowStateDB {
 type UserDB struct {
 	bun.BaseModel `bun:"table:users,alias:u"`
 
-	ID               string    `bun:"id,pk" json:"user_id"`
-	Email            string    `bun:"email,notnull" json:"email"`
-	FirstName        string    `bun:"first_name" json:"first_name"`
-	LastName         string    `bun:"last_name" json:"last_name"`
-	StripeCustomerID *string   `bun:"stripe_customer_id" json:"stripe_customer_id"`
-	TokensUsed       int64     `bun:"tokens_used,notnull,default:0" json:"tokens_used"`
-	TokensPurchased  int64     `bun:"tokens_purchased,notnull,default:0" json:"tokens_purchased"`
-	CreatedAt        time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt        time.Time `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+	ID                   string     `bun:"id,pk" json:"user_id"`
+	Email                string     `bun:"email,notnull" json:"email"`
+	FirstName            string     `bun:"first_name" json:"first_name"`
+	LastName             string     `bun:"last_name" json:"last_name"`
+	StripeCustomerID     *string    `bun:"stripe_customer_id" json:"stripe_customer_id"`
+	TokensUsed           int64      `bun:"tokens_used,notnull,default:0" json:"tokens_used"`
+	SubscriptionTier     *string    `bun:"subscription_tier" json:"subscription_tier"`
+	StripeSubscriptionID *string    `bun:"stripe_subscription_id" json:"stripe_subscription_id"`
+	TokensIncluded       int64      `bun:"tokens_included,notnull,default:0" json:"tokens_included"`
+	CurrentPeriodStart   *time.Time `bun:"current_period_start" json:"current_period_start"`
+	CurrentPeriodEnd     *time.Time `bun:"current_period_end" json:"current_period_end"`
+	CreatedAt            time.Time  `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt            time.Time  `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
 func (u *UserDB) ToUser() *User {
 	return &User{
-		ID:               u.ID,
-		Email:            u.Email,
-		FirstName:        u.FirstName,
-		LastName:         u.LastName,
-		StripeCustomerID: u.StripeCustomerID,
-		TokensUsed:       u.TokensUsed,
-		TokensPurchased:  u.TokensPurchased,
-		CreatedAt:        u.CreatedAt,
-		UpdatedAt:        u.UpdatedAt,
+		ID:                   u.ID,
+		Email:                u.Email,
+		FirstName:            u.FirstName,
+		LastName:             u.LastName,
+		StripeCustomerID:     u.StripeCustomerID,
+		TokensUsed:           u.TokensUsed,
+		SubscriptionTier:     u.SubscriptionTier,
+		StripeSubscriptionID: u.StripeSubscriptionID,
+		TokensIncluded:       u.TokensIncluded,
+		CurrentPeriodStart:   u.CurrentPeriodStart,
+		CurrentPeriodEnd:     u.CurrentPeriodEnd,
+		CreatedAt:            u.CreatedAt,
+		UpdatedAt:            u.UpdatedAt,
 	}
 }
 
 func UserFromDomain(user *User) *UserDB {
 	return &UserDB{
-		ID:               user.ID,
-		Email:            user.Email,
-		FirstName:        user.FirstName,
-		LastName:         user.LastName,
-		StripeCustomerID: user.StripeCustomerID,
-		TokensUsed:       user.TokensUsed,
-		TokensPurchased:  user.TokensPurchased,
-		CreatedAt:        user.CreatedAt,
-		UpdatedAt:        user.UpdatedAt,
+		ID:                   user.ID,
+		Email:                user.Email,
+		FirstName:            user.FirstName,
+		LastName:             user.LastName,
+		StripeCustomerID:     user.StripeCustomerID,
+		TokensUsed:           user.TokensUsed,
+		SubscriptionTier:     user.SubscriptionTier,
+		StripeSubscriptionID: user.StripeSubscriptionID,
+		TokensIncluded:       user.TokensIncluded,
+		CurrentPeriodStart:   user.CurrentPeriodStart,
+		CurrentPeriodEnd:     user.CurrentPeriodEnd,
+		CreatedAt:            user.CreatedAt,
+		UpdatedAt:            user.UpdatedAt,
 	}
 }

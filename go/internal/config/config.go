@@ -36,7 +36,16 @@ type Config struct {
 	StripeSecretKey         string
 	StripeWebhookSecret     string
 	EnrichmentCostMeterName string
+	SkipStripeSync          bool
 }
+
+const (
+	StripeMetadataTier      = "ampledata_tier"
+	StripeMetadataPriceType = "ampledata_price_type"
+	StripePriceTypeBase     = "base"
+	StripePriceTypeMetered  = "metered"
+	StripeTierIDKey         = "tier_id"
+)
 
 var cfg Config = Config{
 	DatabaseURL:       getEnv("DATABASE_URL_ENRICH", "postgres://enrichment:enrichment@localhost:5432/enrichment?sslmode=disable"),
@@ -69,6 +78,7 @@ var cfg Config = Config{
 	StripeSecretKey:         getEnv("STRIPE_SECRET", ""),
 	StripeWebhookSecret:     getEnv("STRIPE_WEBHOOK_SECRET", ""),
 	EnrichmentCostMeterName: getEnv("ENRICHMENT_COST_METER_NAME", "enrichment_credits"),
+	SkipStripeSync:          getEnvBool("SKIP_STRIPE_SYNC", false),
 }
 
 func Load() *Config {

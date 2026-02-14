@@ -32,8 +32,10 @@ func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandl
 
 	authenticated.HandleFunc("/select-key", keySelectorHandler.SelectKey).Methods("POST", "OPTIONS")
 
-	authenticated.HandleFunc("/checkout", checkoutHandler.CreateCheckoutSession).Methods("POST", "OPTIONS")
-	authenticated.HandleFunc("/credits/balance", checkoutHandler.GetCreditBalance).Methods("GET", "OPTIONS")
+	authenticated.HandleFunc("/subscribe", checkoutHandler.CreateSubscriptionCheckout).Methods("POST", "OPTIONS")
+	authenticated.HandleFunc("/subscription", checkoutHandler.GetSubscriptionStatus).Methods("GET", "OPTIONS")
+	authenticated.HandleFunc("/subscription/cancel", checkoutHandler.CancelSubscription).Methods("POST", "OPTIONS")
+	authenticated.HandleFunc("/tiers", checkoutHandler.ListTiers).Methods("GET", "OPTIONS")
 
 	return r
 }

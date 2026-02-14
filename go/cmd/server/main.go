@@ -42,6 +42,11 @@ func main() {
 	}
 
 	billingService := billing.NewBilling(userRepo)
+	if !cfg.SkipStripeSync {
+		if err := billingService.SyncStripeCatalog(context.Background()); err != nil {
+			log.Fatalf("Failed to sync Stripe catalog: %v", err)
+		}
+	}
 	userService := user.NewUserService(userRepo, billingService)
 
 	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate, services.WithStore(store))
