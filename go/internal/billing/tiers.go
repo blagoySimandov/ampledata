@@ -17,14 +17,14 @@ var Tiers = map[string]*SubscriptionTier{
 		DisplayName:              "Starter",
 		MonthlyPriceCents:        2900,
 		IncludedTokens:           1000,
-		OveragePriceCentsDecimal: "3.5",
+		OveragePriceCentsDecimal: "2.5",
 	},
 	"pro": {
 		ID:                       "pro",
 		DisplayName:              "Pro",
 		MonthlyPriceCents:        9900,
 		IncludedTokens:           5000,
-		OveragePriceCentsDecimal: "2",
+		OveragePriceCentsDecimal: "1.8",
 	},
 	"enterprise": {
 		ID:                       "enterprise",

@@ -200,7 +200,7 @@ func (h *CheckoutHandler) handleCheckoutCompleted(ctx context.Context, event *st
 		return fmt.Errorf("failed to retrieve subscription %s: %w", session.Subscription, err)
 	}
 
-	tierID := sub.Metadata["tier_id"]
+	tierID := sub.Metadata[billing.TIER_ID_KEY]
 	if tierID == "" {
 		return fmt.Errorf("no tier_id in subscription %s metadata", session.Subscription)
 	}

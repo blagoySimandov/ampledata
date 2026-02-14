@@ -11,6 +11,8 @@ import (
 	"github.com/stripe/stripe-go/v84/webhook"
 )
 
+const TIER_ID_KEY = "tier_id"
+
 type Billing struct {
 	sc                      *stripe.Client
 	enrichmentCostMeterName string
@@ -97,7 +99,7 @@ func (b *Billing) CreateSubscriptionCheckout(ctx context.Context, customerID, ti
 		CancelURL:  stripe.String(cancelURL),
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{
-				"tier_id": tierID,
+				TIER_ID_KEY: tierID,
 			},
 		},
 	}
