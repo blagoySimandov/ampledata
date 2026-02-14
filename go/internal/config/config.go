@@ -36,6 +36,7 @@ type Config struct {
 	StripeSecretKey         string
 	StripeWebhookSecret     string
 	EnrichmentCostMeterName string
+	SkipStripeSync          bool
 }
 
 var cfg Config = Config{
@@ -69,6 +70,7 @@ var cfg Config = Config{
 	StripeSecretKey:         getEnv("STRIPE_SECRET", ""),
 	StripeWebhookSecret:     getEnv("STRIPE_WEBHOOK_SECRET", ""),
 	EnrichmentCostMeterName: getEnv("ENRICHMENT_COST_METER_NAME", "enrichment_credits"),
+	SkipStripeSync:          getEnvBool("SKIP_STRIPE_SYNC", false),
 }
 
 func Load() *Config {

@@ -18,7 +18,9 @@ type Repository interface {
 	UpdateStripeCustomerID(ctx context.Context, userID, stripeCustomerID string) error
 	GetAvailableCredits(ctx context.Context, userID string) (int64, error)
 	IncrementTokensUsed(ctx context.Context, stripeCustomerID string, amount int64) error
-	IncrementTokensPurchased(ctx context.Context, stripeCustomerID string, amount int64) error
+	UpdateSubscription(ctx context.Context, stripeCustomerID, tier, subscriptionID string, tokensIncluded int64, periodStart, periodEnd time.Time) error
+	ResetBillingCycle(ctx context.Context, stripeCustomerID string, periodStart, periodEnd time.Time) error
+	ClearSubscription(ctx context.Context, stripeCustomerID string) error
 }
 
 type UserRepository struct {
@@ -133,13 +135,13 @@ func (r *UserRepository) GetAvailableCredits(ctx context.Context, userID string)
 	userDB := new(models.UserDB)
 	err := r.db.NewSelect().
 		Model(userDB).
-		Column("tokens_purchased", "tokens_used").
+		Column("tokens_included", "tokens_used").
 		Where("id = ?", userID).
 		Scan(ctx)
 	if err != nil {
 		return 0, err
 	}
-	return userDB.TokensPurchased - userDB.TokensUsed, nil
+	return userDB.TokensIncluded - userDB.TokensUsed, nil
 }
 
 func (r *UserRepository) IncrementTokensUsed(ctx context.Context, stripeCustomerID string, amount int64) error {
@@ -152,10 +154,41 @@ func (r *UserRepository) IncrementTokensUsed(ctx context.Context, stripeCustomer
 	return err
 }
 
-func (r *UserRepository) IncrementTokensPurchased(ctx context.Context, stripeCustomerID string, amount int64) error {
+func (r *UserRepository) UpdateSubscription(ctx context.Context, stripeCustomerID, tier, subscriptionID string, tokensIncluded int64, periodStart, periodEnd time.Time) error {
 	_, err := r.db.NewUpdate().
 		Model((*models.UserDB)(nil)).
-		Set("tokens_purchased = tokens_purchased + ?", amount).
+		Set("subscription_tier = ?", tier).
+		Set("stripe_subscription_id = ?", subscriptionID).
+		Set("tokens_included = ?", tokensIncluded).
+		Set("current_period_start = ?", periodStart).
+		Set("current_period_end = ?", periodEnd).
+		Set("updated_at = ?", time.Now()).
+		Where("stripe_customer_id = ?", stripeCustomerID).
+		Exec(ctx)
+	return err
+}
+
+func (r *UserRepository) ResetBillingCycle(ctx context.Context, stripeCustomerID string, periodStart, periodEnd time.Time) error {
+	_, err := r.db.NewUpdate().
+		Model((*models.UserDB)(nil)).
+		Set("tokens_used = 0").
+		Set("current_period_start = ?", periodStart).
+		Set("current_period_end = ?", periodEnd).
+		Set("updated_at = ?", time.Now()).
+		Where("stripe_customer_id = ?", stripeCustomerID).
+		Exec(ctx)
+	return err
+}
+
+func (r *UserRepository) ClearSubscription(ctx context.Context, stripeCustomerID string) error {
+	_, err := r.db.NewUpdate().
+		Model((*models.UserDB)(nil)).
+		Set("subscription_tier = NULL").
+		Set("stripe_subscription_id = NULL").
+		Set("tokens_included = 0").
+		Set("tokens_used = 0").
+		Set("current_period_start = NULL").
+		Set("current_period_end = NULL").
 		Set("updated_at = ?", time.Now()).
 		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)
