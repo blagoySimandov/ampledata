@@ -9,9 +9,6 @@ import (
 	"github.com/stripe/stripe-go/v84"
 )
 
-// SyncStripeCatalog idempotently ensures that the Stripe meter, products, and prices
-// exist for all subscription tiers. It stores the resulting Stripe IDs back on the
-// tier structs so they can be used at runtime.
 func (b *Billing) SyncStripeCatalog(ctx context.Context) error {
 	meterID, err := b.ensureMeter(ctx)
 	if err != nil {
@@ -33,21 +30,20 @@ func (b *Billing) SyncStripeCatalog(ctx context.Context) error {
 }
 
 func (b *Billing) ensureMeter(ctx context.Context) (string, error) {
-	// List meters and find one matching our event name
-	params := &stripe.BillingMeterListParams{}
-	iter := b.sc.V1BillingMeters.List(ctx, params)
-	for iter.Next() {
-		meter := iter.Current()
+	for meter, err := range b.sc.V1BillingMeters.List(ctx, &stripe.BillingMeterListParams{}) {
+		if err != nil {
+			return "", fmt.Errorf("failed to list meters: %w", err)
+		}
 		if meter.EventName == b.enrichmentCostMeterName {
 			return meter.ID, nil
 		}
 	}
-	if err := iter.Err(); err != nil {
-		return "", fmt.Errorf("failed to list meters: %w", err)
-	}
 
-	// Create meter
-	createParams := &stripe.BillingMeterCreateParams{
+	return b.createMeter(ctx)
+}
+
+func (b *Billing) createMeter(ctx context.Context) (string, error) {
+	params := &stripe.BillingMeterCreateParams{
 		DisplayName: stripe.String("Enrichment Credits"),
 		EventName:   stripe.String(b.enrichmentCostMeterName),
 		DefaultAggregation: &stripe.BillingMeterCreateDefaultAggregationParams{
@@ -61,7 +57,7 @@ func (b *Billing) ensureMeter(ctx context.Context) (string, error) {
 			EventPayloadKey: stripe.String("value"),
 		},
 	}
-	meter, err := b.sc.V1BillingMeters.Create(ctx, createParams)
+	meter, err := b.sc.V1BillingMeters.Create(ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to create meter: %w", err)
 	}
@@ -69,21 +65,18 @@ func (b *Billing) ensureMeter(ctx context.Context) (string, error) {
 }
 
 func (b *Billing) syncTier(ctx context.Context, tier *SubscriptionTier, meterID string) error {
-	// Find or create product
 	productID, err := b.ensureProduct(ctx, tier)
 	if err != nil {
 		return err
 	}
 	tier.ProductID = productID
 
-	// Find or create base price (flat monthly)
 	basePriceID, err := b.ensureBasePrice(ctx, tier, productID)
 	if err != nil {
 		return err
 	}
 	tier.BasePriceID = basePriceID
 
-	// Find or create metered price
 	meteredPriceID, err := b.ensureMeteredPrice(ctx, tier, productID, meterID)
 	if err != nil {
 		return err
@@ -99,22 +92,24 @@ func (b *Billing) ensureProduct(ctx context.Context, tier *SubscriptionTier) (st
 			Query: fmt.Sprintf("metadata['ampledata_tier']:'%s'", tier.ID),
 		},
 	}
-	iter := b.sc.V1Products.Search(ctx, params)
-	for iter.Next() {
-		return iter.Current().ID, nil
-	}
-	if err := iter.Err(); err != nil {
-		return "", fmt.Errorf("failed to search products: %w", err)
+	for product, err := range b.sc.V1Products.Search(ctx, params) {
+		if err != nil {
+			return "", fmt.Errorf("failed to search products: %w", err)
+		}
+		return product.ID, nil
 	}
 
-	// Create product
-	createParams := &stripe.ProductCreateParams{
+	return b.createProduct(ctx, tier)
+}
+
+func (b *Billing) createProduct(ctx context.Context, tier *SubscriptionTier) (string, error) {
+	params := &stripe.ProductCreateParams{
 		Name: stripe.String(fmt.Sprintf("AmpleData %s", tier.DisplayName)),
 		Metadata: map[string]string{
 			"ampledata_tier": tier.ID,
 		},
 	}
-	product, err := b.sc.V1Products.Create(ctx, createParams)
+	product, err := b.sc.V1Products.Create(ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to create product: %w", err)
 	}
@@ -127,18 +122,20 @@ func (b *Billing) ensureBasePrice(ctx context.Context, tier *SubscriptionTier, p
 			Query: fmt.Sprintf("product:'%s' AND metadata['ampledata_price_type']:'base'", productID),
 		},
 	}
-	iter := b.sc.V1Prices.Search(ctx, params)
-	for iter.Next() {
-		p := iter.Current()
+	for p, err := range b.sc.V1Prices.Search(ctx, params) {
+		if err != nil {
+			return "", fmt.Errorf("failed to search prices: %w", err)
+		}
 		if p.Active {
 			return p.ID, nil
 		}
 	}
-	if err := iter.Err(); err != nil {
-		return "", fmt.Errorf("failed to search prices: %w", err)
-	}
 
-	createParams := &stripe.PriceCreateParams{
+	return b.createBasePrice(ctx, tier, productID)
+}
+
+func (b *Billing) createBasePrice(ctx context.Context, tier *SubscriptionTier, productID string) (string, error) {
+	params := &stripe.PriceCreateParams{
 		Product:    stripe.String(productID),
 		Currency:   stripe.String(string(stripe.CurrencyUSD)),
 		UnitAmount: stripe.Int64(tier.MonthlyPriceCents),
@@ -150,7 +147,7 @@ func (b *Billing) ensureBasePrice(ctx context.Context, tier *SubscriptionTier, p
 			"ampledata_tier":       tier.ID,
 		},
 	}
-	price, err := b.sc.V1Prices.Create(ctx, createParams)
+	price, err := b.sc.V1Prices.Create(ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to create base price: %w", err)
 	}
@@ -163,23 +160,25 @@ func (b *Billing) ensureMeteredPrice(ctx context.Context, tier *SubscriptionTier
 			Query: fmt.Sprintf("product:'%s' AND metadata['ampledata_price_type']:'metered'", productID),
 		},
 	}
-	iter := b.sc.V1Prices.Search(ctx, params)
-	for iter.Next() {
-		p := iter.Current()
+	for p, err := range b.sc.V1Prices.Search(ctx, params) {
+		if err != nil {
+			return "", fmt.Errorf("failed to search metered prices: %w", err)
+		}
 		if p.Active {
 			return p.ID, nil
 		}
 	}
-	if err := iter.Err(); err != nil {
-		return "", fmt.Errorf("failed to search metered prices: %w", err)
-	}
 
+	return b.createMeteredPrice(ctx, tier, productID, meterID)
+}
+
+func (b *Billing) createMeteredPrice(ctx context.Context, tier *SubscriptionTier, productID, meterID string) (string, error) {
 	overageDecimal, err := strconv.ParseFloat(tier.OveragePriceCentsDecimal, 64)
 	if err != nil {
 		return "", fmt.Errorf("invalid overage price decimal %q: %w", tier.OveragePriceCentsDecimal, err)
 	}
 
-	createParams := &stripe.PriceCreateParams{
+	params := &stripe.PriceCreateParams{
 		Product:           stripe.String(productID),
 		Currency:          stripe.String(string(stripe.CurrencyUSD)),
 		UnitAmountDecimal: stripe.Float64(overageDecimal),
@@ -193,7 +192,7 @@ func (b *Billing) ensureMeteredPrice(ctx context.Context, tier *SubscriptionTier
 			"ampledata_tier":       tier.ID,
 		},
 	}
-	price, err := b.sc.V1Prices.Create(ctx, createParams)
+	price, err := b.sc.V1Prices.Create(ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("failed to create metered price: %w", err)
 	}

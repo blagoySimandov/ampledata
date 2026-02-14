@@ -1,18 +1,16 @@
 package billing
 
-// SubscriptionTier defines a subscription plan tier.
 type SubscriptionTier struct {
 	ID                       string
 	DisplayName              string
 	MonthlyPriceCents        int64
 	IncludedTokens           int64
-	OveragePriceCentsDecimal string // sub-cent precision, e.g. "3.5"
-	ProductID                string // set by SyncStripeCatalog
-	BasePriceID              string // set by SyncStripeCatalog
-	MeteredPriceID           string // set by SyncStripeCatalog
+	OveragePriceCentsDecimal string
+	ProductID                string
+	BasePriceID              string
+	MeteredPriceID           string
 }
 
-// Tiers holds all available subscription tiers keyed by tier ID.
 var Tiers = map[string]*SubscriptionTier{
 	"starter": {
 		ID:                       "starter",
@@ -37,20 +35,8 @@ var Tiers = map[string]*SubscriptionTier{
 	},
 }
 
-// TierOrder defines the display ordering of tiers.
 var TierOrder = []string{"starter", "pro", "enterprise"}
 
-// GetTier returns a tier by its ID.
 func GetTier(id string) *SubscriptionTier {
 	return Tiers[id]
-}
-
-// GetTierByProductID finds a tier by its Stripe product ID.
-func GetTierByProductID(productID string) *SubscriptionTier {
-	for _, t := range Tiers {
-		if t.ProductID == productID {
-			return t
-		}
-	}
-	return nil
 }

@@ -104,6 +104,10 @@ func (b *Billing) CreateSubscriptionCheckout(ctx context.Context, customerID, ti
 	return b.sc.V1CheckoutSessions.Create(ctx, params)
 }
 
+func (b *Billing) GetSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error) {
+	return b.sc.V1Subscriptions.Retrieve(ctx, subscriptionID, nil)
+}
+
 func (b *Billing) CancelSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error) {
 	return b.sc.V1Subscriptions.Cancel(ctx, subscriptionID, nil)
 }

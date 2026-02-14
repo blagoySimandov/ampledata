@@ -3,8 +3,10 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -161,194 +163,163 @@ func (h *CheckoutHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var handleErr error
 	switch event.Type {
 	case "checkout.session.completed":
-		h.handleCheckoutCompleted(r.Context(), event, w)
+		handleErr = h.handleCheckoutCompleted(r.Context(), event)
 	case "invoice.paid":
-		h.handleInvoicePaid(r.Context(), event, w)
+		handleErr = h.handleInvoicePaid(r.Context(), event)
 	case "customer.subscription.deleted":
-		h.handleSubscriptionDeleted(r.Context(), event, w)
+		handleErr = h.handleSubscriptionDeleted(r.Context(), event)
+	}
+
+	if handleErr != nil {
+		log.Printf("Webhook %s handling failed: %v", event.Type, handleErr)
+		http.Error(w, "Webhook handling failed", http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *CheckoutHandler) handleCheckoutCompleted(ctx context.Context, event *stripe.Event, w http.ResponseWriter) {
-	var session struct {
-		ID           string `json:"id"`
-		Customer     string `json:"customer"`
-		Subscription string `json:"subscription"`
-		Metadata     struct {
-			TierID string `json:"tier_id"`
-		} `json:"metadata"`
-	}
-
-	// The metadata is on the subscription_data, which gets copied to the subscription.
-	// But checkout.session.completed also has subscription ID. Let's get the tier from
-	// the subscription metadata by retrieving the subscription object, or we can put it
-	// in session metadata too. For simplicity, we parse the session and then look up
-	// subscription metadata from the raw event.
-
-	if err := json.Unmarshal(event.Data.Raw, &session); err != nil {
-		log.Printf("Failed to parse checkout session: %v", err)
-		return
+func (h *CheckoutHandler) handleCheckoutCompleted(ctx context.Context, event *stripe.Event) error {
+	session, err := parseEventData[checkoutSession](event)
+	if err != nil {
+		return fmt.Errorf("failed to parse checkout session: %w", err)
 	}
 
 	if session.Subscription == "" {
-		return // not a subscription checkout
+		return nil
 	}
 
-	// Parse subscription metadata from the event - we need to fetch it from subscription_data
-	// The tier_id was set in subscription_data.metadata, which is on the subscription object
-	// We'll extract it from the session display_items or we use a simpler approach:
-	// re-parse to get nested subscription data
-	var fullSession struct {
-		Customer     string `json:"customer"`
-		Subscription string `json:"subscription"`
-	}
-	json.Unmarshal(event.Data.Raw, &fullSession)
-
-	// We need to find the tier. Since the metadata was put on subscription_data,
-	// it ends up on the subscription. We need to look at the subscription's metadata.
-	// Unfortunately, the checkout.session.completed event only has the subscription ID.
-	// Let's parse the raw event more carefully for subscription metadata.
-	var rawMap map[string]interface{}
-	json.Unmarshal(event.Data.Raw, &rawMap)
-
-	tierID := ""
-	// Try to get tier from subscription metadata (if expanded in the event)
-	if subData, ok := rawMap["subscription_data"].(map[string]interface{}); ok {
-		if md, ok := subData["metadata"].(map[string]interface{}); ok {
-			if tid, ok := md["tier_id"].(string); ok {
-				tierID = tid
-			}
-		}
+	sub, err := h.billing.GetSubscription(ctx, session.Subscription)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve subscription %s: %w", session.Subscription, err)
 	}
 
-	// Fallback: session metadata might also have it
+	tierID := sub.Metadata["tier_id"]
 	if tierID == "" {
-		if md, ok := rawMap["metadata"].(map[string]interface{}); ok {
-			if tid, ok := md["tier_id"].(string); ok {
-				tierID = tid
-			}
-		}
-	}
-
-	if tierID == "" {
-		log.Printf("No tier_id found in checkout session %s metadata", session.ID)
-		return
+		return fmt.Errorf("no tier_id in subscription %s metadata", session.Subscription)
 	}
 
 	tier := billing.GetTier(tierID)
 	if tier == nil {
-		log.Printf("Unknown tier %s in checkout session %s", tierID, session.ID)
-		return
+		return fmt.Errorf("unknown tier %s in checkout session %s", tierID, session.ID)
 	}
 
-	now := time.Now()
-	periodEnd := now.AddDate(0, 1, 0)
-	if err := h.userRepo.UpdateSubscription(ctx, fullSession.Customer, tierID, fullSession.Subscription, tier.IncludedTokens, now, periodEnd); err != nil {
-		log.Printf("Failed to update subscription for customer %s: %v", fullSession.Customer, err)
-		return
+	periodStart := time.Unix(sub.StartDate, 0)
+	periodEnd := periodStart.AddDate(0, 1, 0)
+
+	if err := h.userRepo.UpdateSubscription(ctx, session.Customer, tierID, session.Subscription, tier.IncludedTokens, periodStart, periodEnd); err != nil {
+		return fmt.Errorf("failed to update subscription for customer %s: %w", session.Customer, err)
 	}
 
-	// Issue initial credit grant
-	creditAmountCents := creditGrantCentsForTier(tier)
-	if creditAmountCents > 0 {
-		if _, err := h.billing.CreateCreditGrant(ctx, fullSession.Customer, creditAmountCents); err != nil {
-			log.Printf("Failed to create initial credit grant for customer %s: %v", fullSession.Customer, err)
-		}
-	}
+	h.issueCreditGrant(ctx, session.Customer, tier)
 
-	log.Printf("Subscription created for customer %s: tier=%s, subscription=%s", fullSession.Customer, tierID, fullSession.Subscription)
+	log.Printf("Subscription created for customer %s: tier=%s, subscription=%s", session.Customer, tierID, session.Subscription)
+	return nil
 }
 
-func (h *CheckoutHandler) handleInvoicePaid(ctx context.Context, event *stripe.Event, w http.ResponseWriter) {
-	var invoice struct {
-		Customer     string `json:"customer"`
-		Subscription string `json:"subscription"`
-		PeriodStart  int64  `json:"period_start"`
-		PeriodEnd    int64  `json:"period_end"`
-		BillingReason string `json:"billing_reason"`
-	}
-
-	if err := json.Unmarshal(event.Data.Raw, &invoice); err != nil {
-		log.Printf("Failed to parse invoice: %v", err)
-		return
-	}
-
-	if invoice.Subscription == "" {
-		return
-	}
-
-	// Skip the first invoice (handled by checkout.session.completed)
-	if invoice.BillingReason == "subscription_create" {
-		return
-	}
-
-	// Find user to determine tier
-	usr, err := h.userRepo.GetByStripeCustomerID(ctx, invoice.Customer)
+func (h *CheckoutHandler) handleInvoicePaid(ctx context.Context, event *stripe.Event) error {
+	invoice, err := parseEventData[invoiceEvent](event)
 	if err != nil {
-		log.Printf("Failed to find user for customer %s: %v", invoice.Customer, err)
-		return
+		return fmt.Errorf("failed to parse invoice: %w", err)
 	}
 
-	if usr.SubscriptionTier == nil {
-		log.Printf("User for customer %s has no subscription tier", invoice.Customer)
-		return
+	if invoice.Subscription == "" || invoice.BillingReason == "subscription_create" {
+		return nil
 	}
 
-	tier := billing.GetTier(*usr.SubscriptionTier)
-	if tier == nil {
-		log.Printf("Unknown tier %s for customer %s", *usr.SubscriptionTier, invoice.Customer)
-		return
+	tier, err := h.lookupUserTier(ctx, invoice.Customer)
+	if err != nil {
+		return err
 	}
 
 	periodStart := time.Unix(invoice.PeriodStart, 0)
 	periodEnd := time.Unix(invoice.PeriodEnd, 0)
 
-	// Reset billing cycle
 	if err := h.userRepo.ResetBillingCycle(ctx, invoice.Customer, periodStart, periodEnd); err != nil {
-		log.Printf("Failed to reset billing cycle for customer %s: %v", invoice.Customer, err)
-		return
+		return fmt.Errorf("failed to reset billing cycle for customer %s: %w", invoice.Customer, err)
 	}
 
-	// Issue credit grant for new period
-	creditAmountCents := creditGrantCentsForTier(tier)
-	if creditAmountCents > 0 {
-		if _, err := h.billing.CreateCreditGrant(ctx, invoice.Customer, creditAmountCents); err != nil {
-			log.Printf("Failed to create credit grant for customer %s: %v", invoice.Customer, err)
-		}
-	}
+	h.issueCreditGrant(ctx, invoice.Customer, tier)
 
 	log.Printf("Billing cycle reset for customer %s: period %s to %s", invoice.Customer, periodStart, periodEnd)
+	return nil
 }
 
-func (h *CheckoutHandler) handleSubscriptionDeleted(ctx context.Context, event *stripe.Event, w http.ResponseWriter) {
-	var subscription struct {
-		ID       string `json:"id"`
-		Customer string `json:"customer"`
+func (h *CheckoutHandler) handleSubscriptionDeleted(ctx context.Context, event *stripe.Event) error {
+	sub, err := parseEventData[subscriptionEvent](event)
+	if err != nil {
+		return fmt.Errorf("failed to parse subscription: %w", err)
 	}
 
-	if err := json.Unmarshal(event.Data.Raw, &subscription); err != nil {
-		log.Printf("Failed to parse subscription: %v", err)
-		return
+	if err := h.userRepo.ClearSubscription(ctx, sub.Customer); err != nil {
+		return fmt.Errorf("failed to clear subscription for customer %s: %w", sub.Customer, err)
 	}
 
-	if err := h.userRepo.ClearSubscription(ctx, subscription.Customer); err != nil {
-		log.Printf("Failed to clear subscription for customer %s: %v", subscription.Customer, err)
-		return
-	}
-
-	log.Printf("Subscription %s deleted for customer %s", subscription.ID, subscription.Customer)
+	log.Printf("Subscription %s deleted for customer %s", sub.ID, sub.Customer)
+	return nil
 }
 
-// creditGrantCentsForTier computes the credit grant value in cents for a tier's included tokens.
-// credit_amount = included_tokens * overage_price_per_token_in_cents
+func (h *CheckoutHandler) lookupUserTier(ctx context.Context, stripeCustomerID string) (*billing.SubscriptionTier, error) {
+	usr, err := h.userRepo.GetByStripeCustomerID(ctx, stripeCustomerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user for customer %s: %w", stripeCustomerID, err)
+	}
+
+	if usr.SubscriptionTier == nil {
+		return nil, fmt.Errorf("user for customer %s has no subscription tier", stripeCustomerID)
+	}
+
+	tier := billing.GetTier(*usr.SubscriptionTier)
+	if tier == nil {
+		return nil, fmt.Errorf("unknown tier %s for customer %s", *usr.SubscriptionTier, stripeCustomerID)
+	}
+	return tier, nil
+}
+
+func (h *CheckoutHandler) issueCreditGrant(ctx context.Context, customerID string, tier *billing.SubscriptionTier) {
+	amount := creditGrantCentsForTier(tier)
+	if amount <= 0 {
+		return
+	}
+	if _, err := h.billing.CreateCreditGrant(ctx, customerID, amount); err != nil {
+		log.Printf("Failed to create credit grant for customer %s: %v", customerID, err)
+	}
+}
+
 func creditGrantCentsForTier(tier *billing.SubscriptionTier) int64 {
 	overageCents, err := strconv.ParseFloat(tier.OveragePriceCentsDecimal, 64)
 	if err != nil {
 		return 0
 	}
-	return int64(float64(tier.IncludedTokens) * overageCents)
+	return int64(math.Round(float64(tier.IncludedTokens) * overageCents))
+}
+
+func parseEventData[T any](event *stripe.Event) (*T, error) {
+	var data T
+	if err := json.Unmarshal(event.Data.Raw, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+type checkoutSession struct {
+	ID           string `json:"id"`
+	Customer     string `json:"customer"`
+	Subscription string `json:"subscription"`
+}
+
+type invoiceEvent struct {
+	Customer      string `json:"customer"`
+	Subscription  string `json:"subscription"`
+	PeriodStart   int64  `json:"period_start"`
+	PeriodEnd     int64  `json:"period_end"`
+	BillingReason string `json:"billing_reason"`
+}
+
+type subscriptionEvent struct {
+	ID       string `json:"id"`
+	Customer string `json:"customer"`
 }
