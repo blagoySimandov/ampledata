@@ -2,11 +2,27 @@ package user
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/uptrace/bun"
 )
+
+func checkRowsAffected(res sql.Result, err error, customerID string) error {
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("no user found for stripe customer %s", customerID)
+	}
+	return nil
+}
 
 type Repository interface {
 	InitializeDatabase(ctx context.Context) error
@@ -155,7 +171,7 @@ func (r *UserRepository) IncrementTokensUsed(ctx context.Context, stripeCustomer
 }
 
 func (r *UserRepository) UpdateSubscription(ctx context.Context, stripeCustomerID, tier, subscriptionID string, tokensIncluded int64, periodStart, periodEnd time.Time) error {
-	_, err := r.db.NewUpdate().
+	res, err := r.db.NewUpdate().
 		Model((*models.UserDB)(nil)).
 		Set("subscription_tier = ?", tier).
 		Set("stripe_subscription_id = ?", subscriptionID).
@@ -165,11 +181,11 @@ func (r *UserRepository) UpdateSubscription(ctx context.Context, stripeCustomerI
 		Set("updated_at = ?", time.Now()).
 		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)
-	return err
+	return checkRowsAffected(res, err, stripeCustomerID)
 }
 
 func (r *UserRepository) ResetBillingCycle(ctx context.Context, stripeCustomerID string, periodStart, periodEnd time.Time) error {
-	_, err := r.db.NewUpdate().
+	res, err := r.db.NewUpdate().
 		Model((*models.UserDB)(nil)).
 		Set("tokens_used = 0").
 		Set("current_period_start = ?", periodStart).
@@ -177,11 +193,11 @@ func (r *UserRepository) ResetBillingCycle(ctx context.Context, stripeCustomerID
 		Set("updated_at = ?", time.Now()).
 		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)
-	return err
+	return checkRowsAffected(res, err, stripeCustomerID)
 }
 
 func (r *UserRepository) ClearSubscription(ctx context.Context, stripeCustomerID string) error {
-	_, err := r.db.NewUpdate().
+	res, err := r.db.NewUpdate().
 		Model((*models.UserDB)(nil)).
 		Set("subscription_tier = NULL").
 		Set("stripe_subscription_id = NULL").
@@ -192,5 +208,5 @@ func (r *UserRepository) ClearSubscription(ctx context.Context, stripeCustomerID
 		Set("updated_at = ?", time.Now()).
 		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)
-	return err
+	return checkRowsAffected(res, err, stripeCustomerID)
 }

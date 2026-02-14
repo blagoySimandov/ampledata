@@ -112,7 +112,7 @@ func (b *Billing) CancelSubscription(ctx context.Context, subscriptionID string)
 	return b.sc.V1Subscriptions.Cancel(ctx, subscriptionID, nil)
 }
 
-func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amountCents int64) (*stripe.BillingCreditGrant, error) {
+func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amountCents int64, idempotencyKey string) (*stripe.BillingCreditGrant, error) {
 	params := &stripe.BillingCreditGrantCreateParams{
 		Customer: stripe.String(customerID),
 		Name:     stripe.String("Subscription Credits"),
@@ -130,20 +130,10 @@ func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amou
 			},
 		},
 	}
-	return b.sc.V1BillingCreditGrants.Create(ctx, params)
-}
-
-func (b *Billing) GetCreditBalance(ctx context.Context, customerID string) (*stripe.BillingCreditBalanceSummary, error) {
-	params := &stripe.BillingCreditBalanceSummaryRetrieveParams{
-		Customer: stripe.String(customerID),
-		Filter: &stripe.BillingCreditBalanceSummaryRetrieveFilterParams{
-			Type: stripe.String("applicability_scope"),
-			ApplicabilityScope: &stripe.BillingCreditBalanceSummaryRetrieveFilterApplicabilityScopeParams{
-				PriceType: stripe.String(string(stripe.BillingCreditGrantApplicabilityConfigScopePriceTypeMetered)),
-			},
-		},
+	if idempotencyKey != "" {
+		params.SetIdempotencyKey(idempotencyKey)
 	}
-	return b.sc.V1BillingCreditBalanceSummary.Retrieve(ctx, params)
+	return b.sc.V1BillingCreditGrants.Create(ctx, params)
 }
 
 func (b *Billing) VerifyWebhookSignature(payload []byte, signature string) (*stripe.Event, error) {

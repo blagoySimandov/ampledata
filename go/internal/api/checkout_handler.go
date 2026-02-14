@@ -17,6 +17,13 @@ import (
 	"github.com/stripe/stripe-go/v84"
 )
 
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("Failed to encode JSON response: %v", err)
+	}
+}
+
 type CheckoutHandler struct {
 	billing  services.BillingService
 	userRepo user.Repository
@@ -88,8 +95,7 @@ func (h *CheckoutHandler) CreateSubscriptionCheckout(w http.ResponseWriter, r *h
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(CreateCheckoutResponse{
+	writeJSON(w, CreateCheckoutResponse{
 		CheckoutURL: session.URL,
 		SessionID:   session.ID,
 	})
@@ -102,8 +108,7 @@ func (h *CheckoutHandler) GetSubscriptionStatus(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(SubscriptionStatusResponse{
+	writeJSON(w, SubscriptionStatusResponse{
 		Tier:               dbUser.SubscriptionTier,
 		TokensUsed:         dbUser.TokensUsed,
 		TokensIncluded:     dbUser.TokensIncluded,
@@ -126,8 +131,7 @@ func (h *CheckoutHandler) CancelSubscription(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Subscription cancelled"})
+	writeJSON(w, map[string]string{"message": "Subscription cancelled"})
 }
 
 func (h *CheckoutHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
@@ -143,8 +147,7 @@ func (h *CheckoutHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tiers)
+	writeJSON(w, tiers)
 }
 
 func (h *CheckoutHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -207,14 +210,16 @@ func (h *CheckoutHandler) handleCheckoutCompleted(ctx context.Context, event *st
 		return fmt.Errorf("unknown tier %s in checkout session %s", tierID, session.ID)
 	}
 
-	periodStart := time.Unix(sub.StartDate, 0)
-	periodEnd := periodStart.AddDate(0, 1, 0)
+	periodStart, periodEnd, err := subscriptionPeriod(sub)
+	if err != nil {
+		return fmt.Errorf("subscription %s: %w", session.Subscription, err)
+	}
 
 	if err := h.userRepo.UpdateSubscription(ctx, session.Customer, tierID, session.Subscription, tier.IncludedTokens, periodStart, periodEnd); err != nil {
 		return fmt.Errorf("failed to update subscription for customer %s: %w", session.Customer, err)
 	}
 
-	h.issueCreditGrant(ctx, session.Customer, tier)
+	h.issueCreditGrant(ctx, session.Customer, tier, event.ID)
 
 	log.Printf("Subscription created for customer %s: tier=%s, subscription=%s", session.Customer, tierID, session.Subscription)
 	return nil
@@ -230,19 +235,26 @@ func (h *CheckoutHandler) handleInvoicePaid(ctx context.Context, event *stripe.E
 		return nil
 	}
 
+	sub, err := h.billing.GetSubscription(ctx, invoice.Subscription)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve subscription %s: %w", invoice.Subscription, err)
+	}
+
 	tier, err := h.lookupUserTier(ctx, invoice.Customer)
 	if err != nil {
 		return err
 	}
 
-	periodStart := time.Unix(invoice.PeriodStart, 0)
-	periodEnd := time.Unix(invoice.PeriodEnd, 0)
+	periodStart, periodEnd, err := subscriptionPeriod(sub)
+	if err != nil {
+		return fmt.Errorf("subscription %s: %w", invoice.Subscription, err)
+	}
 
 	if err := h.userRepo.ResetBillingCycle(ctx, invoice.Customer, periodStart, periodEnd); err != nil {
 		return fmt.Errorf("failed to reset billing cycle for customer %s: %w", invoice.Customer, err)
 	}
 
-	h.issueCreditGrant(ctx, invoice.Customer, tier)
+	h.issueCreditGrant(ctx, invoice.Customer, tier, event.ID)
 
 	log.Printf("Billing cycle reset for customer %s: period %s to %s", invoice.Customer, periodStart, periodEnd)
 	return nil
@@ -279,14 +291,23 @@ func (h *CheckoutHandler) lookupUserTier(ctx context.Context, stripeCustomerID s
 	return tier, nil
 }
 
-func (h *CheckoutHandler) issueCreditGrant(ctx context.Context, customerID string, tier *billing.SubscriptionTier) {
+func (h *CheckoutHandler) issueCreditGrant(ctx context.Context, customerID string, tier *billing.SubscriptionTier, eventID string) {
 	amount := creditGrantCentsForTier(tier)
 	if amount <= 0 {
 		return
 	}
-	if _, err := h.billing.CreateCreditGrant(ctx, customerID, amount); err != nil {
+	idempotencyKey := fmt.Sprintf("credit_grant_%s", eventID)
+	if _, err := h.billing.CreateCreditGrant(ctx, customerID, amount, idempotencyKey); err != nil {
 		log.Printf("Failed to create credit grant for customer %s: %v", customerID, err)
 	}
+}
+
+func subscriptionPeriod(sub *stripe.Subscription) (time.Time, time.Time, error) {
+	if sub.Items == nil || len(sub.Items.Data) == 0 {
+		return time.Time{}, time.Time{}, fmt.Errorf("no subscription items found")
+	}
+	item := sub.Items.Data[0]
+	return time.Unix(item.CurrentPeriodStart, 0), time.Unix(item.CurrentPeriodEnd, 0), nil
 }
 
 func creditGrantCentsForTier(tier *billing.SubscriptionTier) int64 {
@@ -314,8 +335,6 @@ type checkoutSession struct {
 type invoiceEvent struct {
 	Customer      string `json:"customer"`
 	Subscription  string `json:"subscription"`
-	PeriodStart   int64  `json:"period_start"`
-	PeriodEnd     int64  `json:"period_end"`
 	BillingReason string `json:"billing_reason"`
 }
 
