@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/stripe/stripe-go/v84"
 )
 
@@ -89,7 +90,7 @@ func (b *Billing) syncTier(ctx context.Context, tier *SubscriptionTier, meterID 
 func (b *Billing) ensureProduct(ctx context.Context, tier *SubscriptionTier) (string, error) {
 	params := &stripe.ProductSearchParams{
 		SearchParams: stripe.SearchParams{
-			Query: fmt.Sprintf("metadata['ampledata_tier']:'%s'", tier.ID),
+			Query: fmt.Sprintf("metadata['%s']:'%s'", config.StripeMetadataTier, tier.ID),
 		},
 	}
 	for product, err := range b.sc.V1Products.Search(ctx, params) {
@@ -106,7 +107,7 @@ func (b *Billing) createProduct(ctx context.Context, tier *SubscriptionTier) (st
 	params := &stripe.ProductCreateParams{
 		Name: stripe.String(fmt.Sprintf("AmpleData %s", tier.DisplayName)),
 		Metadata: map[string]string{
-			"ampledata_tier": tier.ID,
+			config.StripeMetadataTier: tier.ID,
 		},
 	}
 	product, err := b.sc.V1Products.Create(ctx, params)
@@ -119,7 +120,7 @@ func (b *Billing) createProduct(ctx context.Context, tier *SubscriptionTier) (st
 func (b *Billing) ensureBasePrice(ctx context.Context, tier *SubscriptionTier, productID string) (string, error) {
 	params := &stripe.PriceSearchParams{
 		SearchParams: stripe.SearchParams{
-			Query: fmt.Sprintf("product:'%s' AND metadata['ampledata_price_type']:'base'", productID),
+			Query: fmt.Sprintf("product:'%s' AND metadata['%s']:'%s'", productID, config.StripeMetadataPriceType, config.StripePriceTypeBase),
 		},
 	}
 	for p, err := range b.sc.V1Prices.Search(ctx, params) {
@@ -143,7 +144,7 @@ func (b *Billing) createBasePrice(ctx context.Context, tier *SubscriptionTier, p
 			Interval: stripe.String(string(stripe.PriceRecurringIntervalMonth)),
 		},
 		Metadata: map[string]string{
-			"ampledata_price_type": "base",
+			config.StripeMetadataPriceType: config.StripePriceTypeBase,
 			"ampledata_tier":       tier.ID,
 		},
 	}
@@ -157,7 +158,7 @@ func (b *Billing) createBasePrice(ctx context.Context, tier *SubscriptionTier, p
 func (b *Billing) ensureMeteredPrice(ctx context.Context, tier *SubscriptionTier, productID, meterID string) (string, error) {
 	params := &stripe.PriceSearchParams{
 		SearchParams: stripe.SearchParams{
-			Query: fmt.Sprintf("product:'%s' AND metadata['ampledata_price_type']:'metered'", productID),
+			Query: fmt.Sprintf("product:'%s' AND metadata['%s']:'%s'", productID, config.StripeMetadataPriceType, config.StripePriceTypeMetered),
 		},
 	}
 	for p, err := range b.sc.V1Prices.Search(ctx, params) {
@@ -188,7 +189,7 @@ func (b *Billing) createMeteredPrice(ctx context.Context, tier *SubscriptionTier
 			Meter:     stripe.String(meterID),
 		},
 		Metadata: map[string]string{
-			"ampledata_price_type": "metered",
+			config.StripeMetadataPriceType: config.StripePriceTypeMetered,
 			"ampledata_tier":       tier.ID,
 		},
 	}

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/billing"
+	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/stripe/stripe-go/v84"
@@ -200,7 +201,7 @@ func (h *CheckoutHandler) handleCheckoutCompleted(ctx context.Context, event *st
 		return fmt.Errorf("failed to retrieve subscription %s: %w", session.Subscription, err)
 	}
 
-	tierID := sub.Metadata[billing.TIER_ID_KEY]
+	tierID := sub.Metadata[config.StripeTierIDKey]
 	if tierID == "" {
 		return fmt.Errorf("no tier_id in subscription %s metadata", session.Subscription)
 	}

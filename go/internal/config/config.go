@@ -39,6 +39,14 @@ type Config struct {
 	SkipStripeSync          bool
 }
 
+const (
+	StripeMetadataTier      = "ampledata_tier"
+	StripeMetadataPriceType = "ampledata_price_type"
+	StripePriceTypeBase     = "base"
+	StripePriceTypeMetered  = "metered"
+	StripeTierIDKey         = "tier_id"
+)
+
 var cfg Config = Config{
 	DatabaseURL:       getEnv("DATABASE_URL_ENRICH", "postgres://enrichment:enrichment@localhost:5432/enrichment?sslmode=disable"),
 	ServerAddr:        getEnv("SERVER_ADDR", ":8080"),
