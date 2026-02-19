@@ -203,6 +203,18 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No rows found in the specified key column", http.StatusBadRequest)
 		return
 	}
+
+	// Read source column values for the imputation stage (optional).
+	var rowData map[string]map[string]string
+	if len(req.SourceColumns) > 0 {
+		rowData, err = h.gcsReader.ReadRowsWithSourceColumns(r.Context(), job.FilePath, req.KeyColumns, req.SourceColumns)
+		if err != nil {
+			log.Printf("Failed to read source columns: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to read source columns from CSV: %v", err), http.StatusBadRequest)
+			return
+		}
+	}
+
 	cfg := config.Load()
 	totalCells := len(rowKeys) * len(req.ColumnsMetadata)
 	requiredCredits := int64(totalCells * cfg.CreditsPerCell)
@@ -217,7 +229,7 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.UpdateJobConfiguration(r.Context(), jobID, req.KeyColumns, req.ColumnsMetadata, req.EntityType); err != nil {
+	if err := h.store.UpdateJobConfiguration(r.Context(), jobID, req.KeyColumns, req.ColumnsMetadata, req.EntityType, req.SourceColumns); err != nil {
 		log.Printf("Failed to update job configuration: %v", err)
 		http.Error(w, "Failed to update job configuration", http.StatusInternalServerError)
 		return
@@ -234,7 +246,7 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		stripeCustomerID = *dbUser.StripeCustomerID
 	}
 
-	go h.enricher.Enrich(context.Background(), jobID, dbUser.ID, stripeCustomerID, rowKeys, req.ColumnsMetadata)
+	go h.enricher.Enrich(context.Background(), jobID, dbUser.ID, stripeCustomerID, rowKeys, req.ColumnsMetadata, rowData)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(models.StartJobResponse{

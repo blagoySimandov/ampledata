@@ -23,6 +23,9 @@ type EnrichmentWorkflowInput struct {
 	RetryCount       int
 	PreviousAttempts []*models.EnrichmentAttempt
 	MaxRetries       int
+	// SourceData holds the values of existing CSV columns for this row.
+	// When non-empty, the imputation stage runs before web-search enrichment.
+	SourceData map[string]string
 }
 
 type EnrichmentWorkflowOutput struct {
@@ -34,6 +37,10 @@ type EnrichmentWorkflowOutput struct {
 	Error          string
 	IterationCount int
 }
+
+// imputationConfidenceThreshold is the minimum score for an imputed field to be
+// considered "done" — i.e., it will not be re-fetched from the web.
+const imputationConfidenceThreshold = 0.8
 
 func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*EnrichmentWorkflowOutput, error) {
 	info := workflow.GetInfo(ctx)
@@ -58,7 +65,80 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		IterationCount: input.RetryCount + 1,
 	}
 
-	// Generate patterns if this is a retry with feedback
+	// ── Stage 0: Column Imputation ────────────────────────────────────────────
+	// Run only on the first attempt (imputed results are carried into retries).
+	// Columns imputed with high confidence are removed from ColumnsMetadata so
+	// the expensive web-search pipeline only processes what is still missing.
+	imputedData := make(map[string]interface{})
+	imputedConfidence := make(map[string]*models.FieldConfidenceInfo)
+
+	if input.RetryCount == 0 && len(input.SourceData) > 0 {
+		event.StartStage("IMPUTATION")
+		var imputeOutput activities.ImputeOutput
+		workflow.ExecuteActivity(ctx, "Impute", activities.ImputeInput{
+			JobID:           input.JobID,
+			RowKey:          input.RowKey,
+			SourceData:      input.SourceData,
+			ColumnsMetadata: input.ColumnsMetadata,
+		}).Get(ctx, &imputeOutput)
+
+		if imputeOutput.ImputedData != nil {
+			imputedData = imputeOutput.ImputedData
+		}
+		if imputeOutput.Confidence != nil {
+			imputedConfidence = imputeOutput.Confidence
+		}
+
+		event.CompleteStage("IMPUTATION", map[string]interface{}{
+			"imputed_count": len(imputedData),
+		})
+
+		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
+			JobID:  input.JobID,
+			RowKey: input.RowKey,
+			Stage:  models.StageImputed,
+			Data:   nil,
+		}).Get(ctx, nil)
+
+		// If every target column was imputed with sufficient confidence, we are done.
+		if allImputedWithHighConfidence(input.ColumnsMetadata, imputedData, imputedConfidence) {
+			output.ExtractedData = imputedData
+			output.Confidence = imputedConfidence
+			output.Sources = []string{}
+			output.Success = true
+
+			workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
+				JobID:  input.JobID,
+				RowKey: input.RowKey,
+				Stage:  models.StageCompleted,
+				Data: &models.StateUpdate{
+					ExtractedData: imputedData,
+					Confidence:    imputedConfidence,
+				},
+			}).Get(ctx, nil)
+
+			event.EmitSuccess(ctx)
+
+			if input.RetryCount == 0 {
+				var reportErr error
+				workflow.ExecuteActivity(ctx, "ReportUsage", activities.ReportUsageInput{
+					StripeCustomerID: input.StripeCustomerID,
+					Credits:          len(output.ExtractedData),
+				}).Get(ctx, &reportErr)
+				if reportErr != nil {
+					event.SetMetadata("billing_error", reportErr.Error())
+				}
+			}
+
+			return output, nil
+		}
+
+		// Remove well-imputed columns so the web-search pipeline only handles
+		// the remaining ones.
+		input.ColumnsMetadata = filterNotImputed(input.ColumnsMetadata, imputedData, imputedConfidence)
+	}
+
+	// ── Stage 1: Pattern Regeneration (on retry) ─────────────────────────────
 	queryPatterns := input.QueryPatterns
 	if input.RetryCount > 0 && len(input.PreviousAttempts) > 0 {
 		event.StartStage("PATTERN_REGENERATION")
@@ -79,6 +159,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		}
 	}
 
+	// ── Stage 2: SERP Fetch ───────────────────────────────────────────────────
 	event.StartStage(models.StageSerpFetched)
 	var serpOutput activities.SerpFetchOutput
 	err := workflow.ExecuteActivity(ctx, "SerpFetch", activities.SerpFetchInput{
@@ -114,6 +195,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Data:   nil,
 	}).Get(ctx, nil)
 
+	// ── Stage 3: Decision Making ──────────────────────────────────────────────
 	event.StartStage(models.StageDecisionMade)
 	var decisionOutput activities.DecisionOutput
 	err = workflow.ExecuteActivity(ctx, "MakeDecision", activities.DecisionInput{
@@ -148,6 +230,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Data:   nil,
 	}).Get(ctx, nil)
 
+	// ── Stage 4: Crawl ────────────────────────────────────────────────────────
 	event.StartStage(models.StageCrawled)
 	var crawlOutput activities.CrawlOutput
 	err = workflow.ExecuteActivity(ctx, "Crawl", activities.CrawlInput{
@@ -184,6 +267,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Data:   nil,
 	}).Get(ctx, nil)
 
+	// ── Stage 5: Extraction ───────────────────────────────────────────────────
 	event.StartStage(models.StageEnriched)
 	var extractOutput activities.ExtractOutput
 	err = workflow.ExecuteActivity(ctx, "Extract", activities.ExtractInput{
@@ -211,21 +295,22 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		return output, nil
 	}
 
-	extractedFieldCount := 0
-	if extractOutput.ExtractedData != nil {
-		extractedFieldCount = len(extractOutput.ExtractedData)
-	}
+	// Merge imputed data with web-search extracted data.
+	// Web-search results take precedence for columns that appear in both.
+	mergedData, mergedConfidence := mergeImputedWithExtracted(imputedData, imputedConfidence, extractOutput.ExtractedData, extractOutput.Confidence)
+
+	extractedFieldCount := len(mergedData)
 	event.CompleteStage(models.StageEnriched, map[string]interface{}{
 		"fields_extracted": extractedFieldCount,
-		"confidence":       extractOutput.Confidence,
+		"confidence":       mergedConfidence,
 	})
 
 	enrichedData := models.StateUpdate{}
-	if extractOutput.ExtractedData != nil {
-		enrichedData.ExtractedData = extractOutput.ExtractedData
+	if len(mergedData) > 0 {
+		enrichedData.ExtractedData = mergedData
 	}
-	if extractOutput.Confidence != nil {
-		enrichedData.Confidence = extractOutput.Confidence
+	if len(mergedConfidence) > 0 {
+		enrichedData.Confidence = mergedConfidence
 	}
 	if crawlOutput.CrawlResults != nil && crawlOutput.CrawlResults.Sources != nil {
 		enrichedData.Sources = crawlOutput.CrawlResults.Sources
@@ -238,17 +323,18 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Data:   &enrichedData,
 	}).Get(ctx, nil)
 
-	output.ExtractedData = extractOutput.ExtractedData
-	output.Confidence = extractOutput.Confidence
+	output.ExtractedData = mergedData
+	output.Confidence = mergedConfidence
 	output.Sources = crawlOutput.CrawlResults.Sources
 	output.Success = true
 
+	// ── Stage 6: Feedback Analysis ────────────────────────────────────────────
 	var feedbackOutput activities.FeedbackAnalysisOutput
 	workflow.ExecuteActivity(ctx, "AnalyzeFeedback", activities.FeedbackAnalysisInput{
 		JobID:           input.JobID,
 		RowKey:          input.RowKey,
-		ExtractedData:   extractOutput.ExtractedData,
-		Confidence:      extractOutput.Confidence,
+		ExtractedData:   mergedData,
+		Confidence:      mergedConfidence,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(ctx, &feedbackOutput)
 
@@ -288,6 +374,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			RetryCount:       input.RetryCount + 1,
 			PreviousAttempts: previousAttempts,
 			MaxRetries:       input.MaxRetries,
+			// SourceData is intentionally omitted on retries: imputation already ran
+			// in the first pass, and its results are merged into mergedData above.
 		}
 
 		retryOutput, err := EnrichmentWorkflow(ctx, retryInput)
@@ -353,4 +441,75 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}
 
 	return output, nil
+}
+
+// allImputedWithHighConfidence returns true when every target column has been
+// imputed with a confidence score at or above imputationConfidenceThreshold.
+func allImputedWithHighConfidence(
+	targetCols []*models.ColumnMetadata,
+	imputedData map[string]interface{},
+	imputedConfidence map[string]*models.FieldConfidenceInfo,
+) bool {
+	if len(imputedData) == 0 {
+		return false
+	}
+	for _, col := range targetCols {
+		conf, ok := imputedConfidence[col.Name]
+		if !ok || conf.Score < imputationConfidenceThreshold {
+			return false
+		}
+		if _, exists := imputedData[col.Name]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
+// filterNotImputed returns only the columns that were NOT successfully imputed
+// with high confidence, so the web-search pipeline focuses on what is still missing.
+func filterNotImputed(
+	cols []*models.ColumnMetadata,
+	imputedData map[string]interface{},
+	imputedConfidence map[string]*models.FieldConfidenceInfo,
+) []*models.ColumnMetadata {
+	var remaining []*models.ColumnMetadata
+	for _, col := range cols {
+		conf, hasConf := imputedConfidence[col.Name]
+		_, hasData := imputedData[col.Name]
+		if hasData && hasConf && conf.Score >= imputationConfidenceThreshold {
+			continue
+		}
+		remaining = append(remaining, col)
+	}
+	return remaining
+}
+
+// mergeImputedWithExtracted combines imputed and web-search extracted data.
+// Web-search results take precedence when a column appears in both.
+func mergeImputedWithExtracted(
+	imputedData map[string]interface{},
+	imputedConfidence map[string]*models.FieldConfidenceInfo,
+	extractedData map[string]interface{},
+	extractedConfidence map[string]*models.FieldConfidenceInfo,
+) (map[string]interface{}, map[string]*models.FieldConfidenceInfo) {
+	merged := make(map[string]interface{})
+	mergedConf := make(map[string]*models.FieldConfidenceInfo)
+
+	for k, v := range imputedData {
+		merged[k] = v
+		if c, ok := imputedConfidence[k]; ok {
+			mergedConf[k] = c
+		}
+	}
+	for k, v := range extractedData {
+		merged[k] = v
+		if c, ok := extractedConfidence[k]; ok {
+			mergedConf[k] = c
+		}
+	}
+
+	if len(merged) == 0 {
+		return nil, nil
+	}
+	return merged, mergedConf
 }

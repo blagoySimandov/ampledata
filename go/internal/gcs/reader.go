@@ -156,3 +156,65 @@ func (r *CSVReader) ReadCompositeKeyFromFile(ctx context.Context, objectName str
 	}
 	return r.ExtractCompositeKey(result, columnNames)
 }
+
+// ReadRowsWithSourceColumns reads the CSV and returns a map from composite row key to
+// the values of the specified source columns for that row. Only source columns
+// present in the CSV headers are included; missing headers are silently skipped.
+func (r *CSVReader) ReadRowsWithSourceColumns(ctx context.Context, objectName string, keyColumns []string, sourceColumns []string) (map[string]map[string]string, error) {
+	result, err := r.ReadCSV(ctx, objectName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build index for key columns.
+	keyIndices := make([]int, len(keyColumns))
+	for i, col := range keyColumns {
+		idx := -1
+		for j, h := range result.Headers {
+			if h == col {
+				idx = j
+				break
+			}
+		}
+		if idx == -1 {
+			return nil, fmt.Errorf("key column '%s' not found in CSV headers: %v", col, result.Headers)
+		}
+		keyIndices[i] = idx
+	}
+
+	// Build index for source columns (only those present in the CSV).
+	type sourceCol struct {
+		name  string
+		index int
+	}
+	var sourceCols []sourceCol
+	for _, col := range sourceColumns {
+		for j, h := range result.Headers {
+			if h == col {
+				sourceCols = append(sourceCols, sourceCol{name: col, index: j})
+				break
+			}
+		}
+	}
+
+	rowData := make(map[string]map[string]string, len(result.Rows))
+	for _, row := range result.Rows {
+		keyParts := make([]string, len(keyIndices))
+		for i, idx := range keyIndices {
+			if idx < len(row) {
+				keyParts[i] = row[idx]
+			}
+		}
+		compositeKey := joinKeyParts(keyParts)
+
+		colValues := make(map[string]string, len(sourceCols))
+		for _, sc := range sourceCols {
+			if sc.index < len(row) {
+				colValues[sc.name] = row[sc.index]
+			}
+		}
+		rowData[compositeKey] = colValues
+	}
+
+	return rowData, nil
+}

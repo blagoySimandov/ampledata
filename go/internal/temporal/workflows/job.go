@@ -21,6 +21,9 @@ type JobWorkflowInput struct {
 	ColumnsMetadata  []*models.ColumnMetadata
 	EntityType       *string
 	MaxRetries       int
+	// RowData maps each composite row key to the values of source columns for
+	// that row. When non-empty, the imputation stage is enabled per row.
+	RowData map[string]map[string]string
 }
 
 type JobWorkflowOutput struct {
@@ -90,6 +93,11 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			entityType = *input.EntityType
 		}
 
+		var sourceData map[string]string
+		if input.RowData != nil {
+			sourceData = input.RowData[rowKey]
+		}
+
 		childInput := EnrichmentWorkflowInput{
 			JobID:            input.JobID,
 			UserID:           input.UserID,
@@ -101,6 +109,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			RetryCount:       0,
 			PreviousAttempts: []*models.EnrichmentAttempt{},
 			MaxRetries:       input.MaxRetries,
+			SourceData:       sourceData,
 		}
 
 		childWorkflow := workflow.ExecuteChildWorkflow(childCtx, EnrichmentWorkflow, childInput)

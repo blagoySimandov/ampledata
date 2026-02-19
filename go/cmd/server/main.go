@@ -84,6 +84,8 @@ func main() {
 	}
 	defer tc.Close()
 
+	columnImputer := services.NewGeminiColumnImputer(aiClient)
+
 	acts := activities.NewActivities(
 		stateManager,
 		webSearcher,
@@ -92,6 +94,7 @@ func main() {
 		extractor,
 		patternGenerator,
 		billingService,
+		columnImputer,
 	)
 
 	w := worker.NewWorker(tc, cfg.TemporalTaskQueue, acts)

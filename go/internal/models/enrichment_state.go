@@ -8,6 +8,7 @@ type RowStage string
 
 const (
 	StagePending      RowStage = "PENDING"
+	StageImputed      RowStage = "IMPUTED"
 	StageSerpFetched  RowStage = "SERP_FETCHED"
 	StageDecisionMade RowStage = "DECISION_MADE"
 	StageCrawled      RowStage = "CRAWLED"
@@ -33,6 +34,7 @@ type Job struct {
 	FilePath        string            `json:"file_path"`
 	KeyColumns      []string          `json:"key_columns"`
 	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
+	SourceColumns   []string          `json:"source_columns"`
 	EntityType      *string           `json:"entity_type"`
 	TotalRows       int               `json:"total_rows"`
 	StartedAt       *time.Time        `json:"started_at"`

@@ -1,0 +1,2 @@
+ALTER TABLE jobs
+DROP COLUMN IF EXISTS source_columns;

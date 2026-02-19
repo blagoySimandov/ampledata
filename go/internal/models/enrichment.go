@@ -12,6 +12,10 @@ type StartJobRequest struct {
 	KeyColumns      []string          `json:"key_columns"`
 	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
 	EntityType      *string           `json:"entity_type,omitempty"`
+	// SourceColumns lists CSV column names whose values are passed to the imputation
+	// stage. These columns must already exist in the uploaded CSV and are NOT
+	// target enrichment columns themselves.
+	SourceColumns []string `json:"source_columns,omitempty"`
 }
 
 type StartJobResponse struct {

@@ -19,6 +19,7 @@ type Activities struct {
 	contentExtractor services.IContentExtractor
 	patternGenerator services.QueryPatternGenerator
 	billingService   services.BillingService
+	columnImputer    services.ColumnImputer
 }
 
 func NewActivities(
@@ -29,6 +30,7 @@ func NewActivities(
 	contentExtractor services.IContentExtractor,
 	patternGenerator services.QueryPatternGenerator,
 	billingService services.BillingService,
+	columnImputer services.ColumnImputer,
 ) *Activities {
 	return &Activities{
 		stateManager:     stateManager,
@@ -38,6 +40,7 @@ func NewActivities(
 		contentExtractor: contentExtractor,
 		patternGenerator: patternGenerator,
 		billingService:   billingService,
+		columnImputer:    columnImputer,
 	}
 }
 
@@ -498,4 +501,56 @@ type ReportUsageInput struct {
 
 func (a *Activities) ReportUsage(ctx context.Context, input ReportUsageInput) error {
 	return a.billingService.ReportUsage(ctx, input.StripeCustomerID, input.Credits)
+}
+
+type ImputeInput struct {
+	JobID           string
+	RowKey          string
+	// SourceData contains the values of existing CSV columns for this row.
+	SourceData      map[string]string
+	ColumnsMetadata []*models.ColumnMetadata
+}
+
+type ImputeOutput struct {
+	ImputedData map[string]interface{}
+	Confidence  map[string]*models.FieldConfidenceInfo
+}
+
+// Impute derives target column values from existing source column data for a row.
+// Returns an empty result (no error) when imputation is not possible or not configured.
+func (a *Activities) Impute(ctx context.Context, input ImputeInput) (*ImputeOutput, error) {
+	event := logger.NewActivityEvent("impute", input.JobID)
+	event.RowKey = input.RowKey
+
+	empty := &ImputeOutput{
+		ImputedData: make(map[string]interface{}),
+		Confidence:  make(map[string]*models.FieldConfidenceInfo),
+	}
+
+	if a.columnImputer == nil || len(input.SourceData) == 0 || len(input.ColumnsMetadata) == 0 {
+		event.EmitActivitySuccess(ctx, map[string]interface{}{"skipped": true})
+		return empty, nil
+	}
+
+	result, err := a.columnImputer.ImputeColumns(ctx, input.RowKey, input.SourceData, input.ColumnsMetadata)
+	if err != nil {
+		// Imputation failure is non-fatal: log and continue to web-search enrichment.
+		event.SetMetadata("imputation_error", err.Error())
+		event.EmitActivitySuccess(ctx, map[string]interface{}{"skipped": true, "error": err.Error()})
+		return empty, nil
+	}
+
+	imputedCount := 0
+	if result.ImputedData != nil {
+		imputedCount = len(result.ImputedData)
+	}
+
+	event.EmitActivitySuccess(ctx, map[string]interface{}{
+		"imputed_count": imputedCount,
+	})
+
+	return &ImputeOutput{
+		ImputedData: result.ImputedData,
+		Confidence:  result.Confidence,
+	}, nil
 }

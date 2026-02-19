@@ -29,8 +29,9 @@ func NewTemporalEnricher(temporalClient client.Client, stateManager *state.State
 	}
 }
 
-// Enrich starts a Temporal workflow to process the job
-func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata) error {
+// Enrich starts a Temporal workflow to process the job.
+// rowData is optional: when non-nil it enables the imputation stage for each row.
+func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, rowData map[string]map[string]string) error {
 	workflowOptions := client.StartWorkflowOptions{
 		ID:        fmt.Sprintf("job-%s", jobID),
 		TaskQueue: e.taskQueue,
@@ -44,6 +45,7 @@ func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCust
 		ColumnsMetadata:  columnsMetadata,
 		EntityType:       nil,
 		MaxRetries:       e.maxRetries,
+		RowData:          rowData,
 	}
 
 	workflowRun, err := e.temporalClient.ExecuteWorkflow(ctx, workflowOptions, workflows.JobWorkflow, input)

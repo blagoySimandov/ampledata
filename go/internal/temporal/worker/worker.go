@@ -55,6 +55,9 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 	w.RegisterActivityWithOptions(activities.ReportUsage, activity.RegisterOptions{
 		Name: "ReportUsage",
 	})
+	w.RegisterActivityWithOptions(activities.Impute, activity.RegisterOptions{
+		Name: "Impute",
+	})
 
 	return &Worker{
 		temporalWorker: w,

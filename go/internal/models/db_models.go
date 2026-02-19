@@ -15,6 +15,7 @@ type JobDB struct {
 	FilePath        string            `bun:"file_path" json:"file_path"`
 	KeyColumns      []string          `bun:"key_columns,type:jsonb" json:"key_columns"`
 	ColumnsMetadata []*ColumnMetadata `bun:"columns_metadata,type:jsonb" json:"columns_metadata"`
+	SourceColumns   []string          `bun:"source_columns,type:jsonb" json:"source_columns"`
 	EntityType      *string           `bun:"entity_type" json:"entity_type"`
 	TotalRows       int               `bun:"total_rows,notnull" json:"total_rows"`
 	StartedAt       *time.Time        `bun:"started_at" json:"started_at"`
@@ -32,6 +33,7 @@ func (j *JobDB) ToJob() *Job {
 		FilePath:        j.FilePath,
 		KeyColumns:      j.KeyColumns,
 		ColumnsMetadata: j.ColumnsMetadata,
+		SourceColumns:   j.SourceColumns,
 		EntityType:      j.EntityType,
 		TotalRows:       j.TotalRows,
 		StartedAt:       j.StartedAt,
@@ -48,6 +50,7 @@ func JobFromDomain(job *Job) *JobDB {
 		FilePath:        job.FilePath,
 		KeyColumns:      job.KeyColumns,
 		ColumnsMetadata: job.ColumnsMetadata,
+		SourceColumns:   job.SourceColumns,
 		EntityType:      job.EntityType,
 		TotalRows:       job.TotalRows,
 		StartedAt:       job.StartedAt,
