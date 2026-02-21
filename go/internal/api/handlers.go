@@ -203,6 +203,11 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No rows found in the specified key column", http.StatusBadRequest)
 		return
 	}
+	if dbUser.SubscriptionTier == nil {
+		http.Error(w, "Active subscription required", http.StatusPaymentRequired)
+		return
+	}
+
 	cfg := config.Load()
 	totalCells := len(rowKeys) * len(req.ColumnsMetadata)
 	requiredCredits := int64(totalCells * cfg.CreditsPerCell)
