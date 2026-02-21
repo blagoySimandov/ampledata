@@ -18,16 +18,66 @@ func (b *Billing) SyncStripeCatalog(ctx context.Context) error {
 	b.meterID = meterID
 	log.Printf("Stripe meter synced: %s", meterID)
 
+	products, err := b.listActiveProducts(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list products: %w", err)
+	}
+
+	prices, err := b.listActivePrices(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list prices: %w", err)
+	}
+
 	for _, tierID := range TierOrder {
 		tier := Tiers[tierID]
-		if err := b.syncTier(ctx, tier, meterID); err != nil {
+		if err := b.syncTier(ctx, tier, meterID, products, prices); err != nil {
 			return fmt.Errorf("failed to sync tier %s: %w", tierID, err)
 		}
-		log.Printf("Stripe tier synced: %s (product=%s, base_price=%s, metered_price=%s)",
-			tierID, tier.ProductID, tier.BasePriceID, tier.MeteredPriceID)
+		log.Printf("Stripe tier synced: %s (base_product=%s, metered_product=%s, base_price=%s, metered_price=%s)",
+			tierID, tier.BaseProductID, tier.MeteredProductID, tier.BasePriceID, tier.MeteredPriceID)
 	}
 
 	return nil
+}
+
+func (b *Billing) listActiveProducts(ctx context.Context) ([]*stripe.Product, error) {
+	var products []*stripe.Product
+	for p, err := range b.sc.V1Products.List(ctx, &stripe.ProductListParams{Active: stripe.Bool(true)}) {
+		if err != nil {
+			return nil, err
+		}
+		products = append(products, p)
+	}
+	return products, nil
+}
+
+func (b *Billing) listActivePrices(ctx context.Context) ([]*stripe.Price, error) {
+	var prices []*stripe.Price
+	for p, err := range b.sc.V1Prices.List(ctx, &stripe.PriceListParams{Active: stripe.Bool(true)}) {
+		if err != nil {
+			return nil, err
+		}
+		prices = append(prices, p)
+	}
+	return prices, nil
+}
+
+func findProduct(products []*stripe.Product, tierID, productType string) string {
+	for _, p := range products {
+		if p.Metadata[config.StripeMetadataTier] == tierID && p.Metadata[config.StripeMetadataProductType] == productType {
+			return p.ID
+		}
+	}
+	return ""
+}
+
+func findPrice(prices []*stripe.Price, productID, priceType string) string {
+	for _, p := range prices {
+		if p.Product != nil && p.Product.ID == productID && p.Metadata[config.StripeMetadataPriceType] == priceType {
+			return p.ID
+		}
+	}
+	return ""
 }
 
 func (b *Billing) ensureMeter(ctx context.Context) (string, error) {
@@ -39,7 +89,6 @@ func (b *Billing) ensureMeter(ctx context.Context) (string, error) {
 			return meter.ID, nil
 		}
 	}
-
 	return b.createMeter(ctx)
 }
 
@@ -65,20 +114,26 @@ func (b *Billing) createMeter(ctx context.Context) (string, error) {
 	return meter.ID, nil
 }
 
-func (b *Billing) syncTier(ctx context.Context, tier *SubscriptionTier, meterID string) error {
-	productID, err := b.ensureProduct(ctx, tier)
+func (b *Billing) syncTier(ctx context.Context, tier *SubscriptionTier, meterID string, products []*stripe.Product, prices []*stripe.Price) error {
+	baseProductID, err := b.ensureProduct(ctx, tier, config.StripePriceTypeBase, products)
 	if err != nil {
 		return err
 	}
-	tier.ProductID = productID
+	tier.BaseProductID = baseProductID
 
-	basePriceID, err := b.ensureBasePrice(ctx, tier, productID)
+	meteredProductID, err := b.ensureProduct(ctx, tier, config.StripePriceTypeMetered, products)
+	if err != nil {
+		return err
+	}
+	tier.MeteredProductID = meteredProductID
+
+	basePriceID, err := b.ensureBasePrice(ctx, tier, baseProductID, prices)
 	if err != nil {
 		return err
 	}
 	tier.BasePriceID = basePriceID
 
-	meteredPriceID, err := b.ensureMeteredPrice(ctx, tier, productID, meterID)
+	meteredPriceID, err := b.ensureMeteredPrice(ctx, tier, meteredProductID, meterID, prices)
 	if err != nil {
 		return err
 	}
@@ -87,27 +142,21 @@ func (b *Billing) syncTier(ctx context.Context, tier *SubscriptionTier, meterID 
 	return nil
 }
 
-func (b *Billing) ensureProduct(ctx context.Context, tier *SubscriptionTier) (string, error) {
-	params := &stripe.ProductSearchParams{
-		SearchParams: stripe.SearchParams{
-			Query: fmt.Sprintf("metadata['%s']:'%s'", config.StripeMetadataTier, tier.ID),
-		},
+func (b *Billing) ensureProduct(ctx context.Context, tier *SubscriptionTier, productType string, products []*stripe.Product) (string, error) {
+	if id := findProduct(products, tier.ID, productType); id != "" {
+		return id, nil
 	}
-	for product, err := range b.sc.V1Products.Search(ctx, params) {
-		if err != nil {
-			return "", fmt.Errorf("failed to search products: %w", err)
-		}
-		return product.ID, nil
-	}
-
-	return b.createProduct(ctx, tier)
+	return b.createProduct(ctx, tier, productType)
 }
 
-func (b *Billing) createProduct(ctx context.Context, tier *SubscriptionTier) (string, error) {
+func (b *Billing) createProduct(ctx context.Context, tier *SubscriptionTier, productType string) (string, error) {
+	name, description := productNameAndDescription(tier, productType)
 	params := &stripe.ProductCreateParams{
-		Name: stripe.String(fmt.Sprintf("AmpleData %s", tier.DisplayName)),
+		Name:        stripe.String(name),
+		Description: stripe.String(description),
 		Metadata: map[string]string{
-			config.StripeMetadataTier: tier.ID,
+			config.StripeMetadataTier:        tier.ID,
+			config.StripeMetadataProductType: productType,
 		},
 	}
 	product, err := b.sc.V1Products.Create(ctx, params)
@@ -117,21 +166,19 @@ func (b *Billing) createProduct(ctx context.Context, tier *SubscriptionTier) (st
 	return product.ID, nil
 }
 
-func (b *Billing) ensureBasePrice(ctx context.Context, tier *SubscriptionTier, productID string) (string, error) {
-	params := &stripe.PriceSearchParams{
-		SearchParams: stripe.SearchParams{
-			Query: fmt.Sprintf("product:'%s' AND metadata['%s']:'%s'", productID, config.StripeMetadataPriceType, config.StripePriceTypeBase),
-		},
+func productNameAndDescription(tier *SubscriptionTier, productType string) (string, string) {
+	if productType == config.StripePriceTypeBase {
+		return fmt.Sprintf("AmpleData %s", tier.DisplayName),
+			fmt.Sprintf("Includes %d enrichment credits per month", tier.IncludedTokens)
 	}
-	for p, err := range b.sc.V1Prices.Search(ctx, params) {
-		if err != nil {
-			return "", fmt.Errorf("failed to search prices: %w", err)
-		}
-		if p.Active {
-			return p.ID, nil
-		}
-	}
+	return fmt.Sprintf("AmpleData %s — Overage", tier.DisplayName),
+		"Usage-based billing for credits beyond your included allowance"
+}
 
+func (b *Billing) ensureBasePrice(ctx context.Context, tier *SubscriptionTier, productID string, prices []*stripe.Price) (string, error) {
+	if id := findPrice(prices, productID, config.StripePriceTypeBase); id != "" {
+		return id, nil
+	}
 	return b.createBasePrice(ctx, tier, productID)
 }
 
@@ -145,7 +192,7 @@ func (b *Billing) createBasePrice(ctx context.Context, tier *SubscriptionTier, p
 		},
 		Metadata: map[string]string{
 			config.StripeMetadataPriceType: config.StripePriceTypeBase,
-			"ampledata_tier":       tier.ID,
+			config.StripeMetadataTier:      tier.ID,
 		},
 	}
 	price, err := b.sc.V1Prices.Create(ctx, params)
@@ -155,21 +202,10 @@ func (b *Billing) createBasePrice(ctx context.Context, tier *SubscriptionTier, p
 	return price.ID, nil
 }
 
-func (b *Billing) ensureMeteredPrice(ctx context.Context, tier *SubscriptionTier, productID, meterID string) (string, error) {
-	params := &stripe.PriceSearchParams{
-		SearchParams: stripe.SearchParams{
-			Query: fmt.Sprintf("product:'%s' AND metadata['%s']:'%s'", productID, config.StripeMetadataPriceType, config.StripePriceTypeMetered),
-		},
+func (b *Billing) ensureMeteredPrice(ctx context.Context, tier *SubscriptionTier, productID, meterID string, prices []*stripe.Price) (string, error) {
+	if id := findPrice(prices, productID, config.StripePriceTypeMetered); id != "" {
+		return id, nil
 	}
-	for p, err := range b.sc.V1Prices.Search(ctx, params) {
-		if err != nil {
-			return "", fmt.Errorf("failed to search metered prices: %w", err)
-		}
-		if p.Active {
-			return p.ID, nil
-		}
-	}
-
 	return b.createMeteredPrice(ctx, tier, productID, meterID)
 }
 
@@ -190,7 +226,7 @@ func (b *Billing) createMeteredPrice(ctx context.Context, tier *SubscriptionTier
 		},
 		Metadata: map[string]string{
 			config.StripeMetadataPriceType: config.StripePriceTypeMetered,
-			"ampledata_tier":       tier.ID,
+			config.StripeMetadataTier:      tier.ID,
 		},
 	}
 	price, err := b.sc.V1Prices.Create(ctx, params)

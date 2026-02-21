@@ -95,6 +95,14 @@ func (b *Billing) CreateSubscriptionCheckout(ctx context.Context, customerID, ti
 		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		SuccessURL: stripe.String(successURL),
 		CancelURL:  stripe.String(cancelURL),
+		CustomText: &stripe.CheckoutSessionCreateCustomTextParams{
+			AfterSubmit: &stripe.CheckoutSessionCreateCustomTextAfterSubmitParams{
+				Message: stripe.String(fmt.Sprintf(
+					"Your plan includes %d credits/month. Overage is billed at end of cycle.",
+					tier.IncludedTokens,
+				)),
+			},
+		},
 		SubscriptionData: &stripe.CheckoutSessionCreateSubscriptionDataParams{
 			Metadata: map[string]string{
 				config.StripeTierIDKey: tierID,

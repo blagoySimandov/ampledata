@@ -40,11 +40,12 @@ type Config struct {
 }
 
 const (
-	StripeMetadataTier      = "ampledata_tier"
-	StripeMetadataPriceType = "ampledata_price_type"
-	StripePriceTypeBase     = "base"
-	StripePriceTypeMetered  = "metered"
-	StripeTierIDKey         = "tier_id"
+	StripeMetadataTier        = "ampledata_tier"
+	StripeMetadataProductType = "ampledata_product_type"
+	StripeMetadataPriceType   = "ampledata_price_type"
+	StripePriceTypeBase       = "base"
+	StripePriceTypeMetered    = "metered"
+	StripeTierIDKey           = "tier_id"
 )
 
 var cfg Config = Config{
