@@ -16,12 +16,20 @@ type Billing struct {
 	enrichmentCostMeterName string
 	webhookSecret           string
 	userRepo                user.Repository
-	meterID                 string
 }
 
 func NewBilling(userRepo user.Repository) *Billing {
 	cfg := config.Load()
 	sc := stripe.NewClient(cfg.StripeSecretKey)
+
+	// Populate tier price IDs from env vars set by `terraform apply`.
+	Tiers["starter"].BasePriceID = cfg.StarterBasePriceID
+	Tiers["starter"].MeteredPriceID = cfg.StarterMeteredPriceID
+	Tiers["pro"].BasePriceID = cfg.ProBasePriceID
+	Tiers["pro"].MeteredPriceID = cfg.ProMeteredPriceID
+	Tiers["enterprise"].BasePriceID = cfg.EnterpriseBasePriceID
+	Tiers["enterprise"].MeteredPriceID = cfg.EnterpriseMeteredPriceID
+
 	return &Billing{
 		sc:                      sc,
 		enrichmentCostMeterName: cfg.EnrichmentCostMeterName,

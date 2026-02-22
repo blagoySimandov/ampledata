@@ -14,5 +14,4 @@ type BillingService interface {
 	CancelSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error)
 	CreateCreditGrant(ctx context.Context, customerID string, amountCents int64, idempotencyKey string) (*stripe.BillingCreditGrant, error)
 	VerifyWebhookSignature(payload []byte, signature string) (*stripe.Event, error)
-	SyncStripeCatalog(ctx context.Context) error
 }
