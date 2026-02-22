@@ -36,7 +36,15 @@ type Config struct {
 	StripeSecretKey         string
 	StripeWebhookSecret     string
 	EnrichmentCostMeterName string
-	SkipStripeSync          bool
+
+	// Stripe Price IDs – populated by Terraform, set as environment variables.
+	// Run `terraform apply` in terraform/stripe and export the outputs.
+	StarterBasePriceID       string
+	StarterMeteredPriceID    string
+	ProBasePriceID           string
+	ProMeteredPriceID        string
+	EnterpriseBasePriceID    string
+	EnterpriseMeteredPriceID string
 }
 
 const (
@@ -79,7 +87,13 @@ var cfg Config = Config{
 	StripeSecretKey:         getEnv("STRIPE_SECRET", ""),
 	StripeWebhookSecret:     getEnv("STRIPE_WEBHOOK_SECRET", ""),
 	EnrichmentCostMeterName: getEnv("ENRICHMENT_COST_METER_NAME", "enrichment_credits"),
-	SkipStripeSync:          getEnvBool("SKIP_STRIPE_SYNC", false),
+
+	StarterBasePriceID:       getEnv("STRIPE_STARTER_BASE_PRICE_ID", ""),
+	StarterMeteredPriceID:    getEnv("STRIPE_STARTER_METERED_PRICE_ID", ""),
+	ProBasePriceID:           getEnv("STRIPE_PRO_BASE_PRICE_ID", ""),
+	ProMeteredPriceID:        getEnv("STRIPE_PRO_METERED_PRICE_ID", ""),
+	EnterpriseBasePriceID:    getEnv("STRIPE_ENTERPRISE_BASE_PRICE_ID", ""),
+	EnterpriseMeteredPriceID: getEnv("STRIPE_ENTERPRISE_METERED_PRICE_ID", ""),
 }
 
 func Load() *Config {

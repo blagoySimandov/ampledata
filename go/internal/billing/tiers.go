@@ -6,8 +6,6 @@ type SubscriptionTier struct {
 	MonthlyPriceCents        int64
 	IncludedTokens           int64
 	OveragePriceCentsDecimal string
-	BaseProductID            string
-	MeteredProductID         string
 	BasePriceID              string
 	MeteredPriceID           string
 }
