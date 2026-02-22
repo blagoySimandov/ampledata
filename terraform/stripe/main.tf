@@ -1,6 +1,3 @@
-# ─────────────────────────────────────────────
-# Billing Meter
-# ─────────────────────────────────────────────
 # NOTE: stripe_billing_meter support depends on your provider version.
 # If "stripe_billing_meter" is not yet available in lukasaron/stripe,
 # create the meter once via the Stripe CLI:
@@ -15,7 +12,7 @@
 #
 # Then import it: terraform import stripe_billing_meter.enrichment_credits <meter_id>
 
-resource "stripe_billing_meter" "enrichment_credits" {
+resource "stripe_meter" "enrichment_credits" {
   display_name = "Enrichment Credits"
   event_name   = var.enrichment_meter_event_name
 
@@ -62,7 +59,8 @@ resource "stripe_price" "starter_base" {
   unit_amount = 2900
 
   recurring {
-    interval = "month"
+    interval       = "month"
+    interval_count = 1
   }
 
   metadata = {
@@ -77,9 +75,10 @@ resource "stripe_price" "starter_metered" {
   unit_amount_decimal = "2.5"
 
   recurring {
-    interval   = "month"
-    usage_type = "metered"
-    meter      = stripe_billing_meter.enrichment_credits.id
+    interval       = "month"
+    interval_count = 1
+    usage_type     = "metered"
+    meter          = stripe_meter.enrichment_credits.id
   }
 
   metadata = {
@@ -117,7 +116,8 @@ resource "stripe_price" "pro_base" {
   unit_amount = 9900
 
   recurring {
-    interval = "month"
+    interval       = "month"
+    interval_count = 1
   }
 
   metadata = {
@@ -132,9 +132,10 @@ resource "stripe_price" "pro_metered" {
   unit_amount_decimal = "1.8"
 
   recurring {
-    interval   = "month"
-    usage_type = "metered"
-    meter      = stripe_billing_meter.enrichment_credits.id
+    interval       = "month"
+    interval_count = 1
+    usage_type     = "metered"
+    meter          = stripe_meter.enrichment_credits.id
   }
 
   metadata = {
@@ -172,7 +173,8 @@ resource "stripe_price" "enterprise_base" {
   unit_amount = 29900
 
   recurring {
-    interval = "month"
+    interval       = "month"
+    interval_count = 1
   }
 
   metadata = {
@@ -187,9 +189,10 @@ resource "stripe_price" "enterprise_metered" {
   unit_amount_decimal = "1"
 
   recurring {
-    interval   = "month"
-    usage_type = "metered"
-    meter      = stripe_billing_meter.enrichment_credits.id
+    interval       = "month"
+    interval_count = 1
+    usage_type     = "metered"
+    meter          = stripe_meter.enrichment_credits.id
   }
 
   metadata = {

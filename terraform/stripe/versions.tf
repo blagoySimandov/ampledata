@@ -1,10 +1,10 @@
 terraform {
-  required_version = ">= 1.0"
+  required_version = "~>1.10.3"
 
   required_providers {
     stripe = {
       source  = "lukasaron/stripe"
-      version = "~> 1.10"
+      version = "3.4.1"
     }
   }
 }

@@ -1,6 +1,6 @@
 output "enrichment_meter_id" {
   description = "ID of the enrichment credits billing meter"
-  value       = stripe_billing_meter.enrichment_credits.id
+  value       = stripe_meter.enrichment_credits.id
 }
 
 # Starter
