@@ -156,3 +156,66 @@ func (r *CSVReader) ReadCompositeKeyFromFile(ctx context.Context, objectName str
 	}
 	return r.ExtractCompositeKey(result, columnNames)
 }
+
+func (r *CSVReader) ReadCompositeKeyFromFileFiltered(ctx context.Context, objectName string, keyColumns []string, filterColumns []string) ([]string, error) {
+	result, err := r.ReadCSV(ctx, objectName)
+	if err != nil {
+		return nil, err
+	}
+	return ExtractCompositeKeyFiltered(result, keyColumns, filterColumns)
+}
+
+func ExtractCompositeKeyFiltered(result *CSVResult, keyColumns []string, filterColumns []string) ([]string, error) {
+	keyIndices, err := findColumnIndices(result.Headers, keyColumns)
+	if err != nil {
+		return nil, err
+	}
+
+	filterIndices, err := findColumnIndices(result.Headers, filterColumns)
+	if err != nil {
+		return nil, err
+	}
+
+	values := make([]string, 0, len(result.Rows))
+	for _, row := range result.Rows {
+		if !hasAnyEmptyColumn(row, filterIndices) {
+			continue
+		}
+		keyParts := make([]string, len(keyIndices))
+		for i, idx := range keyIndices {
+			if idx < len(row) {
+				keyParts[i] = row[idx]
+			}
+		}
+		values = append(values, joinKeyParts(keyParts))
+	}
+
+	return values, nil
+}
+
+func findColumnIndices(headers []string, columnNames []string) ([]int, error) {
+	indices := make([]int, len(columnNames))
+	for i, name := range columnNames {
+		idx := -1
+		for j, header := range headers {
+			if header == name {
+				idx = j
+				break
+			}
+		}
+		if idx == -1 {
+			return nil, fmt.Errorf("column '%s' not found in CSV headers: %v", name, headers)
+		}
+		indices[i] = idx
+	}
+	return indices, nil
+}
+
+func hasAnyEmptyColumn(row []string, indices []int) bool {
+	for _, idx := range indices {
+		if idx >= len(row) || row[idx] == "" {
+			return true
+		}
+	}
+	return false
+}
