@@ -19,7 +19,6 @@ type PaginatedRows struct {
 }
 
 type Store interface {
-	CreateJob(ctx context.Context, jobID string, totalRows int, status models.JobStatus) error
 	CreatePendingJob(ctx context.Context, jobID, userID, filePath string) error
 	GetJob(ctx context.Context, jobID string) (*models.Job, error)
 	UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, entityType *string) error
