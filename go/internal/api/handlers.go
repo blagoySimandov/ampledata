@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
-	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -193,7 +192,7 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rowKeys, err := h.gcsReader.ReadCompositeKeyFromFile(r.Context(), job.FilePath, req.KeyColumns)
+	rowKeys, err := h.readRowKeys(r.Context(), job.FilePath, req.KeyColumns, req.ColumnsMetadata)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to read CSV file: %v", err), http.StatusBadRequest)
 		return
@@ -205,20 +204,6 @@ func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
 	}
 	if dbUser.SubscriptionTier == nil {
 		http.Error(w, "Active subscription required", http.StatusPaymentRequired)
-		return
-	}
-
-	cfg := config.Load()
-	totalCells := len(rowKeys) * len(req.ColumnsMetadata)
-	requiredCredits := int64(totalCells * cfg.CreditsPerCell)
-	availableCredits, err := h.userRepo.GetAvailableCredits(r.Context(), dbUser.ID)
-	if err != nil {
-		log.Printf("Failed to get available credits: %v", err)
-		http.Error(w, "Failed to check credit balance", http.StatusInternalServerError)
-		return
-	}
-	if availableCredits < requiredCredits {
-		http.Error(w, fmt.Sprintf("Insufficient credits. Required: %d, Available: %d", requiredCredits, availableCredits), http.StatusPaymentRequired)
 		return
 	}
 
@@ -339,4 +324,22 @@ func (h *EnrichHandler) GetRowsProgress(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func (h *EnrichHandler) readRowKeys(ctx context.Context, filePath string, keyColumns []string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
+	imputationCols := imputationColumnNames(columnsMetadata)
+	if len(imputationCols) > 0 {
+		return h.gcsReader.ReadCompositeKeyFromFileFiltered(ctx, filePath, keyColumns, imputationCols)
+	}
+	return h.gcsReader.ReadCompositeKeyFromFile(ctx, filePath, keyColumns)
+}
+
+func imputationColumnNames(cols []*models.ColumnMetadata) []string {
+	var names []string
+	for _, col := range cols {
+		if col.JobType == models.JobTypeImputation {
+			names = append(names, col.Name)
+		}
+	}
+	return names
 }

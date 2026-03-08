@@ -21,7 +21,7 @@ func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandl
 	authenticated.Use(auth.Middleware(jwtVerifier))
 	authenticated.Use(user.UserMiddleware(userService))
 
-	authenticated.HandleFunc("/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST", "OPTIONS")
+	authenticated.HandleFunc("/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST", "OPTIONS") // Creates a pending enrichment job
 	authenticated.HandleFunc("/jobs", enrHandler.ListJobs).Methods("GET", "OPTIONS")
 	authenticated.HandleFunc("/jobs/{jobID}/start", enrHandler.StartJob).Methods("POST", "OPTIONS")
 	authenticated.HandleFunc("/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST", "OPTIONS")
