@@ -13,3 +13,4 @@ terraform/stripe/terraform.tfvars
 .terraform
 terraform/stripe/terraform.tfstate
 terraform/stripe/terraform.tfstate.backup
+CLAUDE.md
