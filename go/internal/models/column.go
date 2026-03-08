@@ -2,7 +2,6 @@ package models
 
 type (
 	ColumnType string
-	JobType    string
 )
 
 const (
@@ -12,14 +11,8 @@ const (
 	ColumnTypeDate    ColumnType = "date"
 )
 
-const (
-	JobTypeEnrichment JobType = "enrichment"
-	JobTypeImputation JobType = "imputation"
-)
-
 type ColumnMetadata struct {
 	Name        string     `json:"name"`
 	Type        ColumnType `json:"type"`
-	JobType     JobType    `json:"job_type,omitempty"`
 	Description *string    `json:"description,omitempty"`
 }
