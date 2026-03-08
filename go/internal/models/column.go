@@ -20,6 +20,6 @@ const (
 type ColumnMetadata struct {
 	Name        string     `json:"name"`
 	Type        ColumnType `json:"type"`
-	JobType     *string    `json:"job_type,omitempty"`
+	JobType     JobType    `json:"job_type,omitempty"`
 	Description *string    `json:"description,omitempty"`
 }
