@@ -80,7 +80,7 @@ components:
 
     JobSummary:
       type: object
-      required: [job_id, status, total_rows, file_path, created_at]
+      required: [job_id, status, total_rows, source_id, created_at]
       properties:
         job_id:
           type: string
@@ -88,8 +88,9 @@ components:
           $ref: "#/components/schemas/JobStatus"
         total_rows:
           type: integer
-        file_path:
+        source_id:
           type: string
+          format: uuid
         created_at:
           type: string
           format: date-time

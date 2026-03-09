@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 )
 
@@ -26,9 +27,42 @@ func NewPostgresStore(db *bun.DB) (*PostgresStore, error) {
 }
 
 func (s *PostgresStore) InitializeDatabase(ctx context.Context) error {
+	if err := s.createEnumTypes(ctx); err != nil {
+		return err
+	}
+	if err := s.createTables(ctx); err != nil {
+		return err
+	}
+	return s.createIndexes(ctx)
+}
+
+func (s *PostgresStore) createEnumTypes(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `
+		DO $$ BEGIN
+			CREATE TYPE source_type AS ENUM ('csv_upload');
+		EXCEPTION WHEN duplicate_object THEN null;
+		END $$;
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create enum types: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) createTables(ctx context.Context) error {
 	_, err := s.db.NewCreateTable().
+		Model((*models.SourceDB)(nil)).
+		IfNotExists().
+		ForeignKey(`("user_id") REFERENCES "users" ("id")`).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create sources table: %w", err)
+	}
+
+	_, err = s.db.NewCreateTable().
 		Model((*models.JobDB)(nil)).
 		IfNotExists().
+		ForeignKey(`("source_id") REFERENCES "sources" ("id")`).
 		Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create jobs table: %w", err)
@@ -43,54 +77,33 @@ func (s *PostgresStore) InitializeDatabase(ctx context.Context) error {
 		return fmt.Errorf("failed to create row_states table: %w", err)
 	}
 
-	_, err = s.db.NewCreateIndex().
-		Model((*models.RowStateDB)(nil)).
-		Index("idx_row_states_job_id").
-		Column("job_id").
-		IfNotExists().
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create job_id index: %w", err)
+	return nil
+}
+
+func (s *PostgresStore) createIndexes(ctx context.Context) error {
+	indexes := []struct {
+		model  any
+		name   string
+		column []string
+	}{
+		{(*models.SourceDB)(nil), "idx_sources_user_id", []string{"user_id"}},
+		{(*models.JobDB)(nil), "idx_jobs_user_id", []string{"user_id"}},
+		{(*models.JobDB)(nil), "idx_jobs_status", []string{"status"}},
+		{(*models.RowStateDB)(nil), "idx_row_states_job_id", []string{"job_id"}},
+		{(*models.RowStateDB)(nil), "idx_row_states_stage", []string{"job_id", "stage"}},
+		{(*models.RowStateDB)(nil), "idx_row_states_updated_at", []string{"updated_at"}},
 	}
 
-	_, err = s.db.NewCreateIndex().
-		Model((*models.RowStateDB)(nil)).
-		Index("idx_row_states_stage").
-		Column("job_id", "stage").
-		IfNotExists().
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create stage index: %w", err)
-	}
-
-	_, err = s.db.NewCreateIndex().
-		Model((*models.RowStateDB)(nil)).
-		Index("idx_row_states_updated_at").
-		Column("updated_at").
-		IfNotExists().
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create updated_at index: %w", err)
-	}
-
-	_, err = s.db.NewCreateIndex().
-		Model((*models.JobDB)(nil)).
-		Index("idx_jobs_user_id").
-		Column("user_id").
-		IfNotExists().
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create user_id index: %w", err)
-	}
-
-	_, err = s.db.NewCreateIndex().
-		Model((*models.JobDB)(nil)).
-		Index("idx_jobs_status").
-		Column("status").
-		IfNotExists().
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create status index: %w", err)
+	for _, idx := range indexes {
+		_, err := s.db.NewCreateIndex().
+			Model(idx.model).
+			Index(idx.name).
+			Column(idx.column...).
+			IfNotExists().
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to create index %s: %w", idx.name, err)
+		}
 	}
 
 	return nil
@@ -117,21 +130,27 @@ func (s *PostgresStore) CreateJob(ctx context.Context, jobID string, totalRows i
 	return nil
 }
 
-func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID, filePath string) error {
+func (s *PostgresStore) CreateSource(ctx context.Context, source *models.SourceDB) error {
+	_, err := s.db.NewInsert().Model(source).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create source: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID string, sourceID uuid.UUID) error {
 	now := time.Now()
 	job := &models.JobDB{
 		JobID:     jobID,
 		UserID:    userID,
-		FilePath:  filePath,
+		SourceID:  sourceID,
 		TotalRows: 0,
 		Status:    models.JobStatusPending,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
-	_, err := s.db.NewInsert().
-		Model(job).
-		Exec(ctx)
+	_, err := s.db.NewInsert().Model(job).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create pending job: %w", err)
 	}
@@ -142,12 +161,13 @@ func (s *PostgresStore) GetJob(ctx context.Context, jobID string) (*models.Job, 
 	var jobDB models.JobDB
 	err := s.db.NewSelect().
 		Model(&jobDB).
-		Where("job_id = ?", jobID).
+		Relation("Source").
+		Where("j.job_id = ?", jobID).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get job: %w", err)
 	}
-	return jobDB.ToJob(), nil
+	return jobDB.ToJob()
 }
 
 func (s *PostgresStore) UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error {
@@ -186,8 +206,9 @@ func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset
 	var jobsDB []*models.JobDB
 	query := s.db.NewSelect().
 		Model(&jobsDB).
-		Where("user_id = ?", userID).
-		Order("created_at DESC")
+		Relation("Source").
+		Where("j.user_id = ?", userID).
+		Order("j.created_at DESC")
 
 	if offset > 0 {
 		query = query.Offset(offset)
@@ -203,7 +224,11 @@ func (s *PostgresStore) GetJobsByUser(ctx context.Context, userID string, offset
 
 	jobs := make([]*models.Job, len(jobsDB))
 	for i, jobDB := range jobsDB {
-		jobs[i] = jobDB.ToJob()
+		job, err := jobDB.ToJob()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert job: %w", err)
+		}
+		jobs[i] = job
 	}
 	return jobs, nil
 }

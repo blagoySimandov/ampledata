@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type RowStage string
@@ -28,17 +30,18 @@ const (
 )
 
 type Job struct {
-	JobID           string            `json:"job_id"`
-	UserID          string            `json:"user_id"`
-	FilePath        string            `json:"file_path"`
-	KeyColumns      []string          `json:"key_columns"`
-	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
+	JobID                string            `json:"job_id"`
+	UserID               string            `json:"user_id"`
+	SourceID             uuid.UUID         `json:"source_id"`
+	Source               *Source           `json:"source,omitempty"`
+	KeyColumns           []string          `json:"key_columns"`
+	ColumnsMetadata      []*ColumnMetadata `json:"columns_metadata"`
 	KeyColumnDescription *string           `json:"key_column_description"`
-	TotalRows       int               `json:"total_rows"`
-	StartedAt       *time.Time        `json:"started_at"`
-	Status          JobStatus         `json:"status"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	TotalRows            int               `json:"total_rows"`
+	StartedAt            *time.Time        `json:"started_at"`
+	Status               JobStatus         `json:"status"`
+	CreatedAt            time.Time         `json:"created_at"`
+	UpdatedAt            time.Time         `json:"updated_at"`
 }
 
 type SerpData struct {

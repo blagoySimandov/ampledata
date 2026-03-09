@@ -19,7 +19,11 @@ func (s *Server) SelectKey(ctx context.Context, req SelectKeyRequestObject) (Sel
 	if job.UserID != u.ID {
 		return SelectKey403JSONResponse{Message: "Forbidden: You do not own this job"}, nil
 	}
-	return s.selectKeyForJob(ctx, job.FilePath, req.Body.ColumnsMetadata)
+	csvMeta, ok := sourceCSVMeta(job)
+	if !ok {
+		return SelectKey500JSONResponse{Message: "Job source not found"}, nil
+	}
+	return s.selectKeyForJob(ctx, csvMeta.FileURI, req.Body.ColumnsMetadata)
 }
 
 func (s *Server) selectKeyForJob(ctx context.Context, filePath string, meta *[]ColumnMetadata) (SelectKeyResponseObject, error) {

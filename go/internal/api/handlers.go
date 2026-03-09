@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"mime"
 	"slices"
+	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -34,7 +36,12 @@ func (s *Server) createJobWithSignedURL(ctx context.Context, userID, contentType
 		extension = ext[0]
 	}
 	jobID := generateJobId(extension)
-	if err := s.store.CreatePendingJob(ctx, jobID, userID, jobID); err != nil {
+	source, err := s.createCSVSource(ctx, userID, jobID, contentType)
+	if err != nil {
+		log.Printf("Failed to create source: %v", err)
+		return UploadFileForEnrichment500JSONResponse{Message: "Failed to create source"}, nil
+	}
+	if err := s.store.CreatePendingJob(ctx, jobID, userID, source.ID); err != nil {
 		log.Printf("Failed to create pending job: %v", err)
 		return UploadFileForEnrichment500JSONResponse{Message: "Failed to create job"}, nil
 	}
@@ -43,6 +50,25 @@ func (s *Server) createJobWithSignedURL(ctx context.Context, userID, contentType
 		return UploadFileForEnrichment500JSONResponse{Message: err.Error()}, nil
 	}
 	return UploadFileForEnrichment200JSONResponse{Url: url, JobId: jobID}, nil
+}
+
+func (s *Server) createCSVSource(ctx context.Context, userID, fileURI, contentType string) (*models.SourceDB, error) {
+	metaJSON, err := json.Marshal(&models.CSVSourceMetadata{FileURI: fileURI, ContentType: contentType})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+	now := time.Now()
+	source := &models.SourceDB{
+		UserID:    userID,
+		Type:      models.SourceTypeCSVUpload,
+		Metadata:  json.RawMessage(metaJSON),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.store.CreateSource(ctx, source); err != nil {
+		return nil, err
+	}
+	return source, nil
 }
 
 func (s *Server) ListJobs(ctx context.Context, req ListJobsRequestObject) (ListJobsResponseObject, error) {
@@ -103,8 +129,12 @@ func (s *Server) executeStartJob(ctx context.Context, job *models.Job, dbUser *m
 	if dbUser.SubscriptionTier == nil {
 		return StartJob402JSONResponse{Message: "Active subscription required"}, nil
 	}
+	csvMeta, ok := sourceCSVMeta(job)
+	if !ok {
+		return StartJob500JSONResponse{Message: "Job source not found"}, nil
+	}
 	cols := toModelColumnMetadataSlice(body.ColumnsMetadata)
-	rowKeys, err := s.readRowKeys(ctx, job.FilePath, body.KeyColumns, cols)
+	rowKeys, err := s.readRowKeys(ctx, csvMeta.FileURI, body.KeyColumns, cols)
 	if err != nil {
 		return StartJob400JSONResponse{Message: fmt.Sprintf("Failed to read CSV file: %v", err)}, nil
 	}
@@ -232,6 +262,14 @@ func imputationColumnNames(cols []*models.ColumnMetadata) []string {
 		}
 	}
 	return names
+}
+
+func sourceCSVMeta(job *models.Job) (*models.CSVSourceMetadata, bool) {
+	if job.Source == nil {
+		return nil, false
+	}
+	meta, ok := job.Source.Metadata.(*models.CSVSourceMetadata)
+	return meta, ok
 }
 
 func stripeCustomerIDOrEmpty(u *models.User) string {

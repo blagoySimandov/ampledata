@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,50 +11,59 @@ import (
 type JobDB struct {
 	bun.BaseModel `bun:"table:jobs,alias:j"`
 
-	JobID           string            `bun:"job_id,pk" json:"job_id"`
-	UserID          string            `bun:"user_id,notnull" json:"user_id"`
-	FilePath        string            `bun:"file_path" json:"file_path"`
-	KeyColumns      []string          `bun:"key_columns,type:jsonb" json:"key_columns"`
-	ColumnsMetadata []*ColumnMetadata `bun:"columns_metadata,type:jsonb" json:"columns_metadata"`
+	JobID                string            `bun:"job_id,pk" json:"job_id"`
+	UserID               string            `bun:"user_id,notnull" json:"user_id"`
+	SourceID             uuid.UUID         `bun:"source_id,type:uuid" json:"source_id"`
+	Source               *SourceDB         `bun:"rel:belongs-to,join:source_id=id"`
+	KeyColumns           []string          `bun:"key_columns,type:jsonb" json:"key_columns"`
+	ColumnsMetadata      []*ColumnMetadata `bun:"columns_metadata,type:jsonb" json:"columns_metadata"`
 	KeyColumnDescription *string           `bun:"entity_type" json:"key_column_description"`
-	TotalRows       int               `bun:"total_rows,notnull" json:"total_rows"`
-	StartedAt       *time.Time        `bun:"started_at" json:"started_at"`
-	Status          JobStatus         `bun:"status,notnull,default:'PENDING'" json:"status"`
-	CostDollars     int               `bun:"cost_dollars,notnull,default:0" json:"cost_dollars"`
-	CostCredits     int               `bun:"cost_credits,notnull,default:0" json:"cost_credits"`
-	CreatedAt       time.Time         `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt       time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+	TotalRows            int               `bun:"total_rows,notnull" json:"total_rows"`
+	StartedAt            *time.Time        `bun:"started_at" json:"started_at"`
+	Status               JobStatus         `bun:"status,notnull,default:'PENDING'" json:"status"`
+	CostDollars          int               `bun:"cost_dollars,notnull,default:0" json:"cost_dollars"`
+	CostCredits          int               `bun:"cost_credits,notnull,default:0" json:"cost_credits"`
+	CreatedAt            time.Time         `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt            time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
-func (j *JobDB) ToJob() *Job {
-	return &Job{
-		JobID:           j.JobID,
-		UserID:          j.UserID,
-		FilePath:        j.FilePath,
-		KeyColumns:      j.KeyColumns,
-		ColumnsMetadata: j.ColumnsMetadata,
-		KeyColumnDescription:      j.KeyColumnDescription,
-		TotalRows:       j.TotalRows,
-		StartedAt:       j.StartedAt,
-		Status:          j.Status,
-		CreatedAt:       j.CreatedAt,
-		UpdatedAt:       j.UpdatedAt,
+func (j *JobDB) ToJob() (*Job, error) {
+	job := &Job{
+		JobID:                j.JobID,
+		UserID:               j.UserID,
+		SourceID:             j.SourceID,
+		KeyColumns:           j.KeyColumns,
+		ColumnsMetadata:      j.ColumnsMetadata,
+		KeyColumnDescription: j.KeyColumnDescription,
+		TotalRows:            j.TotalRows,
+		StartedAt:            j.StartedAt,
+		Status:               j.Status,
+		CreatedAt:            j.CreatedAt,
+		UpdatedAt:            j.UpdatedAt,
 	}
+	if j.Source != nil {
+		source, err := j.Source.ToSource()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert source: %w", err)
+		}
+		job.Source = source
+	}
+	return job, nil
 }
 
 func JobFromDomain(job *Job) *JobDB {
 	return &JobDB{
-		JobID:           job.JobID,
-		UserID:          job.UserID,
-		FilePath:        job.FilePath,
-		KeyColumns:      job.KeyColumns,
-		ColumnsMetadata: job.ColumnsMetadata,
-		KeyColumnDescription:      job.KeyColumnDescription,
-		TotalRows:       job.TotalRows,
-		StartedAt:       job.StartedAt,
-		Status:          job.Status,
-		CreatedAt:       job.CreatedAt,
-		UpdatedAt:       job.UpdatedAt,
+		JobID:                job.JobID,
+		UserID:               job.UserID,
+		SourceID:             job.SourceID,
+		KeyColumns:           job.KeyColumns,
+		ColumnsMetadata:      job.ColumnsMetadata,
+		KeyColumnDescription: job.KeyColumnDescription,
+		TotalRows:            job.TotalRows,
+		StartedAt:            job.StartedAt,
+		Status:               job.Status,
+		CreatedAt:            job.CreatedAt,
+		UpdatedAt:            job.UpdatedAt,
 	}
 }
 

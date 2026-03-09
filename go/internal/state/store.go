@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/google/uuid"
 )
 
 type RowsQueryParams struct {
@@ -19,7 +20,8 @@ type PaginatedRows struct {
 }
 
 type Store interface {
-	CreatePendingJob(ctx context.Context, jobID, userID, filePath string) error
+	CreateSource(ctx context.Context, source *models.SourceDB) error
+	CreatePendingJob(ctx context.Context, jobID, userID string, sourceID uuid.UUID) error
 	GetJob(ctx context.Context, jobID string) (*models.Job, error)
 	UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error
 	StartJob(ctx context.Context, jobID string, totalRows int) error

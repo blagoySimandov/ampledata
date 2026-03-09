@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type EnrichmentRequest struct {
 	RowKeys              []string          `json:"row_keys"`
@@ -23,7 +27,7 @@ type JobSummary struct {
 	JobID     string     `json:"job_id"`
 	Status    JobStatus  `json:"status"`
 	TotalRows int        `json:"total_rows"`
-	FilePath  string     `json:"file_path"`
+	SourceID  uuid.UUID  `json:"source_id"`
 	CreatedAt time.Time  `json:"created_at"`
 	StartedAt *time.Time `json:"started_at,omitempty"`
 }
@@ -59,7 +63,7 @@ func ToJobSummary(job *Job) *JobSummary {
 		JobID:     job.JobID,
 		Status:    job.Status,
 		TotalRows: job.TotalRows,
-		FilePath:  job.FilePath,
+		SourceID:  job.SourceID,
 		CreatedAt: job.CreatedAt,
 		StartedAt: job.StartedAt,
 	}

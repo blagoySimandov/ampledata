@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 func toModelColumnMetadataSlice(cols []ColumnMetadata) []*models.ColumnMetadata {
@@ -31,7 +32,7 @@ func toAPIJobSummary(j *models.JobSummary) JobSummary {
 		JobId:     j.JobID,
 		Status:    JobStatus(j.Status),
 		TotalRows: j.TotalRows,
-		FilePath:  j.FilePath,
+		SourceId:  openapi_types.UUID(j.SourceID),
 		CreatedAt: j.CreatedAt,
 		StartedAt: j.StartedAt,
 	}
