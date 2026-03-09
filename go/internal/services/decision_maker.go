@@ -23,7 +23,7 @@ type CrawlDecision struct {
 }
 
 type DecisionMaker interface {
-	MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, entityType string) (*CrawlDecision, error)
+	MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error)
 }
 
 type GroqDecisionMaker struct {
@@ -42,8 +42,8 @@ func NewGroqDecisionMaker(apiKey string) *GroqDecisionMaker {
 	}
 }
 
-func (g *GroqDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, entityType string) (*CrawlDecision, error) {
-	prompt := g.buildPrompt(serp, rowKey, maxURLs, columnsMetadata, entityType)
+func (g *GroqDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error) {
+	prompt := g.buildPrompt(serp, rowKey, maxURLs, columnsMetadata, keyColumnDescription)
 
 	reqBody := map[string]interface{}{
 		"model": g.model,
@@ -98,7 +98,7 @@ func (g *GroqDecisionMaker) MakeDecision(ctx context.Context, serp *models.Googl
 	return g.parseResponse(groqResp.Choices[0].Message.Content, serp, columnsMetadata)
 }
 
-func (g *GroqDecisionMaker) buildPrompt(serp *models.GoogleSearchResults, entity string, maxURLs int, columnsMetadata []*models.ColumnMetadata, entityType string) string {
+func (g *GroqDecisionMaker) buildPrompt(serp *models.GoogleSearchResults, entity string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) string {
 	var columnsInfo []string
 	for _, col := range columnsMetadata {
 		desc := ""
@@ -141,11 +141,12 @@ func (g *GroqDecisionMaker) buildPrompt(serp *models.GoogleSearchResults, entity
 		peopleAlsoAsk += fmt.Sprintf("Q: %s A: %s\n", item.Question, item.Snippet)
 	}
 
-	return fmt.Sprintf(`You are a data extraction assistant. Analyze these search results for the %s "%s" and decide how to proceed.
+	entityContext := formatEntityContext(entity, keyColumnDescription)
+	return fmt.Sprintf(`You are a data extraction assistant. Analyze these search results for the entity %s and decide how to proceed.
 
 ## CRITICAL: Entity Extraction Rules
 
-You are analyzing results for TARGET ENTITY: %s "%s"
+You are analyzing results for TARGET ENTITY: %s
 
 ALL extracted data must be about THIS SPECIFIC ENTITY - not about related or mentioned entities.
 
@@ -165,7 +166,7 @@ When search results contain information about MULTIPLE entities:
 
 ## Your Task
 
-1. Extract data from snippets that is about "%s" (%s):
+1. Extract data from snippets that is about %s:
    - CRITICAL: Verify each piece of data is about the TARGET ENTITY, not related entities
    - IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata
    - For number types: use numeric values without quotes (e.g., 1000, 228000)
@@ -188,14 +189,14 @@ When search results contain information about MULTIPLE entities:
    ⚠️  CRITICAL:
      - If you cannot extract a column's data from snippets BUT the search results contain relevant URLs, YOU MUST SELECT URLs TO CRAWL
      - Do NOT return empty urls_to_crawl when relevant URLs exist in the results
-     - Verify URL titles and snippets are about "%s" (%s), not related entities
+     - Verify URL titles and snippets are about %s, not related entities
      - Skip URLs that focus on different entities, even if they mention the target
 
 ## Entity Consistency Check
 
 Before responding:
-1. Review ALL extracted data - does it ALL refer to the same entity ("%s")?
-2. Review ALL selected URLs - are they primarily about "%s" (%s)?
+1. Review ALL extracted data - does it ALL refer to the same entity %s?
+2. Review ALL selected URLs - are they primarily about %s?
 3. If you find mixed entity data, extract ONLY the data about the target entity
 4. In your reasoning, note any entity ambiguity you encountered
 
@@ -221,7 +222,7 @@ Example 3 - Mixed scenario:
     "urls_to_crawl": ["url1", "url2"] or [],
     "extracted_data": {"column_name": value_with_correct_type} or null,
     "reasoning": "Explanation of what was extracted, what needs crawling, and any entity disambiguation performed"
-}`, entityType, entity, entityType, entity, entity, columnsText, organicResults, peopleAlsoAsk, entity, entityType, maxURLs, entity, entity, entityType, entity, entity, entityType)
+}`, entityContext, entityContext, entity, columnsText, organicResults, peopleAlsoAsk, entityContext, maxURLs, entity, entityContext, entityContext, entityContext)
 }
 
 func (g *GroqDecisionMaker) parseResponse(content string, serp *models.GoogleSearchResults, columnsMetadata []*models.ColumnMetadata) (*CrawlDecision, error) {
@@ -289,8 +290,8 @@ func NewGeminiDecisionMaker(apiKey string) (*GeminiDecisionMaker, error) {
 	}, nil
 }
 
-func (g *GeminiDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, entityType string) (*CrawlDecision, error) {
-	prompt := g.buildPrompt(serp, rowKey, maxURLs, columnsMetadata, entityType)
+func (g *GeminiDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error) {
+	prompt := g.buildPrompt(serp, rowKey, maxURLs, columnsMetadata, keyColumnDescription)
 
 	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
 	if err != nil {
@@ -300,7 +301,7 @@ func (g *GeminiDecisionMaker) MakeDecision(ctx context.Context, serp *models.Goo
 	return g.parseResponse(result.Text(), serp, columnsMetadata)
 }
 
-func (g *GeminiDecisionMaker) buildPrompt(serp *models.GoogleSearchResults, entity string, maxURLs int, columnsMetadata []*models.ColumnMetadata, entityType string) string {
+func (g *GeminiDecisionMaker) buildPrompt(serp *models.GoogleSearchResults, entity string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) string {
 	var columnsInfo []string
 	for _, col := range columnsMetadata {
 		desc := ""
@@ -343,11 +344,12 @@ func (g *GeminiDecisionMaker) buildPrompt(serp *models.GoogleSearchResults, enti
 		peopleAlsoAsk += fmt.Sprintf("Q: %s A: %s\n", item.Question, item.Snippet)
 	}
 
-	return fmt.Sprintf(`You are a data extraction assistant. Analyze these search results for the %s "%s" and decide how to proceed.
+	entityContext := formatEntityContext(entity, keyColumnDescription)
+	return fmt.Sprintf(`You are a data extraction assistant. Analyze these search results for the entity %s and decide how to proceed.
 
 ## CRITICAL: Entity Extraction Rules
 
-You are analyzing results for TARGET ENTITY: %s "%s"
+You are analyzing results for TARGET ENTITY: %s
 
 ALL extracted data must be about THIS SPECIFIC ENTITY - not about related or mentioned entities.
 
@@ -367,7 +369,7 @@ When search results contain information about MULTIPLE entities:
 
 ## Your Task
 
-1. Extract data from snippets that is about "%s" (%s):
+1. Extract data from snippets that is about %s:
    - CRITICAL: Verify each piece of data is about the TARGET ENTITY, not related entities
    - IMPORTANT: Extract each value in the CORRECT DATA TYPE as specified in the column metadata
    - For number types: use numeric values without quotes (e.g., 1000, 228000)
@@ -390,14 +392,14 @@ When search results contain information about MULTIPLE entities:
    ⚠️  CRITICAL:
      - If you cannot extract a column's data from snippets BUT the search results contain relevant URLs, YOU MUST SELECT URLs TO CRAWL
      - Do NOT return empty urls_to_crawl when relevant URLs exist in the results
-     - Verify URL titles and snippets are about "%s" (%s), not related entities
+     - Verify URL titles and snippets are about %s, not related entities
      - Skip URLs that focus on different entities, even if they mention the target
 
 ## Entity Consistency Check
 
 Before responding:
-1. Review ALL extracted data - does it ALL refer to the same entity ("%s")?
-2. Review ALL selected URLs - are they primarily about "%s" (%s)?
+1. Review ALL extracted data - does it ALL refer to the same entity %s?
+2. Review ALL selected URLs - are they primarily about %s?
 3. If you find mixed entity data, extract ONLY the data about the target entity
 4. In your reasoning, note any entity ambiguity you encountered
 
@@ -423,7 +425,7 @@ Example 3 - Mixed scenario:
     "urls_to_crawl": ["url1", "url2"] or [],
     "extracted_data": {"column_name": value_with_correct_type} or null,
     "reasoning": "Explanation of what was extracted, what needs crawling, and any entity disambiguation performed"
-}`, entityType, entity, entityType, entity, entity, columnsText, organicResults, peopleAlsoAsk, entity, entityType, maxURLs, entity, entity, entityType, entity, entity, entityType)
+}`, entityContext, entityContext, entity, columnsText, organicResults, peopleAlsoAsk, entityContext, maxURLs, entity, entityContext, entityContext, entityContext)
 }
 
 func (g *GeminiDecisionMaker) parseResponse(content string, serp *models.GoogleSearchResults, columnsMetadata []*models.ColumnMetadata) (*CrawlDecision, error) {

@@ -72,7 +72,7 @@ type DecisionInput struct {
 	RowKey          string
 	SerpData        *models.SerpData
 	ColumnsMetadata []*models.ColumnMetadata
-	EntityType      string
+	KeyColumnDescription      string
 }
 
 type DecisionOutput struct {
@@ -97,7 +97,7 @@ type ExtractInput struct {
 	Decision        *models.Decision
 	CrawlResults    *models.CrawlResults
 	ColumnsMetadata []*models.ColumnMetadata
-	EntityType      string
+	KeyColumnDescription      string
 }
 
 type ExtractOutput struct {
@@ -231,7 +231,7 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 	}
 
 	mergedResults := mergeSerpResults(input.SerpData.Results)
-	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata, input.EntityType)
+	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata, input.KeyColumnDescription)
 	if err != nil {
 		event.EmitActivityError(ctx, fmt.Errorf("decision making failed: %w", err))
 		return nil, fmt.Errorf("decision making failed: %w", err)
@@ -366,7 +366,7 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 
 		if len(missingColsMetadata) > 0 {
 			var err error
-			extractedData, confidence, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata, input.EntityType)
+			extractedData, confidence, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata, input.KeyColumnDescription)
 			if err != nil {
 				event.EmitActivityError(ctx, err)
 				return nil, err

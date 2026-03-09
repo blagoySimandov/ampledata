@@ -3,15 +3,15 @@ package models
 import "time"
 
 type EnrichmentRequest struct {
-	RowKeys         []string          `json:"row_keys"`
-	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
-	EntityType      *string           `json:"entity_type,omitempty"`
+	RowKeys              []string          `json:"row_keys"`
+	ColumnsMetadata      []*ColumnMetadata `json:"columns_metadata"`
+	KeyColumnDescription *string           `json:"key_column_description,omitempty"`
 }
 
 type StartJobRequest struct {
-	KeyColumns      []string          `json:"key_columns"`
-	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
-	EntityType      *string           `json:"entity_type,omitempty"`
+	KeyColumns           []string          `json:"key_columns"`
+	ColumnsMetadata      []*ColumnMetadata `json:"columns_metadata"`
+	KeyColumnDescription *string           `json:"key_column_description,omitempty"`
 }
 
 type StartJobResponse struct {

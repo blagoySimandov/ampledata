@@ -33,7 +33,7 @@ type Job struct {
 	FilePath        string            `json:"file_path"`
 	KeyColumns      []string          `json:"key_columns"`
 	ColumnsMetadata []*ColumnMetadata `json:"columns_metadata"`
-	EntityType      *string           `json:"entity_type"`
+	KeyColumnDescription *string           `json:"key_column_description"`
 	TotalRows       int               `json:"total_rows"`
 	StartedAt       *time.Time        `json:"started_at"`
 	Status          JobStatus         `json:"status"`

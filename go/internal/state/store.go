@@ -21,7 +21,7 @@ type PaginatedRows struct {
 type Store interface {
 	CreatePendingJob(ctx context.Context, jobID, userID, filePath string) error
 	GetJob(ctx context.Context, jobID string) (*models.Job, error)
-	UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, entityType *string) error
+	UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error
 	StartJob(ctx context.Context, jobID string, totalRows int) error
 	GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.Job, error)
 	BulkCreateRows(ctx context.Context, jobID string, rowKeys []string) error

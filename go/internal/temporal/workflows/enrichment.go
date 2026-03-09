@@ -19,7 +19,7 @@ type EnrichmentWorkflowInput struct {
 	RowKey           string
 	ColumnsMetadata  []*models.ColumnMetadata
 	QueryPatterns    []string
-	EntityType       string
+	KeyColumnDescription       string
 	RetryCount       int
 	PreviousAttempts []*models.EnrichmentAttempt
 	MaxRetries       int
@@ -121,7 +121,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		RowKey:          input.RowKey,
 		SerpData:        serpOutput.SerpData,
 		ColumnsMetadata: input.ColumnsMetadata,
-		EntityType:      input.EntityType,
+		KeyColumnDescription:      input.KeyColumnDescription,
 	}).Get(ctx, &decisionOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
@@ -192,7 +192,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Decision:        decisionOutput.Decision,
 		CrawlResults:    crawlOutput.CrawlResults,
 		ColumnsMetadata: input.ColumnsMetadata,
-		EntityType:      input.EntityType,
+		KeyColumnDescription:      input.KeyColumnDescription,
 	}).Get(ctx, &extractOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Extraction failed: %v", err)
@@ -284,7 +284,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			RowKey:           input.RowKey,
 			ColumnsMetadata:  filteredMetadata,
 			QueryPatterns:    input.QueryPatterns,
-			EntityType:       input.EntityType,
+			KeyColumnDescription:       input.KeyColumnDescription,
 			RetryCount:       input.RetryCount + 1,
 			PreviousAttempts: previousAttempts,
 			MaxRetries:       input.MaxRetries,

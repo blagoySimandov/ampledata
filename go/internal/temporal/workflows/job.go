@@ -19,7 +19,7 @@ type JobWorkflowInput struct {
 	StripeCustomerID string
 	RowKeys          []string
 	ColumnsMetadata  []*models.ColumnMetadata
-	EntityType       *string
+	KeyColumnDescription       *string
 	MaxRetries       int
 }
 
@@ -85,19 +85,19 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			break
 		}
 
-		entityType := ""
-		if input.EntityType != nil {
-			entityType = *input.EntityType
+		keyColumnDescription := ""
+		if input.KeyColumnDescription != nil {
+			keyColumnDescription = *input.KeyColumnDescription
 		}
 
 		childInput := EnrichmentWorkflowInput{
-			JobID:            input.JobID,
-			UserID:           input.UserID,
-			StripeCustomerID: input.StripeCustomerID,
-			RowKey:           rowKey,
-			ColumnsMetadata:  input.ColumnsMetadata,
-			QueryPatterns:    patternsOutput.Patterns,
-			EntityType:       entityType,
+			JobID:                input.JobID,
+			UserID:               input.UserID,
+			StripeCustomerID:     input.StripeCustomerID,
+			RowKey:               rowKey,
+			ColumnsMetadata:      input.ColumnsMetadata,
+			QueryPatterns:        patternsOutput.Patterns,
+			KeyColumnDescription: keyColumnDescription,
 			RetryCount:       0,
 			PreviousAttempts: []*models.EnrichmentAttempt{},
 			MaxRetries:       input.MaxRetries,

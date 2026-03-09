@@ -123,7 +123,7 @@ components:
           items:
             $ref: "#/components/schemas/ColumnMetadata"
           minItems: 1
-        entity_type:
+        key_column_description:
           type: string
           nullable: true
 

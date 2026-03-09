@@ -8,7 +8,7 @@ import (
 )
 
 type IExtractionPromptBuilder interface {
-	Build(content string, columnsMetadata []*models.ColumnMetadata, entity string, entityType string) string
+	Build(content string, columnsMetadata []*models.ColumnMetadata, entity string, keyColumnDescription string) string
 }
 
 type ExtractionPromptBuilder struct{}
@@ -17,7 +17,14 @@ func NewExtractionPromptBuilder() *ExtractionPromptBuilder {
 	return &ExtractionPromptBuilder{}
 }
 
-func (e *ExtractionPromptBuilder) Build(content string, columnsMetadata []*models.ColumnMetadata, entity string, entityType string) string {
+func formatEntityContext(entity, keyColumnDescription string) string {
+	if keyColumnDescription == "" {
+		return fmt.Sprintf(`"%s"`, entity)
+	}
+	return fmt.Sprintf(`"%s" (context: %s)`, entity, keyColumnDescription)
+}
+
+func (e *ExtractionPromptBuilder) Build(content string, columnsMetadata []*models.ColumnMetadata, entity string, keyColumnDescription string) string {
 	var columnsInfo []string
 	for _, col := range columnsMetadata {
 		desc := ""
@@ -33,11 +40,13 @@ func (e *ExtractionPromptBuilder) Build(content string, columnsMetadata []*model
 		truncatedContent = content[:8000]
 	}
 
-	return fmt.Sprintf(`You are a data extraction specialist. Extract the following fields about the %s named "%s" from the provided website content.
+	entityContext := formatEntityContext(entity, keyColumnDescription)
+
+	return fmt.Sprintf(`You are a data extraction specialist. Extract the following fields about the entity %s from the provided website content.
 
 ## CRITICAL: Entity Extraction Rules
 
-You are extracting data about the TARGET ENTITY: %s "%s"
+You are extracting data about the TARGET ENTITY: %s
 
 ALL extracted fields must be about THIS SPECIFIC ENTITY - not about related or mentioned entities.
 
@@ -77,7 +86,7 @@ If a field cannot be found in the content, omit it from the response.
 ## Entity Consistency Validation
 
 Before finalizing your response, verify:
-1. ALL extracted data refers to the TARGET ENTITY (%s: "%s"), not to:
+1. ALL extracted data refers to the TARGET ENTITY (%s), not to:
    - Related or associated entities mentioned in the content
    - Similar or competing entities
    - Parent/subsidiary entities (unless explicitly requested)
@@ -129,5 +138,5 @@ Base your confidence on BOTH information availability AND entity certainty:
 ⚠️  ALWAYS reduce confidence by at least 0.2 when:
 - Information is about a related entity instead of the target entity "%s"
 - Multiple entities are mentioned and target is unclear
-- Source is indirect (third-party descriptions, not primary source)`, entityType, entity, entityType, entity, entity, columnsText, truncatedContent, entityType, entity, entity, entity)
+- Source is indirect (third-party descriptions, not primary source)`, entityContext, entityContext, entity, columnsText, truncatedContent, entityContext, entity, entity)
 }

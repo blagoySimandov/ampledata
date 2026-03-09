@@ -201,9 +201,9 @@ type SignedURLResponse struct {
 
 // StartJobRequest defines model for StartJobRequest.
 type StartJobRequest struct {
-	ColumnsMetadata []ColumnMetadata `json:"columns_metadata"`
-	EntityType      *string          `json:"entity_type"`
-	KeyColumns      []string         `json:"key_columns"`
+	ColumnsMetadata      []ColumnMetadata `json:"columns_metadata"`
+	KeyColumnDescription *string          `json:"key_column_description"`
+	KeyColumns           []string         `json:"key_columns"`
 }
 
 // StartJobResponse defines model for StartJobResponse.

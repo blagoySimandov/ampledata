@@ -114,12 +114,12 @@ func (s *Server) executeStartJob(ctx context.Context, job *models.Job, dbUser *m
 	if err := s.configureAndStartJob(ctx, job.JobID, body, cols, len(rowKeys)); err != nil {
 		return StartJob500JSONResponse{Message: err.Error()}, nil
 	}
-	go s.enricher.Enrich(context.Background(), job.JobID, dbUser.ID, stripeCustomerIDOrEmpty(dbUser), rowKeys, cols)
+	go s.enricher.Enrich(context.Background(), job.JobID, dbUser.ID, stripeCustomerIDOrEmpty(dbUser), rowKeys, cols, body.KeyColumnDescription)
 	return StartJob200JSONResponse{JobId: job.JobID, Message: fmt.Sprintf("Enrichment started with %d rows", len(rowKeys))}, nil
 }
 
 func (s *Server) configureAndStartJob(ctx context.Context, jobID string, body *StartJobJSONRequestBody, cols []*models.ColumnMetadata, rowCount int) error {
-	if err := s.store.UpdateJobConfiguration(ctx, jobID, body.KeyColumns, cols, body.EntityType); err != nil {
+	if err := s.store.UpdateJobConfiguration(ctx, jobID, body.KeyColumns, cols, body.KeyColumnDescription); err != nil {
 		log.Printf("Failed to update job configuration: %v", err)
 		return fmt.Errorf("failed to update job configuration")
 	}
