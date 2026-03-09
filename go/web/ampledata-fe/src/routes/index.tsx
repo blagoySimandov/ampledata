@@ -60,7 +60,7 @@ function NewJobDialog() {
   const [file, setFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
   const [allKeys, setAllKeys] = useState<string[]>([]);
-  const [entityType, setEntityType] = useState<string>("Companies");
+  const [keyColumnDescription, setKeyColumnDescription] = useState<string>("");
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
   
@@ -77,7 +77,6 @@ function NewJobDialog() {
     setStep('upload');
     setFile(null);
     setJobId(null);
-    setSuggestedKey("");
     setAllKeys([]);
     setSelectedKeys([]);
     setColumnsMetadata([]);
@@ -139,7 +138,7 @@ function NewJobDialog() {
         req: {
           key_columns: selectedKeys,
           columns_metadata: columnsMetadata,
-          entity_type: entityType
+          key_column_description: keyColumnDescription
         }
       });
       setOpen(false);
@@ -214,12 +213,12 @@ function NewJobDialog() {
               <div className="space-y-8">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Entity Type</Label>
+                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Key Column Description</Label>
                     <Input 
-                      value={entityType}
-                      onChange={(e) => setEntityType(e.target.value)}
+                      value={keyColumnDescription}
+                      onChange={(e) => setKeyColumnDescription(e.target.value)}
                       className="h-10 rounded-xl"
-                      placeholder="e.g. Companies"
+                      placeholder="e.g. A list of technology companies"
                     />
                   </div>
                   <div className="space-y-2">
@@ -259,42 +258,50 @@ function NewJobDialog() {
                   <div className="space-y-3">
                     {columnsMetadata.length > 0 ? (
                       columnsMetadata.map((col, index) => (
-                        <div key={index} className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-200">
-                          <Input 
-                            placeholder="Field name" 
-                            value={col.name} 
-                            onChange={(e) => updateColumn(index, { name: e.target.value })}
-                            className="h-9 text-xs"
+                        <div key={index} className="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm animate-in slide-in-from-left-2 duration-200">
+                          <div className="flex items-center gap-2">
+                            <Input 
+                              placeholder="Field name" 
+                              value={col.name} 
+                              onChange={(e) => updateColumn(index, { name: e.target.value })}
+                              className="h-9 text-xs font-medium"
+                            />
+                            <Select 
+                              value={col.job_type} 
+                              onValueChange={(v: "enrichment" | "imputation") => updateColumn(index, { job_type: v })}
+                            >
+                              <SelectTrigger className="h-9 w-[120px] text-xs font-medium bg-slate-50 border-transparent">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="enrichment">Enrich</SelectItem>
+                                <SelectItem value="imputation">Impute</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select 
+                              value={col.type} 
+                              onValueChange={(v: "string" | "number" | "boolean" | "date") => updateColumn(index, { type: v })}
+                            >
+                              <SelectTrigger className="h-9 w-[100px] text-xs font-medium bg-slate-50 border-transparent">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="string">String</SelectItem>
+                                <SelectItem value="number">Number</SelectItem>
+                                <SelectItem value="boolean">Bool</SelectItem>
+                                <SelectItem value="date">Date</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="icon" onClick={() => removeColumn(index)} className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <Input
+                            placeholder="Optional instructions for the AI (e.g. 'Extract the person's current job title')"
+                            value={col.description || ''}
+                            onChange={(e) => updateColumn(index, { description: e.target.value })}
+                            className="h-8 text-xs bg-slate-50/50 border-slate-100 placeholder:text-slate-400"
                           />
-                          <Select 
-                            value={col.job_type} 
-                            onValueChange={(v: "enrichment" | "imputation") => updateColumn(index, { job_type: v })}
-                          >
-                            <SelectTrigger className="h-9 w-[120px] text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="enrichment">Enrich</SelectItem>
-                              <SelectItem value="imputation">Impute</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Select 
-                            value={col.type} 
-                            onValueChange={(v: "string" | "number" | "boolean" | "date") => updateColumn(index, { type: v })}
-                          >
-                            <SelectTrigger className="h-9 w-[100px] text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="string">String</SelectItem>
-                              <SelectItem value="number">Number</SelectItem>
-                              <SelectItem value="boolean">Bool</SelectItem>
-                              <SelectItem value="date">Date</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button variant="ghost" size="icon" onClick={() => removeColumn(index)} className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
                       ))
                     ) : (

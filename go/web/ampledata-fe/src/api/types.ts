@@ -96,7 +96,7 @@ export interface SelectKeyResponse {
 export interface StartJobRequest {
   key_columns: string[];
   columns_metadata: ColumnMetadata[];
-  entity_type?: string | null;
+  key_column_description?: string | null;
 }
 
 export interface StartJobResponse {
