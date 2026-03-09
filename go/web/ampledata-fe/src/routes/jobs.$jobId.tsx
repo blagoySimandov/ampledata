@@ -21,10 +21,10 @@ const myTheme = themeQuartz.withParams({
   browserColorScheme: 'light',
   chromeBackgroundColor: '#f8fafc',
   fontFamily: 'inherit',
-  fontSize: '13px',
+  fontSize: '14px',
   foregroundColor: '#0f172a',
   headerBackgroundColor: '#f8fafc',
-  headerFontSize: '12px',
+  headerFontSize: '14px',
   headerFontWeight: '600',
   headerTextColor: '#64748b',
   rowBorder: { color: '#f1f5f9' },
@@ -43,7 +43,7 @@ function ConfidenceDataRenderer(params: any) {
   const content = hasValue ? (
     <span className="font-medium text-slate-900">{String(params.value)}</span>
   ) : (
-    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-tight ${
+    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-bold uppercase tracking-tight ${
       stage === 'COMPLETED' || stage === 'FAILED' 
         ? 'bg-amber-50 text-amber-700 border-amber-200' 
         : 'bg-slate-50 text-slate-400 border-slate-200 animate-pulse'
@@ -74,7 +74,7 @@ function ConfidenceDataRenderer(params: any) {
           </div>
           {hasConfidence && (
             <div className={`flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity ${scoreColor}`}>
-              <span className="text-[9px] font-black">{(confidence.score * 100).toFixed(0)}%</span>
+              <span className="text-xs font-black">{(confidence.score * 100).toFixed(0)}%</span>
               <Info className="w-3 h-3" />
             </div>
           )}
@@ -84,20 +84,20 @@ function ConfidenceDataRenderer(params: any) {
         <div className={`h-1.5 w-full ${hasConfidence ? (confidence.score >= 0.8 ? 'bg-emerald-500' : confidence.score >= 0.5 ? 'bg-amber-500' : 'bg-red-500') : 'bg-slate-200'}`} />
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h4 className="font-black text-[10px] uppercase tracking-widest text-slate-400">Field Intelligence</h4>
+            <h4 className="font-black text-xs uppercase tracking-widest text-slate-400">Field Intelligence</h4>
             {hasConfidence ? (
-              <Badge variant="outline" className={`text-[10px] font-black ${scoreColor} border-current bg-white`}>
+              <Badge variant="outline" className={`text-xs font-black ${scoreColor} border-current bg-white`}>
                 {(confidence.score * 100).toFixed(0)}% CONFIDENCE
               </Badge>
             ) : (
-              <Badge variant="outline" className="text-[10px] font-black text-slate-400 border-slate-200 bg-white">
+              <Badge variant="outline" className="text-xs font-black text-slate-400 border-slate-200 bg-white">
                 NO METADATA
               </Badge>
             )}
           </div>
           
           <div className="space-y-1">
-            <div className="text-[11px] font-bold text-slate-900 flex items-center gap-1.5">
+            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                {hasValue ? "Extraction Rationale" : "Reason for Missing Data"}
             </div>
             <p className="text-xs text-slate-500 leading-relaxed italic">
@@ -110,8 +110,8 @@ function ConfidenceDataRenderer(params: any) {
           </div>
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">System Status</span>
-            <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{stage}</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-tight">System Status</span>
+            <span className="text-xs font-black text-slate-900 uppercase tracking-widest">{stage}</span>
           </div>
         </div>
       </PopoverContent>
@@ -192,7 +192,7 @@ function JobDetail() {
                 <div className="flex items-center h-full">
                   <Badge 
                     variant="secondary" 
-                    className={`${color} border font-black text-[9px] px-2 py-0 h-4.5 min-h-0 leading-none tracking-tighter uppercase`}
+                    className={`${color} border font-black text-xs px-2 py-0 h-4.5 min-h-0 leading-none tracking-tighter uppercase`}
                   >
                     {stage}
                   </Badge>
@@ -282,7 +282,7 @@ function JobDetail() {
         </div>
         
         <div className="flex items-center gap-3">
-           <Badge variant="outline" className="px-3 py-1 font-bold tracking-widest text-[10px] uppercase border-slate-300">
+           <Badge variant="outline" className="px-3 py-1 font-bold tracking-widest text-xs uppercase border-slate-300">
               {progress.status}
            </Badge>
            <button 
@@ -309,14 +309,14 @@ function JobDetail() {
             <div className="space-y-2">
               <Progress value={progressPercent} className="h-2.5 bg-white border border-slate-200" />
               <div className="flex justify-end">
-                 <span className="text-[10px] font-black text-primary">{progressPercent.toFixed(0)}% COMPLETE</span>
+                 <span className="text-xs font-black text-primary">{progressPercent.toFixed(0)}% COMPLETE</span>
               </div>
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {Object.entries(progress.rows_by_stage || {}).map(([stage, count]) => (
                 <div key={stage} className="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
-                  <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">{stage}</div>
+                  <div className="text-xs text-slate-400 font-black uppercase tracking-widest mb-1">{stage}</div>
                   <div className="text-xl font-black text-slate-900 leading-none">{count}</div>
                 </div>
               ))}
@@ -335,7 +335,7 @@ function JobDetail() {
             <div className="space-y-4">
               <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between">
                 <div>
-                  <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Avg. Confidence</div>
+                  <div className="text-xs text-slate-400 font-black uppercase tracking-widest mb-1">Avg. Confidence</div>
                   <div className={`text-2xl font-black ${intelligenceStats.avgConfidence >= 80 ? 'text-emerald-500' : intelligenceStats.avgConfidence >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
                     {intelligenceStats.avgConfidence.toFixed(1)}%
                   </div>
@@ -347,7 +347,7 @@ function JobDetail() {
 
               <div className="bg-white p-4 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between">
                 <div>
-                  <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Data Gaps</div>
+                  <div className="text-xs text-slate-400 font-black uppercase tracking-widest mb-1">Data Gaps</div>
                   <div className="text-2xl font-black text-slate-900">
                     {intelligenceStats.missingDataPct.toFixed(1)}%
                   </div>
@@ -358,7 +358,7 @@ function JobDetail() {
               </div>
             </div>
             
-            <p className="text-[10px] text-slate-400 font-medium italic leading-relaxed px-1">
+            <p className="text-xs text-slate-400 font-medium italic leading-relaxed px-1">
               Stats are derived from the {rowsData?.rows.length || 0} records currently visible in this view.
             </p>
           </CardContent>
@@ -368,7 +368,7 @@ function JobDetail() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-black text-slate-900 tracking-tight">Dataset Explorer</h2>
-          {isFetchingRows && <div className="flex items-center gap-2 text-[10px] font-bold text-blue-600 animate-pulse uppercase tracking-widest">
+          {isFetchingRows && <div className="flex items-center gap-2 text-xs font-bold text-blue-600 animate-pulse uppercase tracking-widest">
             <RefreshCw className="w-3 h-3 animate-spin" /> Synchronizing...
           </div>}
         </div>
@@ -388,7 +388,7 @@ function JobDetail() {
             />
           </div>
           <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
               Showing {rowData?.length || 0} of {rowsData?.pagination.total || 0} records
             </div>
             <div className="flex items-center gap-2">

@@ -14,7 +14,7 @@ export const Route = createRootRoute({
           <nav>
             <Link
               to="/"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-base font-medium text-gray-600 hover:text-gray-900 transition-colors"
               activeProps={{ className: 'text-primary font-semibold' }}
             >
               Jobs

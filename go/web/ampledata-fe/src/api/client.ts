@@ -11,6 +11,12 @@ import type {
   JobProgressResponse,
   RowsProgressResponse,
   EnrichmentResult,
+  SignedURLRequest,
+  SignedURLResponse,
+  SelectKeyRequest,
+  SelectKeyResponse,
+  StartJobRequest,
+  StartJobResponse,
 } from './types';
 
 export class ApiClient {
@@ -93,6 +99,41 @@ export class ApiClient {
   public async cancelJob(jobId: string): Promise<{ message: string }> {
     return this.request<{ message: string }>(`/jobs/${jobId}/cancel`, {
       method: 'POST',
+    });
+  }
+
+  public async getSignedUrl(req: SignedURLRequest): Promise<SignedURLResponse> {
+    return this.request<SignedURLResponse>('/enrichment-signed-url', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  }
+
+  public async uploadFile(url: string, file: File): Promise<void> {
+    const response = await fetch(url, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type || 'text/csv',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`File upload failed: ${response.statusText}`);
+    }
+  }
+
+  public async selectKey(req: SelectKeyRequest): Promise<SelectKeyResponse> {
+    return this.request<SelectKeyResponse>('/select-key', {
+      method: 'POST',
+      body: JSON.stringify(req),
+    });
+  }
+
+  public async startJob(jobId: string, req: StartJobRequest): Promise<StartJobResponse> {
+    return this.request<StartJobResponse>(`/jobs/${jobId}/start`, {
+      method: 'POST',
+      body: JSON.stringify(req),
     });
   }
 }

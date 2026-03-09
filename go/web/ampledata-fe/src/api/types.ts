@@ -72,6 +72,34 @@ export interface EnrichmentResult {
   error?: string | null;
 }
 
-export interface ErrorResponse {
+export interface SignedURLRequest {
+  contentType: 'text/csv' | 'application/json';
+  length: number;
+}
+
+export interface SignedURLResponse {
+  url: string;
+  jobId: string;
+}
+
+export interface SelectKeyRequest {
+  job_id: string;
+  columns_metadata?: ColumnMetadata[] | null;
+}
+
+export interface SelectKeyResponse {
+  selected_key: string;
+  all_keys: string[];
+  reasoning: string;
+}
+
+export interface StartJobRequest {
+  key_columns: string[];
+  columns_metadata: ColumnMetadata[];
+  entity_type?: string | null;
+}
+
+export interface StartJobResponse {
+  job_id: string;
   message: string;
 }

@@ -1,6 +1,7 @@
 // src/hooks/useJobs.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiClient } from '../api';
+import type { SignedURLRequest, StartJobRequest, SelectKeyRequest } from '../api';
 
 export function useListJobs(api: ApiClient, offset: number = 0, limit: number = 50) {
   return useQuery({
@@ -47,6 +48,35 @@ export function useCancelJob(api: ApiClient) {
     onSuccess: (_, jobId) => {
       // Invalidate relevant queries so the UI updates to show the job as cancelled
       queryClient.invalidateQueries({ queryKey: ['job-progress', jobId] });
+      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+}
+
+export function useGetSignedUrl(api: ApiClient) {
+  return useMutation({
+    mutationFn: (req: SignedURLRequest) => api.getSignedUrl(req),
+  });
+}
+
+export function useUploadFile(api: ApiClient) {
+  return useMutation({
+    mutationFn: ({ url, file }: { url: string; file: File }) => api.uploadFile(url, file),
+  });
+}
+
+export function useSelectKey(api: ApiClient) {
+  return useMutation({
+    mutationFn: (req: SelectKeyRequest) => api.selectKey(req),
+  });
+}
+
+export function useStartJob(api: ApiClient) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, req }: { jobId: string; req: StartJobRequest }) => 
+      api.startJob(jobId, req),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
     },
   });

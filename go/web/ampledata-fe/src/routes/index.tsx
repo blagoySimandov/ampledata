@@ -1,8 +1,36 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useApi, useListJobs } from '../hooks';
-import { useMemo } from 'react';
+import { 
+  useApi, 
+  useListJobs, 
+  useGetSignedUrl, 
+  useUploadFile, 
+  useSelectKey, 
+  useStartJob 
+} from '../hooks';
+import { useMemo, useState, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { type ColDef, ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Plus, Upload, Loader2, CheckCircle2, ChevronRight, Trash2, Settings2 } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { ColumnMetadata } from '../api';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -14,16 +42,305 @@ const myTheme = themeQuartz.withParams({
   browserColorScheme: 'light',
   chromeBackgroundColor: '#f8fafc',
   fontFamily: 'inherit',
-  fontSize: '14px',
+  fontSize: '15px',
   foregroundColor: '#0f172a',
   headerBackgroundColor: '#f1f5f9',
-  headerFontSize: '14px',
+  headerFontSize: '15px',
   headerFontWeight: '600',
   headerTextColor: '#475569',
   rowBorder: { color: '#f1f5f9' },
   wrapperBorder: true,
   wrapperBorderRadius: '8px',
 });
+
+function NewJobDialog() {
+  const api = useApi();
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<'upload' | 'configure' | 'starting'>('upload');
+  const [file, setFile] = useState<File | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [suggestedKey, setSuggestedKey] = useState<string>("");
+  const [allKeys, setAllKeys] = useState<string[]>([]);
+  const [entityType, setEntityType] = useState<string>("Companies");
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const getSignedUrl = useGetSignedUrl(api);
+  const uploadFile = useUploadFile(api);
+  const selectKey = useSelectKey(api);
+  const startJob = useStartJob(api);
+
+  const reset = () => {
+    setStep('upload');
+    setFile(null);
+    setJobId(null);
+    setSuggestedKey("");
+    setAllKeys([]);
+    setSelectedKeys([]);
+    setColumnsMetadata([]);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+    
+    try {
+      const { url, jobId } = await getSignedUrl.mutateAsync({
+        contentType: 'text/csv',
+        length: file.size
+      });
+      setJobId(jobId);
+
+      await uploadFile.mutateAsync({ url, file });
+
+      const { selected_key, all_keys } = await selectKey.mutateAsync({ job_id: jobId });
+      setSuggestedKey(selected_key);
+      setAllKeys(all_keys);
+      setSelectedKeys([selected_key]);
+      
+      setStep('configure');
+    } catch (error) {
+      console.error("Upload failed", error);
+    }
+  };
+
+  const addColumn = () => {
+    setColumnsMetadata([...columnsMetadata, { name: "", type: "string", job_type: "enrichment" }]);
+  };
+
+  const removeColumn = (index: number) => {
+    setColumnsMetadata(columnsMetadata.filter((_, i) => i !== index));
+  };
+
+  const updateColumn = (index: number, updates: Partial<ColumnMetadata>) => {
+    const updated = [...columnsMetadata];
+    updated[index] = { ...updated[index], ...updates };
+    setColumnsMetadata(updated);
+  };
+
+  const handleStart = async () => {
+    if (!jobId) return;
+    
+    setStep('starting');
+    try {
+      await startJob.mutateAsync({
+        jobId,
+        req: {
+          key_columns: selectedKeys,
+          columns_metadata: columnsMetadata,
+          entity_type: entityType
+        }
+      });
+      setOpen(false);
+      reset();
+    } catch (error) {
+      console.error("Start failed", error);
+      setStep('configure');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => { setOpen(val); if (!val) reset(); }}>
+      <DialogTrigger asChild>
+        <Button className="font-bold gap-2">
+          <Plus className="w-4 h-4" />
+          NEW ENRICHMENT
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-0">
+          <DialogTitle className="text-2xl font-black flex items-center gap-2">
+            {step === 'upload' ? 'Upload Dataset' : 'Configure Enrichment'}
+          </DialogTitle>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 px-6">
+          <div className="py-6">
+            {step === 'upload' && (
+              <div className="space-y-4">
+                <div 
+                  className="border-2 border-dashed border-slate-200 rounded-2xl p-10 flex flex-col items-center justify-center gap-4 hover:border-primary/50 transition-colors cursor-pointer bg-slate-50/50"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                    accept=".csv"
+                  />
+                  <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                    <Upload className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-bold text-slate-900">{file ? file.name : 'Select a CSV file'}</p>
+                    <p className="text-xs text-slate-500 mt-1">Maximum size 50MB</p>
+                  </div>
+                </div>
+
+                <Button 
+                  className="w-full font-black h-12" 
+                  disabled={!file || getSignedUrl.isPending || uploadFile.isPending || selectKey.isPending}
+                  onClick={handleUpload}
+                >
+                  {(getSignedUrl.isPending || uploadFile.isPending || selectKey.isPending) ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      PROCESSING...
+                    </>
+                  ) : (
+                    <>
+                      CONTINUE
+                      <ChevronRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {step === 'configure' && (
+              <div className="space-y-8">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Entity Type</Label>
+                    <Input 
+                      value={entityType}
+                      onChange={(e) => setEntityType(e.target.value)}
+                      className="h-10 rounded-xl"
+                      placeholder="e.g. Companies"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400">Key Columns</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {allKeys.map(k => (
+                        <Badge 
+                          key={k}
+                          variant={selectedKeys.includes(k) ? "default" : "outline"}
+                          className={`cursor-pointer px-2 py-0 text-xs font-bold ${selectedKeys.includes(k) ? '' : 'text-slate-500 hover:bg-slate-50'}`}
+                          onClick={() => {
+                            if (selectedKeys.includes(k)) {
+                              setSelectedKeys(selectedKeys.filter(x => x !== k));
+                            } else {
+                              setSelectedKeys([...selectedKeys, k]);
+                            }
+                          }}
+                        >
+                          {k}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                      <Settings2 className="w-3 h-3" />
+                      Enrichment Fields
+                    </Label>
+                    <Button variant="ghost" size="sm" onClick={addColumn} className="h-7 text-xs font-black px-2 hover:bg-slate-100">
+                      <Plus className="w-3 h-3 mr-1" /> ADD FIELD
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {columnsMetadata.length > 0 ? (
+                      columnsMetadata.map((col, index) => (
+                        <div key={index} className="flex items-center gap-2 animate-in slide-in-from-left-2 duration-200">
+                          <Input 
+                            placeholder="Field name" 
+                            value={col.name} 
+                            onChange={(e) => updateColumn(index, { name: e.target.value })}
+                            className="h-9 text-xs"
+                          />
+                          <Select 
+                            value={col.job_type} 
+                            onValueChange={(v: any) => updateColumn(index, { job_type: v })}
+                          >
+                            <SelectTrigger className="h-9 w-[120px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="enrichment">Enrich</SelectItem>
+                              <SelectItem value="imputation">Impute</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Select 
+                            value={col.type} 
+                            onValueChange={(v: any) => updateColumn(index, { type: v })}
+                          >
+                            <SelectTrigger className="h-9 w-[100px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="string">String</SelectItem>
+                              <SelectItem value="number">Number</SelectItem>
+                              <SelectItem value="boolean">Bool</SelectItem>
+                              <SelectItem value="date">Date</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="icon" onClick={() => removeColumn(index)} className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 flex flex-col items-center text-center gap-3 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                          <Settings2 className="w-5 h-5 text-slate-400" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-slate-900">Define enrichment fields</p>
+                          <p className="text-xs text-slate-500 max-w-[280px] leading-relaxed">
+                            Add the fields you want the AI to extract (Enrich) or fill in (Impute) from your data.
+                          </p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={addColumn} className="mt-1 font-bold h-8 px-4 border-slate-200">
+                          <Plus className="w-3 h-3 mr-2" />
+                          ADD YOUR FIRST FIELD
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 text-white p-4 rounded-2xl flex gap-3 items-center">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <p className="text-xs font-medium leading-relaxed">
+                    AI will process your data and fill in the selected fields using high-confidence sources.
+                  </p>
+                </div>
+
+                <Button 
+                  className="w-full font-black h-12 bg-primary hover:bg-primary/90" 
+                  onClick={handleStart}
+                  disabled={selectedKeys.length === 0 || columnsMetadata.length === 0 || columnsMetadata.some(c => !c.name)}
+                >
+                  START ENRICHMENT JOB
+                </Button>
+              </div>
+            )}
+
+            {step === 'starting' && (
+              <div className="py-12 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500">
+                 <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                 <p className="font-black uppercase tracking-widest text-slate-400 text-xs">Initializing Job...</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function JobsList() {
   const api = useApi();
@@ -62,7 +379,7 @@ function JobsList() {
         
         return (
           <div className="flex items-center h-full">
-            <div className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wider text-center leading-none ${colorClass}`}>
+            <div className={`px-2 py-0.5 rounded-full border text-xs font-bold uppercase tracking-wider text-center leading-none ${colorClass}`}>
               {status}
             </div>
           </div>
@@ -102,16 +419,13 @@ function JobsList() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold tracking-tight">Enrichment Jobs</h1>
-        {/* Placeholder for future action button */}
-        {/* <button className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium text-sm">
-          New Job
-        </button> */}
+        <h1 className="text-3xl font-black tracking-tight text-slate-900">Enrichment Jobs</h1>
+        <NewJobDialog />
       </div>
 
-      <div className="w-full h-[600px] shadow-sm">
+      <div className="w-full h-[600px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
         <AgGridReact
           rowData={data?.jobs || []}
           columnDefs={columnDefs}
