@@ -37,6 +37,8 @@ type Config struct {
 	StripeWebhookSecret     string
 	EnrichmentCostMeterName string
 
+	StaticDir string
+
 	// Stripe Price IDs – populated by Terraform, set as environment variables.
 	// Run `terraform apply` in terraform/stripe and export the outputs.
 	StarterBasePriceID       string
@@ -87,6 +89,8 @@ var cfg Config = Config{
 	StripeSecretKey:         getEnv("STRIPE_SECRET", ""),
 	StripeWebhookSecret:     getEnv("STRIPE_WEBHOOK_SECRET", ""),
 	EnrichmentCostMeterName: getEnv("ENRICHMENT_COST_METER_NAME", "enrichment_credits"),
+
+	StaticDir: getEnv("STATIC_DIR", "web/ampledata-fe/dist"),
 
 	StarterBasePriceID:       getEnv("STRIPE_STARTER_BASE_PRICE_ID", ""),
 	StarterMeteredPriceID:    getEnv("STRIPE_STARTER_METERED_PRICE_ID", ""),

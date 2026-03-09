@@ -110,7 +110,7 @@ func main() {
 	}
 
 	server := api.NewServer(enr, gcsReader, store, userRepo, billingService, keySelector)
-	router := api.SetupRoutes(server, jwtVerifier, userService)
+	router := api.SetupRoutes(server, jwtVerifier, userService, cfg.StaticDir)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,
