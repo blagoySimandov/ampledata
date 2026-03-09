@@ -1,41 +1,42 @@
+//go:generate oapi-codegen --config=oapi-codegen.yaml openapi.yaml
 package api
 
 import (
+	"net/http"
+
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
-	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(enrHandler *EnrichHandler, keySelectorHandler *KeySelectorHandler, jwtVerifier *auth.JWTVerifier, userService user.Service, billing services.BillingService, userRepo user.Repository) *mux.Router {
-	r := mux.NewRouter()
+func SetupRoutes(server *Server, jwtVerifier *auth.JWTVerifier, userService user.Service) *mux.Router {
+	mainRouter := mux.NewRouter()
+	mainRouter.Use(CORSMiddleware().Handler)
+	mainRouter.Use(LoggingMiddleware)
+	mainRouter.Use(RecoveryMiddleware)
 
-	r.Use(CORSMiddleware().Handler)
-	r.Use(LoggingMiddleware)
-	r.Use(RecoveryMiddleware)
+	strictHandler := NewStrictHandler(server, nil)
 
-	checkoutHandler := NewCheckoutHandler(billing, userRepo)
-	r.HandleFunc("/api/v1/webhooks/stripe", checkoutHandler.HandleWebhook).Methods("POST")
+	webhookWrapper := &ServerInterfaceWrapper{
+		Handler: strictHandler,
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		},
+	}
+	mainRouter.HandleFunc("/api/v1/webhooks/stripe", webhookWrapper.HandleStripeWebhook).Methods("POST")
 
-	authenticated := r.PathPrefix("/api/v1").Subrouter()
-	authenticated.Use(auth.Middleware(jwtVerifier))
-	authenticated.Use(user.UserMiddleware(userService))
+	publicRouter := mux.NewRouter()
+	publicRouter.HandleFunc("/openapi.json", serveOpenAPISpec).Methods("GET")
+	publicRouter.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerUIHandler()))
 
-	authenticated.HandleFunc("/enrichment-signed-url", enrHandler.UploadFileForEnrichment).Methods("POST", "OPTIONS") // Creates a pending enrichment job
-	authenticated.HandleFunc("/jobs", enrHandler.ListJobs).Methods("GET", "OPTIONS")
-	authenticated.HandleFunc("/jobs/{jobID}/start", enrHandler.StartJob).Methods("POST", "OPTIONS")
-	authenticated.HandleFunc("/jobs/{jobID}/cancel", enrHandler.CancelJob).Methods("POST", "OPTIONS")
+	// (auth required)
+	protectedRouter := mux.NewRouter()
+	protectedRouter.Use(auth.Middleware(jwtVerifier))
+	protectedRouter.Use(user.UserMiddleware(userService))
+	HandlerFromMuxWithBaseURL(strictHandler, protectedRouter, "/api/v1")
 
-	authenticated.HandleFunc("/jobs/{jobID}/progress", enrHandler.GetJobProgress).Methods("GET", "OPTIONS")
-	authenticated.HandleFunc("/jobs/{jobID}/results", enrHandler.GetJobResults).Methods("GET", "OPTIONS")
-	authenticated.HandleFunc("/jobs/{jobID}/rows", enrHandler.GetRowsProgress).Methods("GET", "OPTIONS")
+	mainRouter.PathPrefix("/api/v1").Handler(protectedRouter)
+	mainRouter.PathPrefix("/").Handler(publicRouter)
 
-	authenticated.HandleFunc("/select-key", keySelectorHandler.SelectKey).Methods("POST", "OPTIONS")
-
-	authenticated.HandleFunc("/subscribe", checkoutHandler.CreateSubscriptionCheckout).Methods("POST", "OPTIONS")
-	authenticated.HandleFunc("/subscription", checkoutHandler.GetSubscriptionStatus).Methods("GET", "OPTIONS")
-	authenticated.HandleFunc("/subscription/cancel", checkoutHandler.CancelSubscription).Methods("POST", "OPTIONS")
-	authenticated.HandleFunc("/tiers", checkoutHandler.ListTiers).Methods("GET", "OPTIONS")
-
-	return r
+	return mainRouter
 }

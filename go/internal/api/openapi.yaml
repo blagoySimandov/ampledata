@@ -1,0 +1,788 @@
+openapi: "3.0.3"
+info:
+  title: AmpleData API
+  version: "1.0.0"
+  description: AmpleData enrichment API
+
+servers:
+  - url: /api/v1
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ColumnType:
+      type: string
+      enum: [string, number, boolean, date]
+
+    JobType:
+      type: string
+      enum: [enrichment, imputation]
+
+    JobStatus:
+      type: string
+      enum: [PENDING, RUNNING, PAUSED, CANCELLED, COMPLETED]
+
+    RowStage:
+      type: string
+      enum: [PENDING, SERP_FETCHED, DECISION_MADE, CRAWLED, ENRICHED, COMPLETED, FAILED, CANCELLED]
+
+    ColumnMetadata:
+      type: object
+      required: [name, type, job_type]
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/ColumnType"
+        job_type:
+          $ref: "#/components/schemas/JobType"
+        description:
+          type: string
+          nullable: true
+
+    FieldConfidenceInfo:
+      type: object
+      required: [score, reason]
+      properties:
+        score:
+          type: number
+          format: double
+        reason:
+          type: string
+
+    SignedURLRequest:
+      type: object
+      required: [contentType, length]
+      properties:
+        contentType:
+          type: string
+          enum: [text/csv, application/json]
+        length:
+          type: integer
+          minimum: 1
+
+    SignedURLResponse:
+      type: object
+      required: [url, jobId]
+      properties:
+        url:
+          type: string
+        jobId:
+          type: string
+
+    JobSummary:
+      type: object
+      required: [job_id, status, total_rows, file_path, created_at]
+      properties:
+        job_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/JobStatus"
+        total_rows:
+          type: integer
+        file_path:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    JobListResponse:
+      type: object
+      required: [jobs, total_count]
+      properties:
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobSummary"
+        total_count:
+          type: integer
+
+    StartJobRequest:
+      type: object
+      required: [key_columns, columns_metadata]
+      properties:
+        key_columns:
+          type: array
+          items:
+            type: string
+          minItems: 1
+        columns_metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColumnMetadata"
+          minItems: 1
+        entity_type:
+          type: string
+          nullable: true
+
+    StartJobResponse:
+      type: object
+      required: [job_id, message]
+      properties:
+        job_id:
+          type: string
+        message:
+          type: string
+
+    JobProgressResponse:
+      type: object
+      required: [job_id, total_rows, rows_by_stage, started_at, status]
+      properties:
+        job_id:
+          type: string
+        total_rows:
+          type: integer
+        rows_by_stage:
+          type: object
+          additionalProperties:
+            type: integer
+        started_at:
+          type: string
+        status:
+          $ref: "#/components/schemas/JobStatus"
+
+    EnrichmentResult:
+      type: object
+      required: [key, extracted_data, sources]
+      properties:
+        key:
+          type: string
+        extracted_data:
+          type: object
+          additionalProperties: true
+        confidence:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/FieldConfidenceInfo"
+          nullable: true
+        sources:
+          type: array
+          items:
+            type: string
+        error:
+          type: string
+          nullable: true
+
+    PaginationInfo:
+      type: object
+      required: [total, offset, limit, has_more]
+      properties:
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+        has_more:
+          type: boolean
+
+    RowProgressItem:
+      type: object
+      required: [key, stage, updated_at]
+      properties:
+        key:
+          type: string
+        stage:
+          $ref: "#/components/schemas/RowStage"
+        extracted_data:
+          type: object
+          additionalProperties: true
+          nullable: true
+        confidence:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/FieldConfidenceInfo"
+          nullable: true
+        sources:
+          type: array
+          items:
+            type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+
+    RowsProgressResponse:
+      type: object
+      required: [rows, pagination]
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/RowProgressItem"
+        pagination:
+          $ref: "#/components/schemas/PaginationInfo"
+
+    SelectKeyRequest:
+      type: object
+      required: [job_id]
+      properties:
+        job_id:
+          type: string
+        columns_metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColumnMetadata"
+          nullable: true
+
+    SelectKeyResponse:
+      type: object
+      required: [selected_key, all_keys, reasoning]
+      properties:
+        selected_key:
+          type: string
+        all_keys:
+          type: array
+          items:
+            type: string
+        reasoning:
+          type: string
+
+    CreateSubscriptionRequest:
+      type: object
+      required: [tier_id, success_url, cancel_url]
+      properties:
+        tier_id:
+          type: string
+        success_url:
+          type: string
+        cancel_url:
+          type: string
+
+    CreateCheckoutResponse:
+      type: object
+      required: [checkout_url, session_id]
+      properties:
+        checkout_url:
+          type: string
+        session_id:
+          type: string
+
+    SubscriptionStatusResponse:
+      type: object
+      required: [tokens_used, tokens_included]
+      properties:
+        tier:
+          type: string
+          nullable: true
+        tokens_used:
+          type: integer
+          format: int64
+        tokens_included:
+          type: integer
+          format: int64
+        current_period_start:
+          type: string
+          format: date-time
+          nullable: true
+        current_period_end:
+          type: string
+          format: date-time
+          nullable: true
+
+    TierResponse:
+      type: object
+      required: [id, display_name, monthly_price_cents, included_tokens, overage_price_cents_decimal]
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        monthly_price_cents:
+          type: integer
+          format: int64
+        included_tokens:
+          type: integer
+          format: int64
+        overage_price_cents_decimal:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+paths:
+  /webhooks/stripe:
+    post:
+      operationId: handleStripeWebhook
+      summary: Handle Stripe webhook events
+      security: []
+      tags: [billing]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Webhook processed
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /enrichment-signed-url:
+    post:
+      operationId: uploadFileForEnrichment
+      summary: Create a pending enrichment job and get a signed upload URL
+      tags: [jobs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignedURLRequest"
+      responses:
+        "200":
+          description: Signed URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignedURLResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs:
+    get:
+      operationId: listJobs
+      summary: List enrichment jobs for the authenticated user
+      tags: [jobs]
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{jobID}/start:
+    post:
+      operationId: startJob
+      summary: Start an enrichment job
+      tags: [jobs]
+      parameters:
+        - name: jobID
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartJobRequest"
+      responses:
+        "200":
+          description: Job started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartJobResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "402":
+          description: Payment required (no active subscription)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{jobID}/cancel:
+    post:
+      operationId: cancelJob
+      summary: Cancel a running enrichment job
+      tags: [jobs]
+      parameters:
+        - name: jobID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{jobID}/progress:
+    get:
+      operationId: getJobProgress
+      summary: Get progress summary for a job
+      tags: [jobs]
+      parameters:
+        - name: jobID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobProgressResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{jobID}/results:
+    get:
+      operationId: getJobResults
+      summary: Get enrichment results for a job
+      tags: [jobs]
+      parameters:
+        - name: jobID
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: start
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Enrichment results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EnrichmentResult"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /jobs/{jobID}/rows:
+    get:
+      operationId: getRowsProgress
+      summary: Get per-row progress for a job
+      tags: [jobs]
+      parameters:
+        - name: jobID
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: stage
+          in: query
+          schema:
+            type: string
+            default: all
+        - name: sort
+          in: query
+          schema:
+            type: string
+            default: updated_at_desc
+      responses:
+        "200":
+          description: Row progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RowsProgressResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /select-key:
+    post:
+      operationId: selectKey
+      summary: Use AI to select the best key column from a job's CSV
+      tags: [jobs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelectKeyRequest"
+      responses:
+        "200":
+          description: Selected key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SelectKeyResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /subscribe:
+    post:
+      operationId: createSubscriptionCheckout
+      summary: Create a Stripe checkout session for a subscription
+      tags: [billing]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSubscriptionRequest"
+      responses:
+        "200":
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateCheckoutResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /subscription:
+    get:
+      operationId: getSubscriptionStatus
+      summary: Get the current user's subscription status
+      tags: [billing]
+      responses:
+        "200":
+          description: Subscription status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscriptionStatusResponse"
+        "400":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /subscription/cancel:
+    post:
+      operationId: cancelSubscription
+      summary: Cancel the current user's subscription
+      tags: [billing]
+      responses:
+        "200":
+          description: Subscription cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: No active subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /tiers:
+    get:
+      operationId: listTiers
+      summary: List available subscription tiers
+      tags: [billing]
+      responses:
+        "200":
+          description: List of tiers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TierResponse"

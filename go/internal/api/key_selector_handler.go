@@ -1,88 +1,40 @@
 package api
 
 import (
-	"encoding/json"
+	"context"
 	"log"
-	"net/http"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
-	"github.com/blagoySimandov/ampledata/go/internal/gcs"
-	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"github.com/blagoySimandov/ampledata/go/internal/services"
-	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
 
-type KeySelectorHandler struct {
-	keySelector services.KeySelector
-	gcsReader   *gcs.CSVReader
-	store       state.Store
-}
-
-func NewKeySelectorHandler(keySelector services.KeySelector, gcsReader *gcs.CSVReader, store state.Store) *KeySelectorHandler {
-	return &KeySelectorHandler{
-		keySelector: keySelector,
-		gcsReader:   gcsReader,
-		store:       store,
-	}
-}
-
-func (h *KeySelectorHandler) SelectKey(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.GetUserFromRequest(r)
+func (s *Server) SelectKey(ctx context.Context, req SelectKeyRequestObject) (SelectKeyResponseObject, error) {
+	u, ok := auth.GetUserFromContext(ctx)
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return SelectKey401JSONResponse{Message: "Unauthorized"}, nil
 	}
-
-	var req models.SelectKeyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if req.JobID == "" {
-		http.Error(w, "job_id is required", http.StatusBadRequest)
-		return
-	}
-
-	// Verify the job exists and belongs to the user
-	job, err := h.store.GetJob(r.Context(), req.JobID)
+	job, err := s.store.GetJob(ctx, req.Body.JobId)
 	if err != nil {
-		http.Error(w, "Job not found", http.StatusNotFound)
-		return
+		return SelectKey404JSONResponse{Message: "Job not found"}, nil
 	}
-
-	if job.UserID != user.ID {
-		http.Error(w, "Forbidden: You do not own this job", http.StatusForbidden)
-		return
+	if job.UserID != u.ID {
+		return SelectKey403JSONResponse{Message: "Forbidden: You do not own this job"}, nil
 	}
+	return s.selectKeyForJob(ctx, job.FilePath, req.Body.ColumnsMetadata)
+}
 
-	// Read the CSV file to get headers
-	csvResult, err := h.gcsReader.ReadCSV(r.Context(), job.FilePath)
+func (s *Server) selectKeyForJob(ctx context.Context, filePath string, meta *[]ColumnMetadata) (SelectKeyResponseObject, error) {
+	csvResult, err := s.gcsReader.ReadCSV(ctx, filePath)
 	if err != nil {
 		log.Printf("Failed to read CSV file: %v", err)
-		http.Error(w, "Failed to read CSV file", http.StatusInternalServerError)
-		return
+		return SelectKey500JSONResponse{Message: "Failed to read CSV file"}, nil
 	}
-
 	if len(csvResult.Headers) == 0 {
-		http.Error(w, "No headers found in CSV file", http.StatusBadRequest)
-		return
+		return SelectKey400JSONResponse{Message: "No headers found in CSV file"}, nil
 	}
-
-	// Use the key selector service to select the best key
-	result, err := h.keySelector.SelectBestKey(r.Context(), csvResult.Headers, req.ColumnsMetadata)
+	result, err := s.keySelector.SelectBestKey(ctx, csvResult.Headers, toModelColumnMetadataSlicePtr(meta))
 	if err != nil {
 		log.Printf("Failed to select key: %v", err)
-		http.Error(w, "Failed to select key", http.StatusInternalServerError)
-		return
+		return SelectKey500JSONResponse{Message: "Failed to select key"}, nil
 	}
-
-	// Return the response
-	w.Header().Set("Content-Type", "application/json")
-	response := models.SelectKeyResponse{
-		SelectedKey: result.SelectedKey,
-		AllKeys:     result.AllKeys,
-		Reasoning:   result.Reasoning,
-	}
-	json.NewEncoder(w).Encode(response)
+	return SelectKey200JSONResponse{SelectedKey: result.SelectedKey, AllKeys: result.AllKeys, Reasoning: result.Reasoning}, nil
 }

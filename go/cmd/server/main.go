@@ -109,9 +109,8 @@ func main() {
 		log.Fatalf("Failed to create JWT verifier: %v", err)
 	}
 
-	handler := api.NewEnrichHandler(enr, gcsReader, store, userRepo)
-	keySelectorHandler := api.NewKeySelectorHandler(keySelector, gcsReader, store)
-	router := api.SetupRoutes(handler, keySelectorHandler, jwtVerifier, userService, billingService, userRepo)
+	server := api.NewServer(enr, gcsReader, store, userRepo, billingService, keySelector)
+	router := api.SetupRoutes(server, jwtVerifier, userService)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

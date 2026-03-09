@@ -1,0 +1,7 @@
+package: api
+generate:
+  gorilla-server: true
+  strict-server: true
+  models: true
+  embedded-spec: true
+output: zz_generated.go

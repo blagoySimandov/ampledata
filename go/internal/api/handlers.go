@@ -2,336 +2,207 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"mime"
-	"net/http"
 	"slices"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
-	"github.com/blagoySimandov/ampledata/go/internal/enricher"
-	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
-	"github.com/gorilla/mux"
 )
 
-type EnrichHandler struct {
-	enricher  enricher.IEnricher
-	gcsReader *gcs.CSVReader
-	store     state.Store
-	userRepo  user.Repository
+func (s *Server) UploadFileForEnrichment(ctx context.Context, req UploadFileForEnrichmentRequestObject) (UploadFileForEnrichmentResponseObject, error) {
+	u, ok := auth.GetUserFromContext(ctx)
+	if !ok || u == nil {
+		return UploadFileForEnrichment401JSONResponse{Message: "Unauthorized"}, nil
+	}
+	if !slices.Contains(WHITELISTED_CONTENT_TYPES, req.Body.ContentType) {
+		return UploadFileForEnrichment400JSONResponse{Message: fmt.Sprintf("invalid content type: %s", req.Body.ContentType)}, nil
+	}
+	if req.Body.Length <= 0 {
+		return UploadFileForEnrichment400JSONResponse{Message: "invalid length"}, nil
+	}
+	return s.createJobWithSignedURL(ctx, u.ID, string(req.Body.ContentType))
 }
 
-func NewEnrichHandler(enr enricher.IEnricher, gcsReader *gcs.CSVReader, store state.Store, userRepo user.Repository) *EnrichHandler {
-	return &EnrichHandler{
-		enricher:  enr,
-		gcsReader: gcsReader,
-		store:     store,
-		userRepo:  userRepo,
-	}
-}
-
-func (h *EnrichHandler) GetJobProgress(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	jobID := vars["jobID"]
-
-	progress, err := h.enricher.GetProgress(r.Context(), jobID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(progress)
-}
-
-func (h *EnrichHandler) CancelJob(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	jobID := vars["jobID"]
-
-	if err := h.enricher.Cancel(r.Context(), jobID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": "Job cancelled"})
-}
-
-func (h *EnrichHandler) GetJobResults(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	jobID := vars["jobID"]
-
-	offset := 0
-	limit := 0
-
-	if offsetStr := r.URL.Query().Get("start"); offsetStr != "" {
-		_, err := fmt.Sscanf(offsetStr, "%d", &offset)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		_, err := fmt.Sscanf(limitStr, "%d", &limit)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-	}
-
-	results, err := h.enricher.GetResults(r.Context(), jobID, offset, limit)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
-}
-
-func (h *EnrichHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.Request) {
-	var reqBody SignedURLRequest
-	user, ok := auth.GetUserFromRequest(r)
-	if user == nil || !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if !slices.Contains(WHITELISTED_CONTENT_TYPES, reqBody.ContentType) {
-		http.Error(w, fmt.Errorf("invalid content type: %s", reqBody.ContentType).Error(), http.StatusBadRequest)
-		return
-	}
-
-	if reqBody.Length <= 0 {
-		http.Error(w, "invalid length", http.StatusBadRequest)
-		return
-	}
-
-	ext, _ := mime.ExtensionsByType(reqBody.ContentType)
-	extension := ".csv" // assume csv
+func (s *Server) createJobWithSignedURL(ctx context.Context, userID, contentType string) (UploadFileForEnrichmentResponseObject, error) {
+	ext, _ := mime.ExtensionsByType(contentType)
+	extension := ".csv"
 	if len(ext) > 0 {
 		extension = ext[0]
 	}
 	jobID := generateJobId(extension)
-
-	if err := h.store.CreatePendingJob(r.Context(), jobID, user.ID, jobID); err != nil {
+	if err := s.store.CreatePendingJob(ctx, jobID, userID, jobID); err != nil {
 		log.Printf("Failed to create pending job: %v", err)
-		http.Error(w, "Failed to create job", http.StatusInternalServerError)
-		return
+		return UploadFileForEnrichment500JSONResponse{Message: "Failed to create job"}, nil
 	}
-
-	url, err := generateSignedURL(jobID, reqBody.ContentType)
+	url, err := generateSignedURL(jobID, contentType)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return UploadFileForEnrichment500JSONResponse{Message: err.Error()}, nil
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	response := SignedURLResponse{
-		URL:   url,
-		JobID: jobID,
-	}
-	json.NewEncoder(w).Encode(response)
+	return UploadFileForEnrichment200JSONResponse{Url: url, JobId: jobID}, nil
 }
 
-func (h *EnrichHandler) StartJob(w http.ResponseWriter, r *http.Request) {
-	authUser, ok := auth.GetUserFromRequest(r)
+func (s *Server) ListJobs(ctx context.Context, req ListJobsRequestObject) (ListJobsResponseObject, error) {
+	u, ok := auth.GetUserFromContext(ctx)
 	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		return ListJobs401JSONResponse{Message: "Unauthorized"}, nil
 	}
-
-	dbUser, ok := user.GetDBUserFromContext(r.Context())
-	if !ok {
-		http.Error(w, "User not found", http.StatusInternalServerError)
-		return
+	offset, limit := 0, 50
+	if req.Params.Offset != nil {
+		offset = *req.Params.Offset
 	}
-
-	vars := mux.Vars(r)
-	jobID := vars["jobID"]
-
-	job, err := h.store.GetJob(r.Context(), jobID)
-	if err != nil {
-		http.Error(w, "Job not found", http.StatusNotFound)
-		return
+	if req.Params.Limit != nil {
+		limit = *req.Params.Limit
 	}
-
-	if job.UserID != authUser.ID {
-		http.Error(w, "Forbidden: You do not own this job", http.StatusForbidden)
-		return
-	}
-
-	if job.Status != models.JobStatusPending {
-		http.Error(w, fmt.Sprintf("Job cannot be started: current status is %s", job.Status), http.StatusBadRequest)
-		return
-	}
-
-	var req models.StartJobRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if len(req.KeyColumns) == 0 {
-		http.Error(w, "key_columns is required", http.StatusBadRequest)
-		return
-	}
-
-	if len(req.ColumnsMetadata) == 0 {
-		http.Error(w, "columns_metadata is required", http.StatusBadRequest)
-		return
-	}
-
-	rowKeys, err := h.readRowKeys(r.Context(), job.FilePath, req.KeyColumns, req.ColumnsMetadata)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to read CSV file: %v", err), http.StatusBadRequest)
-		return
-	}
-
-	if len(rowKeys) == 0 {
-		http.Error(w, "No rows found in the specified key column", http.StatusBadRequest)
-		return
-	}
-	if dbUser.SubscriptionTier == nil {
-		http.Error(w, "Active subscription required", http.StatusPaymentRequired)
-		return
-	}
-
-	if err := h.store.UpdateJobConfiguration(r.Context(), jobID, req.KeyColumns, req.ColumnsMetadata, req.EntityType); err != nil {
-		log.Printf("Failed to update job configuration: %v", err)
-		http.Error(w, "Failed to update job configuration", http.StatusInternalServerError)
-		return
-	}
-
-	if err := h.store.StartJob(r.Context(), jobID, len(rowKeys)); err != nil {
-		log.Printf("Failed to start job: %v", err)
-		http.Error(w, "Failed to start job", http.StatusInternalServerError)
-		return
-	}
-
-	stripeCustomerID := ""
-	if dbUser.StripeCustomerID != nil {
-		stripeCustomerID = *dbUser.StripeCustomerID
-	}
-
-	go h.enricher.Enrich(context.Background(), jobID, dbUser.ID, stripeCustomerID, rowKeys, req.ColumnsMetadata)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(models.StartJobResponse{
-		JobID:   jobID,
-		Message: fmt.Sprintf("Enrichment started with %d rows", len(rowKeys)),
-	})
-}
-
-func (h *EnrichHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.GetUserFromRequest(r)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	offset := 0
-	limit := 50
-
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		fmt.Sscanf(offsetStr, "%d", &offset)
-	}
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		fmt.Sscanf(limitStr, "%d", &limit)
-	}
-
-	jobs, err := h.store.GetJobsByUser(r.Context(), user.ID, offset, limit)
+	jobs, err := s.store.GetJobsByUser(ctx, u.ID, offset, limit)
 	if err != nil {
 		log.Printf("Failed to retrieve jobs: %v", err)
-		http.Error(w, "Failed to retrieve jobs", http.StatusInternalServerError)
-		return
+		return ListJobs500JSONResponse{Message: "Failed to retrieve jobs"}, nil
 	}
-
-	summaries := make([]*models.JobSummary, len(jobs))
+	summaries := make([]JobSummary, len(jobs))
 	for i, job := range jobs {
-		summaries[i] = models.ToJobSummary(job)
+		summaries[i] = toAPIJobSummary(models.ToJobSummary(job))
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(models.JobListResponse{
-		Jobs:       summaries,
-		TotalCount: len(summaries),
-	})
+	return ListJobs200JSONResponse{Jobs: summaries, TotalCount: len(summaries)}, nil
 }
 
-func (h *EnrichHandler) GetRowsProgress(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	jobID := vars["jobID"]
-
-	offset := 0
-	limit := 50
-	stageFilter := "all"
-	sort := "updated_at_desc"
-
-	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
-		_, err := fmt.Sscanf(offsetStr, "%d", &offset)
-		if err != nil {
-			http.Error(w, "invalid offset parameter", http.StatusBadRequest)
-			return
-		}
+func (s *Server) StartJob(ctx context.Context, req StartJobRequestObject) (StartJobResponseObject, error) {
+	authUser, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return StartJob401JSONResponse{Message: "Unauthorized"}, nil
 	}
-
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		_, err := fmt.Sscanf(limitStr, "%d", &limit)
-		if err != nil {
-			http.Error(w, "invalid limit parameter", http.StatusBadRequest)
-			return
-		}
+	dbUser, ok := user.GetDBUserFromContext(ctx)
+	if !ok {
+		return StartJob500JSONResponse{Message: "User not found"}, nil
 	}
-
-	if limit > 100 {
-		limit = 100
+	job, errResp := s.validateJobForStart(ctx, req.JobID, authUser.ID)
+	if errResp != nil {
+		return errResp, nil
 	}
-	if limit <= 0 {
-		limit = 50
-	}
+	return s.executeStartJob(ctx, job, dbUser, req.Body)
+}
 
-	if stage := r.URL.Query().Get("stage"); stage != "" {
-		stageFilter = stage
-	}
-
-	if sortParam := r.URL.Query().Get("sort"); sortParam != "" {
-		sort = sortParam
-	}
-
-	params := state.RowsQueryParams{
-		Offset: offset,
-		Limit:  limit,
-		Stage:  stageFilter,
-		Sort:   sort,
-	}
-
-	response, err := h.enricher.GetRowsProgress(r.Context(), jobID, params)
+func (s *Server) validateJobForStart(ctx context.Context, jobID, userID string) (*models.Job, StartJobResponseObject) {
+	job, err := s.store.GetJob(ctx, jobID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, StartJob404JSONResponse{Message: "Job not found"}
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if job.UserID != userID {
+		return nil, StartJob403JSONResponse{Message: "Forbidden: You do not own this job"}
+	}
+	if job.Status != models.JobStatusPending {
+		return nil, StartJob400JSONResponse{Message: fmt.Sprintf("Job cannot be started: current status is %s", job.Status)}
+	}
+	return job, nil
 }
 
-func (h *EnrichHandler) readRowKeys(ctx context.Context, filePath string, keyColumns []string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
+func (s *Server) executeStartJob(ctx context.Context, job *models.Job, dbUser *models.User, body *StartJobJSONRequestBody) (StartJobResponseObject, error) {
+	if dbUser.SubscriptionTier == nil {
+		return StartJob402JSONResponse{Message: "Active subscription required"}, nil
+	}
+	cols := toModelColumnMetadataSlice(body.ColumnsMetadata)
+	rowKeys, err := s.readRowKeys(ctx, job.FilePath, body.KeyColumns, cols)
+	if err != nil {
+		return StartJob400JSONResponse{Message: fmt.Sprintf("Failed to read CSV file: %v", err)}, nil
+	}
+	if len(rowKeys) == 0 {
+		return StartJob400JSONResponse{Message: "No rows found in the specified key column"}, nil
+	}
+	if err := s.configureAndStartJob(ctx, job.JobID, body, cols, len(rowKeys)); err != nil {
+		return StartJob500JSONResponse{Message: err.Error()}, nil
+	}
+	go s.enricher.Enrich(context.Background(), job.JobID, dbUser.ID, stripeCustomerIDOrEmpty(dbUser), rowKeys, cols)
+	return StartJob200JSONResponse{JobId: job.JobID, Message: fmt.Sprintf("Enrichment started with %d rows", len(rowKeys))}, nil
+}
+
+func (s *Server) configureAndStartJob(ctx context.Context, jobID string, body *StartJobJSONRequestBody, cols []*models.ColumnMetadata, rowCount int) error {
+	if err := s.store.UpdateJobConfiguration(ctx, jobID, body.KeyColumns, cols, body.EntityType); err != nil {
+		log.Printf("Failed to update job configuration: %v", err)
+		return fmt.Errorf("failed to update job configuration")
+	}
+	if err := s.store.StartJob(ctx, jobID, rowCount); err != nil {
+		log.Printf("Failed to start job: %v", err)
+		return fmt.Errorf("failed to start job")
+	}
+	return nil
+}
+
+func (s *Server) CancelJob(ctx context.Context, req CancelJobRequestObject) (CancelJobResponseObject, error) {
+	if err := s.enricher.Cancel(ctx, req.JobID); err != nil {
+		return CancelJob404JSONResponse{Message: err.Error()}, nil
+	}
+	return CancelJob200JSONResponse{Message: "Job cancelled"}, nil
+}
+
+func (s *Server) GetJobProgress(ctx context.Context, req GetJobProgressRequestObject) (GetJobProgressResponseObject, error) {
+	progress, err := s.enricher.GetProgress(ctx, req.JobID)
+	if err != nil {
+		return GetJobProgress404JSONResponse{Message: err.Error()}, nil
+	}
+	return GetJobProgress200JSONResponse(toAPIJobProgress(progress)), nil
+}
+
+func (s *Server) GetJobResults(ctx context.Context, req GetJobResultsRequestObject) (GetJobResultsResponseObject, error) {
+	offset, limit := 0, 0
+	if req.Params.Start != nil {
+		offset = *req.Params.Start
+	}
+	if req.Params.Limit != nil {
+		limit = *req.Params.Limit
+	}
+	results, err := s.enricher.GetResults(ctx, req.JobID, offset, limit)
+	if err != nil {
+		return GetJobResults500JSONResponse{Message: err.Error()}, nil
+	}
+	apiResults := make([]EnrichmentResult, len(results))
+	for i, r := range results {
+		apiResults[i] = toAPIEnrichmentResult(r)
+	}
+	return GetJobResults200JSONResponse(apiResults), nil
+}
+
+func (s *Server) GetRowsProgress(ctx context.Context, req GetRowsProgressRequestObject) (GetRowsProgressResponseObject, error) {
+	params := parseRowsParams(req.Params)
+	response, err := s.enricher.GetRowsProgress(ctx, req.JobID, params)
+	if err != nil {
+		return GetRowsProgress500JSONResponse{Message: err.Error()}, nil
+	}
+	return GetRowsProgress200JSONResponse(toAPIRowsProgressResponse(response)), nil
+}
+
+func parseRowsParams(p GetRowsProgressParams) state.RowsQueryParams {
+	offset, limit := 0, 50
+	stage, sort := "all", "updated_at_desc"
+	if p.Offset != nil {
+		offset = *p.Offset
+	}
+	if p.Limit != nil {
+		limit = *p.Limit
+		if limit > 100 {
+			limit = 100
+		}
+		if limit <= 0 {
+			limit = 50
+		}
+	}
+	if p.Stage != nil {
+		stage = *p.Stage
+	}
+	if p.Sort != nil {
+		sort = *p.Sort
+	}
+	return state.RowsQueryParams{Offset: offset, Limit: limit, Stage: stage, Sort: sort}
+}
+
+func (s *Server) readRowKeys(ctx context.Context, filePath string, keyColumns []string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	imputationCols := imputationColumnNames(columnsMetadata)
 	if len(imputationCols) > 0 {
-		return h.gcsReader.ReadCompositeKeyFromFileFiltered(ctx, filePath, keyColumns, imputationCols)
+		return s.gcsReader.ReadCompositeKeyFromFileFiltered(ctx, filePath, keyColumns, imputationCols)
 	}
-	return h.gcsReader.ReadCompositeKeyFromFile(ctx, filePath, keyColumns)
+	return s.gcsReader.ReadCompositeKeyFromFile(ctx, filePath, keyColumns)
 }
 
 func imputationColumnNames(cols []*models.ColumnMetadata) []string {
@@ -342,4 +213,11 @@ func imputationColumnNames(cols []*models.ColumnMetadata) []string {
 		}
 	}
 	return names
+}
+
+func stripeCustomerIDOrEmpty(u *models.User) string {
+	if u.StripeCustomerID != nil {
+		return *u.StripeCustomerID
+	}
+	return ""
 }

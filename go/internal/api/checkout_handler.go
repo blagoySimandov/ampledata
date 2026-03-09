@@ -7,284 +7,208 @@ import (
 	"io"
 	"log"
 	"math"
-	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/billing"
 	"github.com/blagoySimandov/ampledata/go/internal/config"
-	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/stripe/stripe-go/v84"
 )
 
-func writeJSON(w http.ResponseWriter, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("Failed to encode JSON response: %v", err)
+func (s *Server) HandleStripeWebhook(ctx context.Context, req HandleStripeWebhookRequestObject) (HandleStripeWebhookResponseObject, error) {
+	payload, err := io.ReadAll(req.Body)
+	if err != nil {
+		return HandleStripeWebhook400JSONResponse{Message: "Failed to read body"}, nil
 	}
+	event, err := s.billing.VerifyWebhookSignature(payload, req.Params.StripeSignature)
+	if err != nil {
+		return HandleStripeWebhook401JSONResponse{Message: "Invalid signature"}, nil
+	}
+	if err := s.handleWebhookEvent(ctx, event); err != nil {
+		log.Printf("Webhook %s handling failed: %v", event.Type, err)
+		return HandleStripeWebhook500JSONResponse{Message: "Webhook handling failed"}, nil
+	}
+	return HandleStripeWebhook200Response{}, nil
 }
 
-type CheckoutHandler struct {
-	billing  services.BillingService
-	userRepo user.Repository
+func (s *Server) handleWebhookEvent(ctx context.Context, event *stripe.Event) error {
+	switch event.Type {
+	case "checkout.session.completed":
+		return s.handleCheckoutCompleted(ctx, event)
+	case "invoice.paid":
+		return s.handleInvoicePaid(ctx, event)
+	case "customer.subscription.deleted":
+		return s.handleSubscriptionDeleted(ctx, event)
+	}
+	return nil
 }
 
-func NewCheckoutHandler(billing services.BillingService, userRepo user.Repository) *CheckoutHandler {
-	return &CheckoutHandler{billing: billing, userRepo: userRepo}
-}
-
-type CreateSubscriptionRequest struct {
-	TierID     string `json:"tier_id"`
-	SuccessURL string `json:"success_url"`
-	CancelURL  string `json:"cancel_url"`
-}
-
-type CreateCheckoutResponse struct {
-	CheckoutURL string `json:"checkout_url"`
-	SessionID   string `json:"session_id"`
-}
-
-type SubscriptionStatusResponse struct {
-	Tier               *string    `json:"tier"`
-	TokensUsed         int64      `json:"tokens_used"`
-	TokensIncluded     int64      `json:"tokens_included"`
-	CurrentPeriodStart *time.Time `json:"current_period_start,omitempty"`
-	CurrentPeriodEnd   *time.Time `json:"current_period_end,omitempty"`
-}
-
-type TierResponse struct {
-	ID                string `json:"id"`
-	DisplayName       string `json:"display_name"`
-	MonthlyPriceCents int64  `json:"monthly_price_cents"`
-	IncludedTokens    int64  `json:"included_tokens"`
-	OveragePrice      string `json:"overage_price_cents_decimal"`
-}
-
-func (h *CheckoutHandler) CreateSubscriptionCheckout(w http.ResponseWriter, r *http.Request) {
-	dbUser, ok := user.GetDBUserFromContext(r.Context())
+func (s *Server) CreateSubscriptionCheckout(ctx context.Context, req CreateSubscriptionCheckoutRequestObject) (CreateSubscriptionCheckoutResponseObject, error) {
+	dbUser, ok := user.GetDBUserFromContext(ctx)
 	if !ok || dbUser.StripeCustomerID == nil {
-		http.Error(w, "User not found or missing Stripe customer", http.StatusBadRequest)
-		return
+		return CreateSubscriptionCheckout400JSONResponse{Message: "User not found or missing Stripe customer"}, nil
 	}
-
-	var req CreateSubscriptionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
+	if resp := validateSubscriptionRequest(req.Body); resp != nil {
+		return resp, nil
 	}
-
-	if req.TierID == "" {
-		http.Error(w, "tier_id is required", http.StatusBadRequest)
-		return
-	}
-
-	if billing.GetTier(req.TierID) == nil {
-		http.Error(w, "Invalid tier_id", http.StatusBadRequest)
-		return
-	}
-
-	if req.SuccessURL == "" || req.CancelURL == "" {
-		http.Error(w, "success_url and cancel_url are required", http.StatusBadRequest)
-		return
-	}
-
-	session, err := h.billing.CreateSubscriptionCheckout(r.Context(), *dbUser.StripeCustomerID, req.TierID, req.SuccessURL, req.CancelURL)
+	session, err := s.billing.CreateSubscriptionCheckout(ctx, *dbUser.StripeCustomerID, req.Body.TierId, req.Body.SuccessUrl, req.Body.CancelUrl)
 	if err != nil {
 		log.Printf("Failed to create subscription checkout: %v", err)
-		http.Error(w, "Failed to create checkout session", http.StatusInternalServerError)
-		return
+		return CreateSubscriptionCheckout500JSONResponse{Message: "Failed to create checkout session"}, nil
 	}
-
-	writeJSON(w, CreateCheckoutResponse{
-		CheckoutURL: session.URL,
-		SessionID:   session.ID,
-	})
+	return CreateSubscriptionCheckout200JSONResponse{CheckoutUrl: session.URL, SessionId: session.ID}, nil
 }
 
-func (h *CheckoutHandler) GetSubscriptionStatus(w http.ResponseWriter, r *http.Request) {
-	dbUser, ok := user.GetDBUserFromContext(r.Context())
-	if !ok {
-		http.Error(w, "User not found", http.StatusBadRequest)
-		return
+func validateSubscriptionRequest(body *CreateSubscriptionCheckoutJSONRequestBody) CreateSubscriptionCheckoutResponseObject {
+	if body.TierId == "" {
+		return CreateSubscriptionCheckout400JSONResponse{Message: "tier_id is required"}
 	}
+	if billing.GetTier(body.TierId) == nil {
+		return CreateSubscriptionCheckout400JSONResponse{Message: "Invalid tier_id"}
+	}
+	if body.SuccessUrl == "" || body.CancelUrl == "" {
+		return CreateSubscriptionCheckout400JSONResponse{Message: "success_url and cancel_url are required"}
+	}
+	return nil
+}
 
-	writeJSON(w, SubscriptionStatusResponse{
+func (s *Server) GetSubscriptionStatus(ctx context.Context, req GetSubscriptionStatusRequestObject) (GetSubscriptionStatusResponseObject, error) {
+	dbUser, ok := user.GetDBUserFromContext(ctx)
+	if !ok {
+		return GetSubscriptionStatus400JSONResponse{Message: "User not found"}, nil
+	}
+	return GetSubscriptionStatus200JSONResponse{
 		Tier:               dbUser.SubscriptionTier,
 		TokensUsed:         dbUser.TokensUsed,
 		TokensIncluded:     dbUser.TokensIncluded,
 		CurrentPeriodStart: dbUser.CurrentPeriodStart,
 		CurrentPeriodEnd:   dbUser.CurrentPeriodEnd,
-	})
+	}, nil
 }
 
-func (h *CheckoutHandler) CancelSubscription(w http.ResponseWriter, r *http.Request) {
-	dbUser, ok := user.GetDBUserFromContext(r.Context())
+func (s *Server) CancelSubscription(ctx context.Context, req CancelSubscriptionRequestObject) (CancelSubscriptionResponseObject, error) {
+	dbUser, ok := user.GetDBUserFromContext(ctx)
 	if !ok || dbUser.StripeSubscriptionID == nil {
-		http.Error(w, "No active subscription found", http.StatusBadRequest)
-		return
+		return CancelSubscription400JSONResponse{Message: "No active subscription found"}, nil
 	}
-
-	_, err := h.billing.CancelSubscription(r.Context(), *dbUser.StripeSubscriptionID)
-	if err != nil {
+	if _, err := s.billing.CancelSubscription(ctx, *dbUser.StripeSubscriptionID); err != nil {
 		log.Printf("Failed to cancel subscription: %v", err)
-		http.Error(w, "Failed to cancel subscription", http.StatusInternalServerError)
-		return
+		return CancelSubscription500JSONResponse{Message: "Failed to cancel subscription"}, nil
 	}
-
-	writeJSON(w, map[string]string{"message": "Subscription cancelled"})
+	return CancelSubscription200JSONResponse{Message: "Subscription cancelled"}, nil
 }
 
-func (h *CheckoutHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
-	tiers := make([]TierResponse, 0, len(billing.TierOrder))
+func (s *Server) ListTiers(ctx context.Context, req ListTiersRequestObject) (ListTiersResponseObject, error) {
+	tiers := make(ListTiers200JSONResponse, 0, len(billing.TierOrder))
 	for _, id := range billing.TierOrder {
 		t := billing.Tiers[id]
 		tiers = append(tiers, TierResponse{
-			ID:                t.ID,
-			DisplayName:       t.DisplayName,
-			MonthlyPriceCents: t.MonthlyPriceCents,
-			IncludedTokens:    t.IncludedTokens,
-			OveragePrice:      t.OveragePriceCentsDecimal,
+			Id:                       t.ID,
+			DisplayName:              t.DisplayName,
+			MonthlyPriceCents:        t.MonthlyPriceCents,
+			IncludedTokens:           t.IncludedTokens,
+			OveragePriceCentsDecimal: t.OveragePriceCentsDecimal,
 		})
 	}
-
-	writeJSON(w, tiers)
+	return tiers, nil
 }
 
-func (h *CheckoutHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
-	payload, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("Failed to read webhook body: %v", err)
-		http.Error(w, "Failed to read body", http.StatusBadRequest)
-		return
-	}
-
-	signature := r.Header.Get("Stripe-Signature")
-	event, err := h.billing.VerifyWebhookSignature(payload, signature)
-	if err != nil {
-		log.Printf("Webhook signature verification failed: %v", err)
-		http.Error(w, "Invalid signature", http.StatusUnauthorized)
-		return
-	}
-
-	var handleErr error
-	switch event.Type {
-	case "checkout.session.completed":
-		handleErr = h.handleCheckoutCompleted(r.Context(), event)
-	case "invoice.paid":
-		handleErr = h.handleInvoicePaid(r.Context(), event)
-	case "customer.subscription.deleted":
-		handleErr = h.handleSubscriptionDeleted(r.Context(), event)
-	}
-
-	if handleErr != nil {
-		log.Printf("Webhook %s handling failed: %v", event.Type, handleErr)
-		http.Error(w, "Webhook handling failed", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func (h *CheckoutHandler) handleCheckoutCompleted(ctx context.Context, event *stripe.Event) error {
+func (s *Server) handleCheckoutCompleted(ctx context.Context, event *stripe.Event) error {
 	session, err := parseEventData[checkoutSession](event)
 	if err != nil {
 		return fmt.Errorf("failed to parse checkout session: %w", err)
 	}
-
 	if session.Subscription == "" {
 		return nil
 	}
+	return s.applySubscription(ctx, session, event.ID)
+}
 
-	sub, err := h.billing.GetSubscription(ctx, session.Subscription)
+func (s *Server) applySubscription(ctx context.Context, session *checkoutSession, eventID string) error {
+	sub, tier, err := s.getSubscriptionAndTier(ctx, session.Subscription, session.ID)
 	if err != nil {
-		return fmt.Errorf("failed to retrieve subscription %s: %w", session.Subscription, err)
+		return err
 	}
-
-	tierID := sub.Metadata[config.StripeTierIDKey]
-	if tierID == "" {
-		return fmt.Errorf("no tier_id in subscription %s metadata", session.Subscription)
-	}
-
-	tier := billing.GetTier(tierID)
-	if tier == nil {
-		return fmt.Errorf("unknown tier %s in checkout session %s", tierID, session.ID)
-	}
-
 	periodStart, periodEnd, err := subscriptionPeriod(sub)
 	if err != nil {
 		return fmt.Errorf("subscription %s: %w", session.Subscription, err)
 	}
-
-	if err := h.userRepo.UpdateSubscription(ctx, session.Customer, tierID, session.Subscription, tier.IncludedTokens, periodStart, periodEnd); err != nil {
+	if err := s.userRepo.UpdateSubscription(ctx, session.Customer, tier.ID, session.Subscription, tier.IncludedTokens, periodStart, periodEnd); err != nil {
 		return fmt.Errorf("failed to update subscription for customer %s: %w", session.Customer, err)
 	}
-
-	h.issueCreditGrant(ctx, session.Customer, tier, event.ID)
-
-	log.Printf("Subscription created for customer %s: tier=%s, subscription=%s", session.Customer, tierID, session.Subscription)
+	s.issueCreditGrant(ctx, session.Customer, tier, eventID)
+	log.Printf("Subscription created for customer %s: tier=%s", session.Customer, tier.ID)
 	return nil
 }
 
-func (h *CheckoutHandler) handleInvoicePaid(ctx context.Context, event *stripe.Event) error {
+func (s *Server) getSubscriptionAndTier(ctx context.Context, subscriptionID, sessionID string) (*stripe.Subscription, *billing.SubscriptionTier, error) {
+	sub, err := s.billing.GetSubscription(ctx, subscriptionID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve subscription %s: %w", subscriptionID, err)
+	}
+	tierID := sub.Metadata[config.StripeTierIDKey]
+	if tierID == "" {
+		return nil, nil, fmt.Errorf("no tier_id in subscription %s metadata", subscriptionID)
+	}
+	tier := billing.GetTier(tierID)
+	if tier == nil {
+		return nil, nil, fmt.Errorf("unknown tier %s in checkout session %s", tierID, sessionID)
+	}
+	return sub, tier, nil
+}
+
+func (s *Server) handleInvoicePaid(ctx context.Context, event *stripe.Event) error {
 	invoice, err := parseEventData[invoiceEvent](event)
 	if err != nil {
 		return fmt.Errorf("failed to parse invoice: %w", err)
 	}
-
 	if invoice.Subscription == "" || invoice.BillingReason == "subscription_create" {
 		return nil
 	}
+	return s.applyBillingCycleReset(ctx, invoice, event.ID)
+}
 
-	sub, err := h.billing.GetSubscription(ctx, invoice.Subscription)
+func (s *Server) applyBillingCycleReset(ctx context.Context, invoice *invoiceEvent, eventID string) error {
+	sub, err := s.billing.GetSubscription(ctx, invoice.Subscription)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve subscription %s: %w", invoice.Subscription, err)
 	}
-
-	tier, err := h.lookupUserTier(ctx, invoice.Customer)
+	tier, err := s.lookupUserTier(ctx, invoice.Customer)
 	if err != nil {
 		return err
 	}
-
 	periodStart, periodEnd, err := subscriptionPeriod(sub)
 	if err != nil {
 		return fmt.Errorf("subscription %s: %w", invoice.Subscription, err)
 	}
-
-	if err := h.userRepo.ResetBillingCycle(ctx, invoice.Customer, periodStart, periodEnd); err != nil {
+	if err := s.userRepo.ResetBillingCycle(ctx, invoice.Customer, periodStart, periodEnd); err != nil {
 		return fmt.Errorf("failed to reset billing cycle for customer %s: %w", invoice.Customer, err)
 	}
-
-	h.issueCreditGrant(ctx, invoice.Customer, tier, event.ID)
-
-	log.Printf("Billing cycle reset for customer %s: period %s to %s", invoice.Customer, periodStart, periodEnd)
+	s.issueCreditGrant(ctx, invoice.Customer, tier, eventID)
 	return nil
 }
 
-func (h *CheckoutHandler) handleSubscriptionDeleted(ctx context.Context, event *stripe.Event) error {
+func (s *Server) handleSubscriptionDeleted(ctx context.Context, event *stripe.Event) error {
 	sub, err := parseEventData[subscriptionEvent](event)
 	if err != nil {
 		return fmt.Errorf("failed to parse subscription: %w", err)
 	}
-
-	if err := h.userRepo.ClearSubscription(ctx, sub.Customer); err != nil {
+	if err := s.userRepo.ClearSubscription(ctx, sub.Customer); err != nil {
 		return fmt.Errorf("failed to clear subscription for customer %s: %w", sub.Customer, err)
 	}
-
 	log.Printf("Subscription %s deleted for customer %s", sub.ID, sub.Customer)
 	return nil
 }
 
-func (h *CheckoutHandler) lookupUserTier(ctx context.Context, stripeCustomerID string) (*billing.SubscriptionTier, error) {
-	usr, err := h.userRepo.GetByStripeCustomerID(ctx, stripeCustomerID)
+func (s *Server) lookupUserTier(ctx context.Context, stripeCustomerID string) (*billing.SubscriptionTier, error) {
+	usr, err := s.userRepo.GetByStripeCustomerID(ctx, stripeCustomerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find user for customer %s: %w", stripeCustomerID, err)
 	}
-
 	if usr.SubscriptionTier == nil {
 		return nil, fmt.Errorf("user for customer %s has no subscription tier", stripeCustomerID)
 	}
-
 	tier := billing.GetTier(*usr.SubscriptionTier)
 	if tier == nil {
 		return nil, fmt.Errorf("unknown tier %s for customer %s", *usr.SubscriptionTier, stripeCustomerID)
@@ -292,13 +216,13 @@ func (h *CheckoutHandler) lookupUserTier(ctx context.Context, stripeCustomerID s
 	return tier, nil
 }
 
-func (h *CheckoutHandler) issueCreditGrant(ctx context.Context, customerID string, tier *billing.SubscriptionTier, eventID string) {
+func (s *Server) issueCreditGrant(ctx context.Context, customerID string, tier *billing.SubscriptionTier, eventID string) {
 	amount := creditGrantCentsForTier(tier)
 	if amount <= 0 {
 		return
 	}
 	idempotencyKey := fmt.Sprintf("credit_grant_%s", eventID)
-	if _, err := h.billing.CreateCreditGrant(ctx, customerID, amount, idempotencyKey); err != nil {
+	if _, err := s.billing.CreateCreditGrant(ctx, customerID, amount, idempotencyKey); err != nil {
 		log.Printf("Failed to create credit grant for customer %s: %v", customerID, err)
 	}
 }

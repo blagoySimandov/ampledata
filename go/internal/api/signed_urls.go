@@ -9,19 +9,10 @@ import (
 	"github.com/google/uuid"
 )
 
-type SignedURLRequest struct {
-	ContentType string `json:"contentType"`
-	Length      int    `json:"length"`
-}
 
-type SignedURLResponse struct {
-	URL   string `json:"url"`
-	JobID string `json:"jobId"`
-}
-
-var WHITELISTED_CONTENT_TYPES = []string{
-	"text/csv",
-	"application/json",
+var WHITELISTED_CONTENT_TYPES = []SignedURLRequestContentType{
+	Textcsv,
+	Applicationjson,
 }
 
 var (
