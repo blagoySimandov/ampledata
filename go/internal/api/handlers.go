@@ -199,10 +199,29 @@ func parseRowsParams(p GetRowsProgressParams) state.RowsQueryParams {
 
 func (s *Server) readRowKeys(ctx context.Context, filePath string, keyColumns []string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	imputationCols := imputationColumnNames(columnsMetadata)
+	var keys []string
+	var err error
 	if len(imputationCols) > 0 {
-		return s.gcsReader.ReadCompositeKeyFromFileFiltered(ctx, filePath, keyColumns, imputationCols)
+		keys, err = s.gcsReader.ReadCompositeKeyFromFileFiltered(ctx, filePath, keyColumns, imputationCols)
+	} else {
+		keys, err = s.gcsReader.ReadCompositeKeyFromFile(ctx, filePath, keyColumns)
 	}
-	return s.gcsReader.ReadCompositeKeyFromFile(ctx, filePath, keyColumns)
+	if err != nil {
+		return nil, err
+	}
+	return deduplicateKeys(keys), nil
+}
+
+func deduplicateKeys(keys []string) []string {
+	seen := make(map[string]struct{}, len(keys))
+	result := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if _, ok := seen[k]; !ok {
+			seen[k] = struct{}{}
+			result = append(result, k)
+		}
+	}
+	return result
 }
 
 func imputationColumnNames(cols []*models.ColumnMetadata) []string {
