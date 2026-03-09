@@ -225,9 +225,13 @@ func (s *PostgresStore) BulkCreateRows(ctx context.Context, jobID string, rowKey
 
 		// Only insert non-JSONB columns to avoid storing JSON "null"
 		// JSONB columns will be database NULL by default
+		// DO NOTHING on conflict makes this idempotent: Temporal may retry
+		// InitializeJob after a transient failure, and rows inserted in a
+		// previous attempt must not cause the retry to fail.
 		_, err := tx.NewInsert().
 			Model(&rows).
 			Column("job_id", "key", "stage", "created_at", "updated_at").
+			On("CONFLICT (job_id, key) DO NOTHING").
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to insert row states: %w", err)

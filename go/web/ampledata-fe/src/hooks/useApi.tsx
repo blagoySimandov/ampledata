@@ -1,4 +1,5 @@
 // src/hooks/useApi.tsx
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { ApiClient } from '../api';
 

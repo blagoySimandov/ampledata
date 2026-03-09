@@ -48,7 +48,7 @@ export interface RowProgressItem {
   updated_at: string;
   confidence?: Record<string, FieldConfidenceInfo> | null;
   error?: string | null;
-  extracted_data?: Record<string, any> | null;
+  extracted_data?: Record<string, unknown> | null;
   sources?: string[] | null;
 }
 
@@ -66,7 +66,7 @@ export interface RowsProgressResponse {
 
 export interface EnrichmentResult {
   key: string;
-  extracted_data: Record<string, any>;
+  extracted_data: Record<string, unknown>;
   sources: string[];
   confidence?: Record<string, FieldConfidenceInfo> | null;
   error?: string | null;

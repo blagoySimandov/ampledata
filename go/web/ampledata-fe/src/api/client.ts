@@ -51,7 +51,7 @@ export class ApiClient {
         if (errorData.message) {
           errorMessage = errorData.message;
         }
-      } catch (e) {
+      } catch {
         // Fallback to text if JSON parsing fails
       }
       throw new Error(errorMessage);

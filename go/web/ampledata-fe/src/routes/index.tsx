@@ -59,7 +59,6 @@ function NewJobDialog() {
   const [step, setStep] = useState<'upload' | 'configure' | 'starting'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [suggestedKey, setSuggestedKey] = useState<string>("");
   const [allKeys, setAllKeys] = useState<string[]>([]);
   const [entityType, setEntityType] = useState<string>("Companies");
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
@@ -71,6 +70,8 @@ function NewJobDialog() {
   const uploadFile = useUploadFile(api);
   const selectKey = useSelectKey(api);
   const startJob = useStartJob(api);
+
+  const navigate = useNavigate();
 
   const reset = () => {
     setStep('upload');
@@ -101,7 +102,6 @@ function NewJobDialog() {
       await uploadFile.mutateAsync({ url, file });
 
       const { selected_key, all_keys } = await selectKey.mutateAsync({ job_id: jobId });
-      setSuggestedKey(selected_key);
       setAllKeys(all_keys);
       setSelectedKeys([selected_key]);
       
@@ -130,6 +130,10 @@ function NewJobDialog() {
     
     setStep('starting');
     try {
+      // Store column names in localStorage so the job page can immediately render the table headers
+      const columnNames = columnsMetadata.map(c => c.name);
+      localStorage.setItem(`job_columns_${jobId}`, JSON.stringify(columnNames));
+
       await startJob.mutateAsync({
         jobId,
         req: {
@@ -140,6 +144,7 @@ function NewJobDialog() {
       });
       setOpen(false);
       reset();
+      navigate({ to: '/jobs/$jobId', params: { jobId } });
     } catch (error) {
       console.error("Start failed", error);
       setStep('configure');
@@ -263,7 +268,7 @@ function NewJobDialog() {
                           />
                           <Select 
                             value={col.job_type} 
-                            onValueChange={(v: any) => updateColumn(index, { job_type: v })}
+                            onValueChange={(v: "enrichment" | "imputation") => updateColumn(index, { job_type: v })}
                           >
                             <SelectTrigger className="h-9 w-[120px] text-xs">
                               <SelectValue />
@@ -275,7 +280,7 @@ function NewJobDialog() {
                           </Select>
                           <Select 
                             value={col.type} 
-                            onValueChange={(v: any) => updateColumn(index, { type: v })}
+                            onValueChange={(v: "string" | "number" | "boolean" | "date") => updateColumn(index, { type: v })}
                           >
                             <SelectTrigger className="h-9 w-[100px] text-xs">
                               <SelectValue />
@@ -352,7 +357,7 @@ function JobsList() {
       field: 'job_id', 
       headerName: 'Job Name', 
       flex: 1,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: { value: string; data: { job_id: string } }) => {
         const trimmed = params.value?.replace(/\.csv$/i, '') || params.value;
         return (
           <span className="font-semibold text-primary cursor-pointer hover:underline">
@@ -368,7 +373,7 @@ function JobsList() {
       field: 'status', 
       headerName: 'Status',
       width: 140,
-      cellRenderer: (params: any) => {
+      cellRenderer: (params: { value: string; data: { job_id: string } }) => {
         const status = params.value;
         let colorClass = "";
         
@@ -390,7 +395,7 @@ function JobsList() {
       field: 'total_rows', 
       headerName: 'Rows', 
       width: 100,
-      cellRenderer: (params: any) => <span className="font-mono text-gray-600">{params.value}</span>
+      cellRenderer: (params: { value: number }) => <span className="font-mono text-gray-600">{params.value}</span>
     },
     { 
       field: 'created_at', 
@@ -418,6 +423,8 @@ function JobsList() {
     );
   }
 
+  const hasJobs = data?.jobs && data.jobs.length > 0;
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
@@ -425,17 +432,32 @@ function JobsList() {
         <NewJobDialog />
       </div>
 
-      <div className="w-full h-[600px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
-        <AgGridReact
-          rowData={data?.jobs || []}
-          columnDefs={columnDefs}
-          theme={myTheme}
-          pagination={true}
-          paginationPageSize={10}
-          paginationPageSizeSelector={[10, 20, 50]}
-          domLayout="normal"
-        />
-      </div>
+      {!hasJobs ? (
+        <div className="border-2 border-dashed border-slate-200 rounded-3xl p-16 flex flex-col items-center justify-center text-center bg-slate-50/50">
+          <div className="w-20 h-20 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100 mb-6">
+            <Settings2 className="w-10 h-10 text-slate-400" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 mb-2">No Jobs Found</h2>
+          <p className="text-slate-500 max-w-md mb-8">
+            You haven't run any enrichment jobs yet. Upload your first CSV to start enriching your data with high-confidence sources.
+          </p>
+          <div className="mt-2">
+             <NewJobDialog />
+          </div>
+        </div>
+      ) : (
+        <div className="w-full h-[600px] bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden">
+          <AgGridReact
+            rowData={data?.jobs || []}
+            columnDefs={columnDefs}
+            theme={myTheme}
+            pagination={true}
+            paginationPageSize={10}
+            paginationPageSizeSelector={[10, 20, 50]}
+            domLayout="normal"
+          />
+        </div>
+      )}
     </div>
   );
 }
