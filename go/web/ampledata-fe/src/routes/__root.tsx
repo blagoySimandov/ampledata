@@ -1,6 +1,6 @@
-import { createRootRoute, Outlet, Link } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/router-devtools';
-import { Database } from 'lucide-react';
+import { createRootRoute, Outlet, Link } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/router-devtools";
+import { Database } from "lucide-react";
 
 export const Route = createRootRoute({
   component: () => (
@@ -15,7 +15,7 @@ export const Route = createRootRoute({
             <Link
               to="/"
               className="text-base font-medium text-gray-600 hover:text-gray-900 transition-colors"
-              activeProps={{ className: 'text-primary font-semibold' }}
+              activeProps={{ className: "text-primary font-semibold" }}
             >
               Jobs
             </Link>

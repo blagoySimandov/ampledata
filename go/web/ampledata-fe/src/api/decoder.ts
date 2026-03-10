@@ -6,7 +6,7 @@ import type {
   JobProgressResponse,
   RowsProgressResponse,
   EnrichmentResult,
-} from './types';
+} from "./types";
 
 export function decodeSourceList(data: unknown): SourceListResponse {
   return data as SourceListResponse;

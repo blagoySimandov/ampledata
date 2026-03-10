@@ -1,7 +1,6 @@
-// src/hooks/useApi.tsx
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, type ReactNode } from 'react';
-import { ApiClient } from '../api';
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { ApiClient } from "../api";
 
 const ApiContext = createContext<ApiClient | null>(null);
 
@@ -13,7 +12,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 export function useApi(): ApiClient {
   const context = useContext(ApiContext);
   if (!context) {
-    throw new Error('useApi must be used within an ApiProvider');
+    throw new Error("useApi must be used within an ApiProvider");
   }
   return context;
 }

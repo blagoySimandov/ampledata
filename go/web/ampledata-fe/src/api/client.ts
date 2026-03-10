@@ -6,7 +6,7 @@ import {
   decodeJobProgress,
   decodeRowsProgress,
   decodeEnrichmentResults,
-} from './decoder';
+} from "./decoder";
 import type {
   SourceListResponse,
   SourceDetail,
@@ -19,24 +19,32 @@ import type {
   SelectKeyResponse,
   EnrichRequest,
   EnrichResponse,
-} from './types';
+} from "./types";
 
 export class ApiClient {
-  private baseUrl = '/api/v1';
+  private baseUrl = "/api/v1";
 
   private getToken(): string {
-    return 'mock-token';
+    return "mock-token";
   }
 
-  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options?: RequestInit,
+  ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
     const headers = new Headers(options?.headers);
-    if (!headers.has('Content-Type') && (!options?.method || options.method === 'GET' || options.method === 'POST')) {
-      headers.set('Content-Type', 'application/json');
+    if (
+      !headers.has("Content-Type") &&
+      (!options?.method ||
+        options.method === "GET" ||
+        options.method === "POST")
+    ) {
+      headers.set("Content-Type", "application/json");
     }
 
-    headers.set('Authorization', `Bearer ${this.getToken()}`);
+    headers.set("Authorization", `Bearer ${this.getToken()}`);
 
     const config: RequestInit = { ...options, headers };
     const response = await fetch(url, config);
@@ -46,7 +54,9 @@ export class ApiClient {
       try {
         const errorData = await response.json();
         if (errorData.message) errorMessage = errorData.message;
-      } catch { /* fallback to statusText */ }
+      } catch {
+        /* fallback to statusText */
+      }
       throw new Error(errorMessage);
     }
 
@@ -56,7 +66,9 @@ export class ApiClient {
   }
 
   public async getSources(offset = 0, limit = 50): Promise<SourceListResponse> {
-    const data = await this.request<unknown>(`/sources?offset=${offset}&limit=${limit}`);
+    const data = await this.request<unknown>(
+      `/sources?offset=${offset}&limit=${limit}`,
+    );
     return decodeSourceList(data);
   }
 
@@ -65,14 +77,21 @@ export class ApiClient {
     return decodeSourceDetail(data);
   }
 
-  public async getSourceData(sourceId: string): Promise<import('./types').SourceDataResponse> {
+  public async getSourceData(
+    sourceId: string,
+  ): Promise<import("./types").SourceDataResponse> {
     // Assuming simple JSON decode is fine here or we can define a decoder. We'll cast for now.
-    return this.request<import('./types').SourceDataResponse>(`/sources/${sourceId}/data`);
+    return this.request<import("./types").SourceDataResponse>(
+      `/sources/${sourceId}/data`,
+    );
   }
 
-  public async enrich(sourceId: string, req: EnrichRequest): Promise<EnrichResponse> {
+  public async enrich(
+    sourceId: string,
+    req: EnrichRequest,
+  ): Promise<EnrichResponse> {
     return this.request<EnrichResponse>(`/sources/${sourceId}/enrich`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(req),
     });
   }
@@ -86,43 +105,52 @@ export class ApiClient {
     jobId: string,
     offset = 0,
     limit = 50,
-    stage = 'all',
-    sort = 'updated_at_desc'
+    stage = "all",
+    sort = "updated_at_desc",
   ): Promise<RowsProgressResponse> {
     const data = await this.request<unknown>(
-      `/jobs/${jobId}/rows?offset=${offset}&limit=${limit}&stage=${stage}&sort=${sort}`
+      `/jobs/${jobId}/rows?offset=${offset}&limit=${limit}&stage=${stage}&sort=${sort}`,
     );
     return decodeRowsProgress(data);
   }
 
-  public async getJobResults(jobId: string, start = 0, limit = 0): Promise<EnrichmentResult[]> {
-    const data = await this.request<unknown>(`/jobs/${jobId}/results?start=${start}&limit=${limit}`);
+  public async getJobResults(
+    jobId: string,
+    start = 0,
+    limit = 0,
+  ): Promise<EnrichmentResult[]> {
+    const data = await this.request<unknown>(
+      `/jobs/${jobId}/results?start=${start}&limit=${limit}`,
+    );
     return decodeEnrichmentResults(data);
   }
 
   public async cancelJob(jobId: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/jobs/${jobId}/cancel`, { method: 'POST' });
+    return this.request<{ message: string }>(`/jobs/${jobId}/cancel`, {
+      method: "POST",
+    });
   }
 
   public async getSignedUrl(req: SignedURLRequest): Promise<SignedURLResponse> {
-    return this.request<SignedURLResponse>('/enrichment-signed-url', {
-      method: 'POST',
+    return this.request<SignedURLResponse>("/enrichment-signed-url", {
+      method: "POST",
       body: JSON.stringify(req),
     });
   }
 
   public async uploadFile(url: string, file: File): Promise<void> {
     const response = await fetch(url, {
-      method: 'PUT',
+      method: "PUT",
       body: file,
-      headers: { 'Content-Type': file.type || 'text/csv' },
+      headers: { "Content-Type": file.type || "text/csv" },
     });
-    if (!response.ok) throw new Error(`File upload failed: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(`File upload failed: ${response.statusText}`);
   }
 
   public async selectKey(req: SelectKeyRequest): Promise<SelectKeyResponse> {
-    return this.request<SelectKeyResponse>('/select-key', {
-      method: 'POST',
+    return this.request<SelectKeyResponse>("/select-key", {
+      method: "POST",
       body: JSON.stringify(req),
     });
   }

@@ -1,12 +1,25 @@
 // src/api/types.ts
 
-export type JobStatus = 'PENDING' | 'RUNNING' | 'PAUSED' | 'CANCELLED' | 'COMPLETED';
+export type JobStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "PAUSED"
+  | "CANCELLED"
+  | "COMPLETED";
 
-export type JobType = 'enrichment' | 'imputation';
+export type JobType = "enrichment" | "imputation";
 
-export type ColumnType = 'string' | 'number' | 'boolean' | 'date';
+export type ColumnType = "string" | "number" | "boolean" | "date";
 
-export type RowStage = 'PENDING' | 'SERP_FETCHED' | 'DECISION_MADE' | 'CRAWLED' | 'ENRICHED' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type RowStage =
+  | "PENDING"
+  | "SERP_FETCHED"
+  | "DECISION_MADE"
+  | "CRAWLED"
+  | "ENRICHED"
+  | "COMPLETED"
+  | "FAILED"
+  | "CANCELLED";
 
 export interface ColumnMetadata {
   name: string;
@@ -105,7 +118,7 @@ export interface EnrichmentResult {
 }
 
 export interface SignedURLRequest {
-  contentType: 'text/csv' | 'application/json';
+  contentType: "text/csv" | "application/json";
   length: number;
 }
 
