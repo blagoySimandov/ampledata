@@ -159,9 +159,12 @@ function ConfidenceDataRenderer(params: {
 function AddColumnsDialog({ sourceId, mostRecentJob }: { sourceId: string; mostRecentJob?: SourceJobSummary }) {
   const api = useApi();
   const enrich = useEnrich(api, sourceId);
+  const { data: sourceData } = useSourceData(api, sourceId);
+  const sourceColumns = sourceData?.headers || [];
+
   const [open, setOpen] = useState(false);
   const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
-  const [keyColumns, setKeyColumns] = useState<string>('');
+  const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>([]);
   const [keyColumnDescription, setKeyColumnDescription] = useState<string>('');
 
   const addColumn = () => setColumnsMetadata(prev => [...prev, { name: '', type: 'string', job_type: 'enrichment' }]);
@@ -172,15 +175,14 @@ function AddColumnsDialog({ sourceId, mostRecentJob }: { sourceId: string; mostR
   const handleEnrich = async () => {
     try {
       const payload: any = { columns_metadata: columnsMetadata };
-      
-      const keys = keyColumns.split(',').map(k => k.trim()).filter(Boolean);
-      if (keys.length > 0) payload.key_columns = keys;
+
+      if (selectedKeyColumns.length > 0) payload.key_columns = selectedKeyColumns;
       if (keyColumnDescription.trim()) payload.key_column_description = keyColumnDescription.trim();
 
       await enrich.mutateAsync(payload);
       setOpen(false);
       setColumnsMetadata([]);
-      setKeyColumns('');
+      setSelectedKeyColumns([]);
       setKeyColumnDescription('');
     } catch (e) { console.error('Enrich failed', e); }
   };
@@ -189,15 +191,15 @@ function AddColumnsDialog({ sourceId, mostRecentJob }: { sourceId: string; mostR
   const canStart = columnsMetadata.length > 0 && columnsMetadata.every(c => c.name) && hasExistingJob;
 
   return (
-    <Dialog open={open} onOpenChange={(val) => { 
-      setOpen(val); 
+    <Dialog open={open} onOpenChange={(val) => {
+      setOpen(val);
       if (!val) {
         setColumnsMetadata([]);
-        setKeyColumns('');
+        setSelectedKeyColumns([]);
         setKeyColumnDescription('');
       } else {
         if (mostRecentJob?.key_columns) {
-          setKeyColumns(mostRecentJob.key_columns.join(', '));
+          setSelectedKeyColumns(mostRecentJob.key_columns);
         }
       }
     }}>
@@ -216,21 +218,40 @@ function AddColumnsDialog({ sourceId, mostRecentJob }: { sourceId: string; mostR
               <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <Settings2 className="w-3 h-3" /> Key Column Settings
               </Label>
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-slate-500 font-bold">Key Columns (comma separated)</Label>
-                  <Input 
-                    placeholder="e.g. company_name, domain" 
-                    value={keyColumns}
-                    onChange={(e) => setKeyColumns(e.target.value)}
-                    className="text-sm font-medium h-9"
-                  />
-                  <p className="text-[10px] text-slate-400">Leave exactly as is to reuse the previous run's keys.</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-500 font-bold">Select Key Columns</Label>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    Select columns that uniquely identify the entity (e.g. Company Name, Website) for the AI to search with.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {sourceColumns.length > 0 ? (
+                      sourceColumns.map(col => {
+                        const isSelected = selectedKeyColumns.includes(col);
+                        return (
+                          <Badge 
+                            key={col} 
+                            variant={isSelected ? 'default' : 'outline'}
+                            className={`cursor-pointer transition-colors ${isSelected ? '' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 border-slate-200'}`}
+                            onClick={() => {
+                              setSelectedKeyColumns(prev => 
+                                prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
+                              )
+                            }}
+                          >
+                            {col}
+                          </Badge>
+                        );
+                      })
+                    ) : (
+                      <div className="text-xs text-slate-400 italic">Loading columns...</div>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 pt-2">
                   <Label className="text-xs text-slate-500 font-bold">Key Column Definition (AI Context)</Label>
-                  <Input 
-                    placeholder="Optional rules to locate the key columns in raw text..." 
+                  <Input
+                    placeholder="Optional rules to locate the key columns in raw text..."
                     value={keyColumnDescription}
                     onChange={(e) => setKeyColumnDescription(e.target.value)}
                     className="text-sm h-9"
@@ -238,7 +259,6 @@ function AddColumnsDialog({ sourceId, mostRecentJob }: { sourceId: string; mostR
                 </div>
               </div>
             </div>
-
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
@@ -532,7 +552,7 @@ function DataTable({ sourceId, jobs }: { sourceId: string; jobs: SourceJobSummar
         headerName: 'Enriched Data',
         children: mergedData.enrichedColumns.map(col => ({
           field: col,
-          headerName: col.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          headerName: col,
           flex: 1,
           minWidth: 150,
           cellRenderer: ConfidenceDataRenderer,
