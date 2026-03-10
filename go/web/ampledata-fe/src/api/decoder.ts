@@ -1,17 +1,19 @@
 // src/api/decoder.ts
 
 import type {
-  JobListResponse,
+  SourceListResponse,
+  SourceDetail,
   JobProgressResponse,
   RowsProgressResponse,
   EnrichmentResult,
-} from './types';
+} from "./types";
 
-// Simple decoders for now that just cast the data.
-// This can be expanded with Zod or a custom validation logic later.
+export function decodeSourceList(data: unknown): SourceListResponse {
+  return data as SourceListResponse;
+}
 
-export function decodeJobList(data: unknown): JobListResponse {
-  return data as JobListResponse;
+export function decodeSourceDetail(data: unknown): SourceDetail {
+  return data as SourceDetail;
 }
 
 export function decodeJobProgress(data: unknown): JobProgressResponse {

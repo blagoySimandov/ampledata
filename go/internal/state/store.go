@@ -21,6 +21,9 @@ type PaginatedRows struct {
 
 type Store interface {
 	CreateSource(ctx context.Context, source *models.SourceDB) error
+	GetSource(ctx context.Context, sourceID uuid.UUID) (*models.Source, error)
+	GetSourcesByUser(ctx context.Context, userID string, offset, limit int) ([]*models.Source, error)
+	GetJobsBySource(ctx context.Context, sourceID uuid.UUID) ([]*models.Job, error)
 	CreatePendingJob(ctx context.Context, jobID, userID string, sourceID uuid.UUID) error
 	GetJob(ctx context.Context, jobID string) (*models.Job, error)
 	UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error

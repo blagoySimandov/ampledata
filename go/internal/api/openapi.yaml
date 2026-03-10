@@ -71,12 +71,13 @@ components:
 
     SignedURLResponse:
       type: object
-      required: [url, jobId]
+      required: [url, sourceId]
       properties:
         url:
           type: string
-        jobId:
+        sourceId:
           type: string
+          format: uuid
 
     JobSummary:
       type: object
@@ -109,33 +110,6 @@ components:
             $ref: "#/components/schemas/JobSummary"
         total_count:
           type: integer
-
-    StartJobRequest:
-      type: object
-      required: [key_columns, columns_metadata]
-      properties:
-        key_columns:
-          type: array
-          items:
-            type: string
-          minItems: 1
-        columns_metadata:
-          type: array
-          items:
-            $ref: "#/components/schemas/ColumnMetadata"
-          minItems: 1
-        key_column_description:
-          type: string
-          nullable: true
-
-    StartJobResponse:
-      type: object
-      required: [job_id, message]
-      properties:
-        job_id:
-          type: string
-        message:
-          type: string
 
     JobProgressResponse:
       type: object
@@ -231,10 +205,11 @@ components:
 
     SelectKeyRequest:
       type: object
-      required: [job_id]
+      required: [source_id]
       properties:
-        job_id:
+        source_id:
           type: string
+          format: uuid
         columns_metadata:
           type: array
           items:
@@ -252,6 +227,108 @@ components:
           items:
             type: string
         reasoning:
+          type: string
+
+    SourceJobSummary:
+      type: object
+      required: [job_id, status, total_rows, created_at]
+      properties:
+        job_id:
+          type: string
+        status:
+          $ref: "#/components/schemas/JobStatus"
+        total_rows:
+          type: integer
+        key_columns:
+          type: array
+          items:
+            type: string
+          nullable: true
+        key_column_description:
+          type: string
+          nullable: true
+        columns_metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColumnMetadata"
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SourceSummary:
+      type: object
+      required: [source_id, type, created_at, job_count]
+      properties:
+        source_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        job_count:
+          type: integer
+        latest_job_status:
+          $ref: "#/components/schemas/JobStatus"
+          nullable: true
+
+    SourceDetail:
+      type: object
+      required: [source_id, type, created_at, jobs]
+      properties:
+        source_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        jobs:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceJobSummary"
+
+    SourceListResponse:
+      type: object
+      required: [sources, total_count]
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourceSummary"
+        total_count:
+          type: integer
+
+    EnrichRequest:
+      type: object
+      required: [columns_metadata]
+      properties:
+        columns_metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/ColumnMetadata"
+          minItems: 1
+        key_columns:
+          type: array
+          items:
+            type: string
+          nullable: true
+        key_column_description:
+          type: string
+          nullable: true
+
+    EnrichResponse:
+      type: object
+      required: [job_id]
+      properties:
+        job_id:
           type: string
 
     CreateSubscriptionRequest:
@@ -399,11 +476,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /jobs:
+  /sources:
     get:
-      operationId: listJobs
-      summary: List enrichment jobs for the authenticated user
-      tags: [jobs]
+      operationId: listSources
+      summary: List sources for the authenticated user
+      tags: [sources]
       parameters:
         - name: offset
           in: query
@@ -417,11 +494,11 @@ paths:
             default: 50
       responses:
         "200":
-          description: List of jobs
+          description: List of sources
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/JobListResponse"
+                $ref: "#/components/schemas/SourceListResponse"
         "401":
           description: Unauthorized
           content:
@@ -435,30 +512,131 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /jobs/{jobID}/start:
-    post:
-      operationId: startJob
-      summary: Start an enrichment job
-      tags: [jobs]
+  /sources/{sourceID}:
+    get:
+      operationId: getSource
+      summary: Get source details with all enrichment runs
+      tags: [sources]
       parameters:
-        - name: jobID
+        - name: sourceID
           in: path
           required: true
           schema:
             type: string
+            format: uuid
+      responses:
+        "200":
+          description: Source detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceDetail"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sources/{sourceID}/data:
+    get:
+      operationId: GetSourceData
+      summary: Get the raw CSV data for a source
+      tags: [sources]
+      parameters:
+        - name: sourceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Raw CSV data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  headers:
+                    type: array
+                    items:
+                      type: string
+                  rows:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: string
+                required: [headers, rows]
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sources/{sourceID}/enrich:
+    post:
+      operationId: enrichSource
+      summary: Start a new enrichment run for a source
+      tags: [sources]
+      parameters:
+        - name: sourceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/StartJobRequest"
+              $ref: "#/components/schemas/EnrichRequest"
       responses:
         "200":
-          description: Job started
+          description: Enrichment started
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StartJobResponse"
+                $ref: "#/components/schemas/EnrichResponse"
         "400":
           description: Bad request
           content:
@@ -472,7 +650,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "402":
-          description: Payment required (no active subscription)
+          description: Payment required
           content:
             application/json:
               schema:
@@ -484,7 +662,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: Job not found
+          description: Source not found
           content:
             application/json:
               schema:
@@ -648,7 +826,7 @@ paths:
   /select-key:
     post:
       operationId: selectKey
-      summary: Use AI to select the best key column from a job's CSV
+      summary: Use AI to select the best key column from a source's CSV
       tags: [jobs]
       requestBody:
         required: true
@@ -682,7 +860,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: Job not found
+          description: Source not found
           content:
             application/json:
               schema:

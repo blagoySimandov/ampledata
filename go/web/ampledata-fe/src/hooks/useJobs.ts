@@ -1,18 +1,23 @@
-// src/hooks/useJobs.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ApiClient } from '../api';
-import type { SignedURLRequest, StartJobRequest, SelectKeyRequest } from '../api';
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useQueries,
+} from "@tanstack/react-query";
+import { ApiClient } from "../api";
+import type {
+  SignedURLRequest,
+  SelectKeyRequest,
+  SourceJobSummary,
+} from "../api";
 
-export function useListJobs(api: ApiClient, offset: number = 0, limit: number = 50) {
+export function useJobProgress(
+  api: ApiClient,
+  jobId: string,
+  refetchInterval: number | false = 5000,
+) {
   return useQuery({
-    queryKey: ['jobs', offset, limit],
-    queryFn: () => api.getJobs(offset, limit),
-  });
-}
-
-export function useJobProgress(api: ApiClient, jobId: string, refetchInterval: number | false = 5000) {
-  return useQuery({
-    queryKey: ['job-progress', jobId],
+    queryKey: ["job-progress", jobId],
     queryFn: () => api.getJobProgress(jobId),
     refetchInterval,
   });
@@ -21,23 +26,40 @@ export function useJobProgress(api: ApiClient, jobId: string, refetchInterval: n
 export function useJobRows(
   api: ApiClient,
   jobId: string,
-  offset: number = 0,
-  limit: number = 50,
-  stage: string = 'all',
-  sort: string = 'updated_at_desc',
-  refetchInterval: number | false = 5000
+  offset = 0,
+  limit = 50,
+  stage = "all",
+  sort = "updated_at_desc",
+  refetchInterval: number | false = 5000,
 ) {
   return useQuery({
-    queryKey: ['job-rows', jobId, offset, limit, stage, sort],
+    queryKey: ["job-rows", jobId, offset, limit, stage, sort],
     queryFn: () => api.getJobRows(jobId, offset, limit, stage, sort),
     refetchInterval,
   });
 }
 
-export function useJobResults(api: ApiClient, jobId: string, start: number = 0, limit: number = 0) {
+export function useJobResults(
+  api: ApiClient,
+  jobId: string,
+  start = 0,
+  limit = 0,
+) {
   return useQuery({
-    queryKey: ['job-results', jobId, start, limit],
+    queryKey: ["job-results", jobId, start, limit],
     queryFn: () => api.getJobResults(jobId, start, limit),
+  });
+}
+
+export function useAllJobsRows(api: ApiClient, jobs: SourceJobSummary[]) {
+  return useQueries({
+    queries: jobs.map((job) => ({
+      queryKey: ["job-rows", job.job_id, 0, 10000, "all", "updated_at_desc"],
+      queryFn: () =>
+        api.getJobRows(job.job_id, 0, 10000, "all", "updated_at_desc"),
+      refetchInterval:
+        job.status === "RUNNING" || job.status === "PENDING" ? 5000 : false,
+    })),
   });
 }
 
@@ -46,9 +68,8 @@ export function useCancelJob(api: ApiClient) {
   return useMutation({
     mutationFn: (jobId: string) => api.cancelJob(jobId),
     onSuccess: (_, jobId) => {
-      // Invalidate relevant queries so the UI updates to show the job as cancelled
-      queryClient.invalidateQueries({ queryKey: ['job-progress', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ["job-progress", jobId] });
+      queryClient.invalidateQueries({ queryKey: ["sources"] });
     },
   });
 }
@@ -61,23 +82,13 @@ export function useGetSignedUrl(api: ApiClient) {
 
 export function useUploadFile(api: ApiClient) {
   return useMutation({
-    mutationFn: ({ url, file }: { url: string; file: File }) => api.uploadFile(url, file),
+    mutationFn: ({ url, file }: { url: string; file: File }) =>
+      api.uploadFile(url, file),
   });
 }
 
 export function useSelectKey(api: ApiClient) {
   return useMutation({
     mutationFn: (req: SelectKeyRequest) => api.selectKey(req),
-  });
-}
-
-export function useStartJob(api: ApiClient) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ jobId, req }: { jobId: string; req: StartJobRequest }) => 
-      api.startJob(jobId, req),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-    },
   });
 }

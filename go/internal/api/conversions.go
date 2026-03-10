@@ -27,17 +27,6 @@ func toModelColumnMetadataSlicePtr(cols *[]ColumnMetadata) []*models.ColumnMetad
 	return toModelColumnMetadataSlice(*cols)
 }
 
-func toAPIJobSummary(j *models.JobSummary) JobSummary {
-	return JobSummary{
-		JobId:     j.JobID,
-		Status:    JobStatus(j.Status),
-		TotalRows: j.TotalRows,
-		SourceId:  openapi_types.UUID(j.SourceID),
-		CreatedAt: j.CreatedAt,
-		StartedAt: j.StartedAt,
-	}
-}
-
 func toAPIJobProgress(p *models.JobProgress) JobProgressResponse {
 	startedAt := ""
 	if !p.StartedAt.IsZero() {
@@ -118,4 +107,51 @@ func toAPIConfidence(c map[string]*models.FieldConfidenceInfo) *map[string]Field
 		}
 	}
 	return &m
+}
+
+func toAPISourceJobSummary(j *models.Job) SourceJobSummary {
+	summary := SourceJobSummary{
+		JobId:     j.JobID,
+		Status:    JobStatus(j.Status),
+		TotalRows: j.TotalRows,
+		CreatedAt: j.CreatedAt,
+		StartedAt: j.StartedAt,
+	}
+	if j.KeyColumns != nil {
+		summary.KeyColumns = &j.KeyColumns
+	}
+	if j.KeyColumnDescription != nil {
+		summary.KeyColumnDescription = j.KeyColumnDescription
+	}
+	if j.ColumnsMetadata != nil {
+		apiCols := toAPIColumnMetadataSlice(j.ColumnsMetadata)
+		summary.ColumnsMetadata = &apiCols
+	}
+	return summary
+}
+
+func toAPIColumnMetadataSlice(cols []*models.ColumnMetadata) []ColumnMetadata {
+	result := make([]ColumnMetadata, len(cols))
+	for i, c := range cols {
+		result[i] = ColumnMetadata{
+			Name:        c.Name,
+			Type:        ColumnType(c.Type),
+			JobType:     JobType(c.JobType),
+			Description: c.Description,
+		}
+	}
+	return result
+}
+
+func toAPISourceDetail(source *models.Source, jobs []*models.Job) SourceDetail {
+	jobSummaries := make([]SourceJobSummary, len(jobs))
+	for i, j := range jobs {
+		jobSummaries[i] = toAPISourceJobSummary(j)
+	}
+	return SourceDetail{
+		SourceId:  openapi_types.UUID(source.ID),
+		Type:      string(source.Type),
+		CreatedAt: source.CreatedAt,
+		Jobs:      jobSummaries,
+	}
 }

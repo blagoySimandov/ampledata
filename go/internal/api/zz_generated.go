@@ -93,6 +93,18 @@ type CreateSubscriptionRequest struct {
 	TierId     string `json:"tier_id"`
 }
 
+// EnrichRequest defines model for EnrichRequest.
+type EnrichRequest struct {
+	ColumnsMetadata      []ColumnMetadata `json:"columns_metadata"`
+	KeyColumnDescription *string          `json:"key_column_description"`
+	KeyColumns           *[]string        `json:"key_columns"`
+}
+
+// EnrichResponse defines model for EnrichResponse.
+type EnrichResponse struct {
+	JobId string `json:"job_id"`
+}
+
 // EnrichmentResult defines model for EnrichmentResult.
 type EnrichmentResult struct {
 	Confidence    *map[string]FieldConfidenceInfo `json:"confidence"`
@@ -113,12 +125,6 @@ type FieldConfidenceInfo struct {
 	Score  float64 `json:"score"`
 }
 
-// JobListResponse defines model for JobListResponse.
-type JobListResponse struct {
-	Jobs       []JobSummary `json:"jobs"`
-	TotalCount int          `json:"total_count"`
-}
-
 // JobProgressResponse defines model for JobProgressResponse.
 type JobProgressResponse struct {
 	JobId       string         `json:"job_id"`
@@ -130,16 +136,6 @@ type JobProgressResponse struct {
 
 // JobStatus defines model for JobStatus.
 type JobStatus string
-
-// JobSummary defines model for JobSummary.
-type JobSummary struct {
-	CreatedAt time.Time          `json:"created_at"`
-	JobId     string             `json:"job_id"`
-	SourceId  openapi_types.UUID `json:"source_id"`
-	StartedAt *time.Time         `json:"started_at"`
-	Status    JobStatus          `json:"status"`
-	TotalRows int                `json:"total_rows"`
-}
 
 // JobType defines model for JobType.
 type JobType string
@@ -174,8 +170,8 @@ type RowsProgressResponse struct {
 
 // SelectKeyRequest defines model for SelectKeyRequest.
 type SelectKeyRequest struct {
-	ColumnsMetadata *[]ColumnMetadata `json:"columns_metadata"`
-	JobId           string            `json:"job_id"`
+	ColumnsMetadata *[]ColumnMetadata  `json:"columns_metadata"`
+	SourceId        openapi_types.UUID `json:"source_id"`
 }
 
 // SelectKeyResponse defines model for SelectKeyResponse.
@@ -196,21 +192,43 @@ type SignedURLRequestContentType string
 
 // SignedURLResponse defines model for SignedURLResponse.
 type SignedURLResponse struct {
-	JobId string `json:"jobId"`
-	Url   string `json:"url"`
+	SourceId openapi_types.UUID `json:"sourceId"`
+	Url      string             `json:"url"`
 }
 
-// StartJobRequest defines model for StartJobRequest.
-type StartJobRequest struct {
-	ColumnsMetadata      []ColumnMetadata `json:"columns_metadata"`
-	KeyColumnDescription *string          `json:"key_column_description"`
-	KeyColumns           []string         `json:"key_columns"`
+// SourceDetail defines model for SourceDetail.
+type SourceDetail struct {
+	CreatedAt time.Time          `json:"created_at"`
+	Jobs      []SourceJobSummary `json:"jobs"`
+	SourceId  openapi_types.UUID `json:"source_id"`
+	Type      string             `json:"type"`
 }
 
-// StartJobResponse defines model for StartJobResponse.
-type StartJobResponse struct {
-	JobId   string `json:"job_id"`
-	Message string `json:"message"`
+// SourceJobSummary defines model for SourceJobSummary.
+type SourceJobSummary struct {
+	ColumnsMetadata      *[]ColumnMetadata `json:"columns_metadata"`
+	CreatedAt            time.Time         `json:"created_at"`
+	JobId                string            `json:"job_id"`
+	KeyColumnDescription *string           `json:"key_column_description"`
+	KeyColumns           *[]string         `json:"key_columns"`
+	StartedAt            *time.Time        `json:"started_at"`
+	Status               JobStatus         `json:"status"`
+	TotalRows            int               `json:"total_rows"`
+}
+
+// SourceListResponse defines model for SourceListResponse.
+type SourceListResponse struct {
+	Sources    []SourceSummary `json:"sources"`
+	TotalCount int             `json:"total_count"`
+}
+
+// SourceSummary defines model for SourceSummary.
+type SourceSummary struct {
+	CreatedAt       time.Time          `json:"created_at"`
+	JobCount        int                `json:"job_count"`
+	LatestJobStatus *JobStatus         `json:"latest_job_status,omitempty"`
+	SourceId        openapi_types.UUID `json:"source_id"`
+	Type            string             `json:"type"`
 }
 
 // SubscriptionStatusResponse defines model for SubscriptionStatusResponse.
@@ -231,12 +249,6 @@ type TierResponse struct {
 	OveragePriceCentsDecimal string `json:"overage_price_cents_decimal"`
 }
 
-// ListJobsParams defines parameters for ListJobs.
-type ListJobsParams struct {
-	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
-	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
-}
-
 // GetJobResultsParams defines parameters for GetJobResults.
 type GetJobResultsParams struct {
 	Start *int `form:"start,omitempty" json:"start,omitempty"`
@@ -251,6 +263,12 @@ type GetRowsProgressParams struct {
 	Sort   *string `form:"sort,omitempty" json:"sort,omitempty"`
 }
 
+// ListSourcesParams defines parameters for ListSources.
+type ListSourcesParams struct {
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // HandleStripeWebhookParams defines parameters for HandleStripeWebhook.
 type HandleStripeWebhookParams struct {
 	StripeSignature string `json:"Stripe-Signature"`
@@ -259,11 +277,11 @@ type HandleStripeWebhookParams struct {
 // UploadFileForEnrichmentJSONRequestBody defines body for UploadFileForEnrichment for application/json ContentType.
 type UploadFileForEnrichmentJSONRequestBody = SignedURLRequest
 
-// StartJobJSONRequestBody defines body for StartJob for application/json ContentType.
-type StartJobJSONRequestBody = StartJobRequest
-
 // SelectKeyJSONRequestBody defines body for SelectKey for application/json ContentType.
 type SelectKeyJSONRequestBody = SelectKeyRequest
+
+// EnrichSourceJSONRequestBody defines body for EnrichSource for application/json ContentType.
+type EnrichSourceJSONRequestBody = EnrichRequest
 
 // CreateSubscriptionCheckoutJSONRequestBody defines body for CreateSubscriptionCheckout for application/json ContentType.
 type CreateSubscriptionCheckoutJSONRequestBody = CreateSubscriptionRequest
@@ -273,9 +291,6 @@ type ServerInterface interface {
 	// Create a pending enrichment job and get a signed upload URL
 	// (POST /enrichment-signed-url)
 	UploadFileForEnrichment(w http.ResponseWriter, r *http.Request)
-	// List enrichment jobs for the authenticated user
-	// (GET /jobs)
-	ListJobs(w http.ResponseWriter, r *http.Request, params ListJobsParams)
 	// Cancel a running enrichment job
 	// (POST /jobs/{jobID}/cancel)
 	CancelJob(w http.ResponseWriter, r *http.Request, jobID string)
@@ -288,12 +303,21 @@ type ServerInterface interface {
 	// Get per-row progress for a job
 	// (GET /jobs/{jobID}/rows)
 	GetRowsProgress(w http.ResponseWriter, r *http.Request, jobID string, params GetRowsProgressParams)
-	// Start an enrichment job
-	// (POST /jobs/{jobID}/start)
-	StartJob(w http.ResponseWriter, r *http.Request, jobID string)
-	// Use AI to select the best key column from a job's CSV
+	// Use AI to select the best key column from a source's CSV
 	// (POST /select-key)
 	SelectKey(w http.ResponseWriter, r *http.Request)
+	// List sources for the authenticated user
+	// (GET /sources)
+	ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams)
+	// Get source details with all enrichment runs
+	// (GET /sources/{sourceID})
+	GetSource(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID)
+	// Get the raw CSV data for a source
+	// (GET /sources/{sourceID}/data)
+	GetSourceData(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID)
+	// Start a new enrichment run for a source
+	// (POST /sources/{sourceID}/enrich)
+	EnrichSource(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID)
 	// Create a Stripe checkout session for a subscription
 	// (POST /subscribe)
 	CreateSubscriptionCheckout(w http.ResponseWriter, r *http.Request)
@@ -328,44 +352,6 @@ func (siw *ServerInterfaceWrapper) UploadFileForEnrichment(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UploadFileForEnrichment(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
-// ListJobs operation middleware
-func (siw *ServerInterfaceWrapper) ListJobs(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListJobsParams
-
-	// ------------- Optional query parameter "offset" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "limit" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListJobs(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -541,25 +527,14 @@ func (siw *ServerInterfaceWrapper) GetRowsProgress(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// StartJob operation middleware
-func (siw *ServerInterfaceWrapper) StartJob(w http.ResponseWriter, r *http.Request) {
+// SelectKey operation middleware
+func (siw *ServerInterfaceWrapper) SelectKey(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "jobID" -------------
-	var jobID string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "jobID", mux.Vars(r)["jobID"], &jobID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "jobID", Err: err})
-		return
-	}
 
 	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.StartJob(w, r, jobID)
+		siw.Handler.SelectKey(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -569,14 +544,119 @@ func (siw *ServerInterfaceWrapper) StartJob(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// SelectKey operation middleware
-func (siw *ServerInterfaceWrapper) SelectKey(w http.ResponseWriter, r *http.Request) {
+// ListSources operation middleware
+func (siw *ServerInterfaceWrapper) ListSources(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	var err error
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSourcesParams
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "offset", r.URL.Query(), &params.Offset)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSources(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetSource operation middleware
+func (siw *ServerInterfaceWrapper) GetSource(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "sourceID" -------------
+	var sourceID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sourceID", mux.Vars(r)["sourceID"], &sourceID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sourceID", Err: err})
+		return
+	}
 
 	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.SelectKey(w, r)
+		siw.Handler.GetSource(w, r, sourceID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetSourceData operation middleware
+func (siw *ServerInterfaceWrapper) GetSourceData(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "sourceID" -------------
+	var sourceID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sourceID", mux.Vars(r)["sourceID"], &sourceID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sourceID", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSourceData(w, r, sourceID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// EnrichSource operation middleware
+func (siw *ServerInterfaceWrapper) EnrichSource(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "sourceID" -------------
+	var sourceID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sourceID", mux.Vars(r)["sourceID"], &sourceID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sourceID", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnrichSource(w, r, sourceID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -814,8 +894,6 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/enrichment-signed-url", wrapper.UploadFileForEnrichment).Methods("POST")
 
-	r.HandleFunc(options.BaseURL+"/jobs", wrapper.ListJobs).Methods("GET")
-
 	r.HandleFunc(options.BaseURL+"/jobs/{jobID}/cancel", wrapper.CancelJob).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/jobs/{jobID}/progress", wrapper.GetJobProgress).Methods("GET")
@@ -824,9 +902,15 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 
 	r.HandleFunc(options.BaseURL+"/jobs/{jobID}/rows", wrapper.GetRowsProgress).Methods("GET")
 
-	r.HandleFunc(options.BaseURL+"/jobs/{jobID}/start", wrapper.StartJob).Methods("POST")
-
 	r.HandleFunc(options.BaseURL+"/select-key", wrapper.SelectKey).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/sources", wrapper.ListSources).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/sources/{sourceID}", wrapper.GetSource).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/sources/{sourceID}/data", wrapper.GetSourceData).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/sources/{sourceID}/enrich", wrapper.EnrichSource).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/subscribe", wrapper.CreateSubscriptionCheckout).Methods("POST")
 
@@ -879,41 +963,6 @@ func (response UploadFileForEnrichment401JSONResponse) VisitUploadFileForEnrichm
 type UploadFileForEnrichment500JSONResponse ErrorResponse
 
 func (response UploadFileForEnrichment500JSONResponse) VisitUploadFileForEnrichmentResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListJobsRequestObject struct {
-	Params ListJobsParams
-}
-
-type ListJobsResponseObject interface {
-	VisitListJobsResponse(w http.ResponseWriter) error
-}
-
-type ListJobs200JSONResponse JobListResponse
-
-func (response ListJobs200JSONResponse) VisitListJobsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListJobs401JSONResponse ErrorResponse
-
-func (response ListJobs401JSONResponse) VisitListJobsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListJobs500JSONResponse ErrorResponse
-
-func (response ListJobs500JSONResponse) VisitListJobsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1046,78 +1095,6 @@ func (response GetRowsProgress500JSONResponse) VisitGetRowsProgressResponse(w ht
 	return json.NewEncoder(w).Encode(response)
 }
 
-type StartJobRequestObject struct {
-	JobID string `json:"jobID"`
-	Body  *StartJobJSONRequestBody
-}
-
-type StartJobResponseObject interface {
-	VisitStartJobResponse(w http.ResponseWriter) error
-}
-
-type StartJob200JSONResponse StartJobResponse
-
-func (response StartJob200JSONResponse) VisitStartJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type StartJob400JSONResponse ErrorResponse
-
-func (response StartJob400JSONResponse) VisitStartJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type StartJob401JSONResponse ErrorResponse
-
-func (response StartJob401JSONResponse) VisitStartJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type StartJob402JSONResponse ErrorResponse
-
-func (response StartJob402JSONResponse) VisitStartJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(402)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type StartJob403JSONResponse ErrorResponse
-
-func (response StartJob403JSONResponse) VisitStartJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type StartJob404JSONResponse ErrorResponse
-
-func (response StartJob404JSONResponse) VisitStartJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type StartJob500JSONResponse ErrorResponse
-
-func (response StartJob500JSONResponse) VisitStartJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 type SelectKeyRequestObject struct {
 	Body *SelectKeyJSONRequestBody
 }
@@ -1174,6 +1151,222 @@ func (response SelectKey404JSONResponse) VisitSelectKeyResponse(w http.ResponseW
 type SelectKey500JSONResponse ErrorResponse
 
 func (response SelectKey500JSONResponse) VisitSelectKeyResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListSourcesRequestObject struct {
+	Params ListSourcesParams
+}
+
+type ListSourcesResponseObject interface {
+	VisitListSourcesResponse(w http.ResponseWriter) error
+}
+
+type ListSources200JSONResponse SourceListResponse
+
+func (response ListSources200JSONResponse) VisitListSourcesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListSources401JSONResponse ErrorResponse
+
+func (response ListSources401JSONResponse) VisitListSourcesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListSources500JSONResponse ErrorResponse
+
+func (response ListSources500JSONResponse) VisitListSourcesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceRequestObject struct {
+	SourceID openapi_types.UUID `json:"sourceID"`
+}
+
+type GetSourceResponseObject interface {
+	VisitGetSourceResponse(w http.ResponseWriter) error
+}
+
+type GetSource200JSONResponse SourceDetail
+
+func (response GetSource200JSONResponse) VisitGetSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSource401JSONResponse ErrorResponse
+
+func (response GetSource401JSONResponse) VisitGetSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSource403JSONResponse ErrorResponse
+
+func (response GetSource403JSONResponse) VisitGetSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSource404JSONResponse ErrorResponse
+
+func (response GetSource404JSONResponse) VisitGetSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSource500JSONResponse ErrorResponse
+
+func (response GetSource500JSONResponse) VisitGetSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceDataRequestObject struct {
+	SourceID openapi_types.UUID `json:"sourceID"`
+}
+
+type GetSourceDataResponseObject interface {
+	VisitGetSourceDataResponse(w http.ResponseWriter) error
+}
+
+type GetSourceData200JSONResponse struct {
+	Headers []string   `json:"headers"`
+	Rows    [][]string `json:"rows"`
+}
+
+func (response GetSourceData200JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData401JSONResponse ErrorResponse
+
+func (response GetSourceData401JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData403JSONResponse ErrorResponse
+
+func (response GetSourceData403JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData404JSONResponse ErrorResponse
+
+func (response GetSourceData404JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData500JSONResponse ErrorResponse
+
+func (response GetSourceData500JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnrichSourceRequestObject struct {
+	SourceID openapi_types.UUID `json:"sourceID"`
+	Body     *EnrichSourceJSONRequestBody
+}
+
+type EnrichSourceResponseObject interface {
+	VisitEnrichSourceResponse(w http.ResponseWriter) error
+}
+
+type EnrichSource200JSONResponse EnrichResponse
+
+func (response EnrichSource200JSONResponse) VisitEnrichSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnrichSource400JSONResponse ErrorResponse
+
+func (response EnrichSource400JSONResponse) VisitEnrichSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnrichSource401JSONResponse ErrorResponse
+
+func (response EnrichSource401JSONResponse) VisitEnrichSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnrichSource402JSONResponse ErrorResponse
+
+func (response EnrichSource402JSONResponse) VisitEnrichSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(402)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnrichSource403JSONResponse ErrorResponse
+
+func (response EnrichSource403JSONResponse) VisitEnrichSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnrichSource404JSONResponse ErrorResponse
+
+func (response EnrichSource404JSONResponse) VisitEnrichSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type EnrichSource500JSONResponse ErrorResponse
+
+func (response EnrichSource500JSONResponse) VisitEnrichSourceResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1341,9 +1534,6 @@ type StrictServerInterface interface {
 	// Create a pending enrichment job and get a signed upload URL
 	// (POST /enrichment-signed-url)
 	UploadFileForEnrichment(ctx context.Context, request UploadFileForEnrichmentRequestObject) (UploadFileForEnrichmentResponseObject, error)
-	// List enrichment jobs for the authenticated user
-	// (GET /jobs)
-	ListJobs(ctx context.Context, request ListJobsRequestObject) (ListJobsResponseObject, error)
 	// Cancel a running enrichment job
 	// (POST /jobs/{jobID}/cancel)
 	CancelJob(ctx context.Context, request CancelJobRequestObject) (CancelJobResponseObject, error)
@@ -1356,12 +1546,21 @@ type StrictServerInterface interface {
 	// Get per-row progress for a job
 	// (GET /jobs/{jobID}/rows)
 	GetRowsProgress(ctx context.Context, request GetRowsProgressRequestObject) (GetRowsProgressResponseObject, error)
-	// Start an enrichment job
-	// (POST /jobs/{jobID}/start)
-	StartJob(ctx context.Context, request StartJobRequestObject) (StartJobResponseObject, error)
-	// Use AI to select the best key column from a job's CSV
+	// Use AI to select the best key column from a source's CSV
 	// (POST /select-key)
 	SelectKey(ctx context.Context, request SelectKeyRequestObject) (SelectKeyResponseObject, error)
+	// List sources for the authenticated user
+	// (GET /sources)
+	ListSources(ctx context.Context, request ListSourcesRequestObject) (ListSourcesResponseObject, error)
+	// Get source details with all enrichment runs
+	// (GET /sources/{sourceID})
+	GetSource(ctx context.Context, request GetSourceRequestObject) (GetSourceResponseObject, error)
+	// Get the raw CSV data for a source
+	// (GET /sources/{sourceID}/data)
+	GetSourceData(ctx context.Context, request GetSourceDataRequestObject) (GetSourceDataResponseObject, error)
+	// Start a new enrichment run for a source
+	// (POST /sources/{sourceID}/enrich)
+	EnrichSource(ctx context.Context, request EnrichSourceRequestObject) (EnrichSourceResponseObject, error)
 	// Create a Stripe checkout session for a subscription
 	// (POST /subscribe)
 	CreateSubscriptionCheckout(ctx context.Context, request CreateSubscriptionCheckoutRequestObject) (CreateSubscriptionCheckoutResponseObject, error)
@@ -1432,32 +1631,6 @@ func (sh *strictHandler) UploadFileForEnrichment(w http.ResponseWriter, r *http.
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UploadFileForEnrichmentResponseObject); ok {
 		if err := validResponse.VisitUploadFileForEnrichmentResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// ListJobs operation middleware
-func (sh *strictHandler) ListJobs(w http.ResponseWriter, r *http.Request, params ListJobsParams) {
-	var request ListJobsRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ListJobs(ctx, request.(ListJobsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListJobs")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ListJobsResponseObject); ok {
-		if err := validResponse.VisitListJobsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1571,39 +1744,6 @@ func (sh *strictHandler) GetRowsProgress(w http.ResponseWriter, r *http.Request,
 	}
 }
 
-// StartJob operation middleware
-func (sh *strictHandler) StartJob(w http.ResponseWriter, r *http.Request, jobID string) {
-	var request StartJobRequestObject
-
-	request.JobID = jobID
-
-	var body StartJobJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.StartJob(ctx, request.(StartJobRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "StartJob")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(StartJobResponseObject); ok {
-		if err := validResponse.VisitStartJobResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // SelectKey operation middleware
 func (sh *strictHandler) SelectKey(w http.ResponseWriter, r *http.Request) {
 	var request SelectKeyRequestObject
@@ -1628,6 +1768,117 @@ func (sh *strictHandler) SelectKey(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SelectKeyResponseObject); ok {
 		if err := validResponse.VisitSelectKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSources operation middleware
+func (sh *strictHandler) ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams) {
+	var request ListSourcesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSources(ctx, request.(ListSourcesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSources")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSourcesResponseObject); ok {
+		if err := validResponse.VisitListSourcesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSource operation middleware
+func (sh *strictHandler) GetSource(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID) {
+	var request GetSourceRequestObject
+
+	request.SourceID = sourceID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSource(ctx, request.(GetSourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSourceResponseObject); ok {
+		if err := validResponse.VisitGetSourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSourceData operation middleware
+func (sh *strictHandler) GetSourceData(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID) {
+	var request GetSourceDataRequestObject
+
+	request.SourceID = sourceID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSourceData(ctx, request.(GetSourceDataRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSourceData")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSourceDataResponseObject); ok {
+		if err := validResponse.VisitGetSourceDataResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EnrichSource operation middleware
+func (sh *strictHandler) EnrichSource(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID) {
+	var request EnrichSourceRequestObject
+
+	request.SourceID = sourceID
+
+	var body EnrichSourceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EnrichSource(ctx, request.(EnrichSourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EnrichSource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EnrichSourceResponseObject); ok {
+		if err := validResponse.VisitEnrichSourceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1769,45 +2020,49 @@ func (sh *strictHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
+	"AAAA//9EQsm77UUAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
