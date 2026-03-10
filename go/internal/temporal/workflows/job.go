@@ -123,6 +123,11 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 	event.Completed = output.SuccessfulRows
 	event.Failed = output.FailedRows
 
+	workflow.ExecuteActivity(activityCtx, "IncrementJobCredits", activities.IncrementJobCreditsInput{
+		JobID:   input.JobID,
+		Credits: output.SuccessfulRows,
+	}).Get(activityCtx, nil)
+
 	err = workflow.ExecuteActivity(activityCtx, "CompleteJob", input.JobID).Get(activityCtx, nil)
 	if err != nil {
 		event.EmitError(ctx, err)

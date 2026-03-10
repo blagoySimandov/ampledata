@@ -74,14 +74,13 @@ func WithStore(store CostStore) CostTrackerOption {
 func (c *CostTracker) AddTokenCost(ctx context.Context, tknIn, tknOut int) {
 	c.mu.Lock()
 	totalCost := tknIn*c.tknInCost + tknOut*c.tknOutCost
-	credits := totalCost * c.creditExchange
 	c.cost += totalCost
 	c.mu.Unlock()
 
 	jobID := JobIDFromContext(ctx)
 	if jobID != "" && c.store != nil {
 		go func() {
-			if err := c.store.IncrementJobCost(context.Background(), jobID, totalCost, credits); err != nil {
+			if err := c.store.IncrementJobCost(context.Background(), jobID, totalCost, 0); err != nil {
 				logger.Log.Error("failed to increment job cost", "error", err, "job_id", jobID)
 			}
 		}()
@@ -91,14 +90,13 @@ func (c *CostTracker) AddTokenCost(ctx context.Context, tknIn, tknOut int) {
 func (c *CostTracker) AddSearchQueryCost(ctx context.Context, count int) {
 	c.mu.Lock()
 	cost := count * c.searchQueryCost
-	credits := cost * c.creditExchange
 	c.cost += cost
 	c.mu.Unlock()
 
 	jobID := JobIDFromContext(ctx)
 	if jobID != "" && c.store != nil {
 		go func() {
-			if err := c.store.IncrementJobCost(context.Background(), jobID, cost, credits); err != nil {
+			if err := c.store.IncrementJobCost(context.Background(), jobID, cost, 0); err != nil {
 				logger.Log.Error("failed to increment job cost", "error", err, "job_id", jobID)
 			}
 		}()

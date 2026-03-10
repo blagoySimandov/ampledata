@@ -500,3 +500,12 @@ type ReportUsageInput struct {
 func (a *Activities) ReportUsage(ctx context.Context, input ReportUsageInput) error {
 	return a.billingService.ReportUsage(ctx, input.StripeCustomerID, input.Credits)
 }
+
+type IncrementJobCreditsInput struct {
+	JobID   string
+	Credits int
+}
+
+func (a *Activities) IncrementJobCredits(ctx context.Context, input IncrementJobCreditsInput) error {
+	return a.stateManager.Store().IncrementJobCost(ctx, input.JobID, 0, input.Credits)
+}

@@ -7,9 +7,14 @@ import {
   useJobProgress,
   useSourceData,
 } from "../hooks";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
-import { type ColDef, type ColGroupDef, themeQuartz } from "ag-grid-community";
+import {
+  type ColDef,
+  type ColGroupDef,
+  type GridApi,
+  themeQuartz,
+} from "ag-grid-community";
 import {
   ArrowLeft,
   RefreshCw,
@@ -27,6 +32,9 @@ import {
   StopCircle,
   CheckCircle2,
   XCircle,
+  Download,
+  Maximize2,
+  Search,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -404,11 +412,8 @@ function AddColumnsDialog({ sourceId, mostRecentJob }: AddColumnsDialogProps) {
   const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>([]);
   const [keyColumnDescription, setKeyColumnDescription] = useState("");
 
-  const hasExistingJob = mostRecentJob !== undefined;
   const canStart =
-    columnsMetadata.length > 0 &&
-    columnsMetadata.every((c) => c.name) &&
-    hasExistingJob;
+    columnsMetadata.length > 0 && columnsMetadata.every((c) => c.name);
 
   const addColumn = () =>
     setColumnsMetadata((prev) => [
@@ -468,7 +473,7 @@ function AddColumnsDialog({ sourceId, mostRecentJob }: AddColumnsDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button className="font-bold gap-2" disabled={!hasExistingJob}>
+        <Button className="font-bold gap-2">
           <Plus className="w-4 h-4" /> ADD COLUMNS
         </Button>
       </DialogTrigger>
@@ -811,22 +816,26 @@ function JobRunsSidebar({
         <h2 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
           <Settings2 className="w-3.5 h-3.5" /> All Runs
         </h2>
-        <button
-          onClick={onClose}
-          className="bg-white border border-slate-200 p-1.5 rounded-md shadow-sm hover:bg-slate-50 transition-all text-slate-400 hover:text-slate-700 active:scale-95"
-        >
-          <PanelRightClose className="w-3.5 h-3.5" />
-        </button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-        {jobs.map((job) => (
-          <JobRunCard
-            key={job.job_id}
-            job={job}
-            isSelected={job.job_id === selectedJobId}
-            onSelect={() => onSelect(job.job_id)}
-          />
-        ))}
+        {jobs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center text-slate-400 py-12">
+            <Settings2 className="w-8 h-8 mb-3 opacity-40" />
+            <p className="font-bold text-sm">No enrichment runs yet</p>
+            <p className="text-xs mt-1">
+              Click "ADD COLUMNS" to start your first enrichment.
+            </p>
+          </div>
+        ) : (
+          jobs.map((job) => (
+            <JobRunCard
+              key={job.job_id}
+              job={job}
+              isSelected={job.job_id === selectedJobId}
+              onSelect={() => onSelect(job.job_id)}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -892,6 +901,34 @@ interface DataTableProps {
   jobs: SourceJobSummary[];
 }
 
+function seedEnrichedColsFromMetadata(
+  job: SourceJobSummary,
+  enrichedCols: Set<string>,
+) {
+  for (const col of job.columns_metadata ?? []) {
+    enrichedCols.add(col.name);
+  }
+}
+
+function markRowPending(job: SourceJobSummary, row: RowData) {
+  if (!job.columns_metadata) return;
+  row.__stages ??= {};
+  for (const col of job.columns_metadata) {
+    row.__stages[col.name] ??= "PENDING";
+  }
+}
+
+function markAllRowsPending(
+  job: SourceJobSummary,
+  rowMap: Map<string, RowData>,
+  csvRows: unknown[],
+) {
+  csvRows.forEach((_, rowIndex) => {
+    const existing = rowMap.get(rowIndex.toString());
+    if (existing) markRowPending(job, existing);
+  });
+}
+
 function useMergedData(
   sourceId: string,
   jobs: SourceJobSummary[],
@@ -927,11 +964,16 @@ function useMergedData(
     const sortedJobs = [...jobs].reverse();
 
     sortedQueries.forEach((query, qIndex) => {
-      if (!query.data) return;
-
       const job = sortedJobs[qIndex];
       const keyCols = job.key_columns ?? [];
       if (keyCols.length === 0) return;
+
+      seedEnrichedColsFromMetadata(job, enrichedCols);
+
+      if (!query.data) {
+        markAllRowsPending(job, rowMap, sourceData.rows);
+        return;
+      }
 
       const keyIndices = keyCols.map((kc) => sourceData.headers.indexOf(kc));
 
@@ -945,11 +987,14 @@ function useMergedData(
           .map((idx) => (idx !== -1 && idx < csvRow.length ? csvRow[idx] : ""))
           .join("||");
 
-        const jobRow = jobRowsByKey.get(jobKey);
-        if (!jobRow) return;
-
         const existing = rowMap.get(rowIndex.toString());
         if (!existing) return;
+
+        const jobRow = jobRowsByKey.get(jobKey);
+        if (!jobRow) {
+          markRowPending(job, existing);
+          return;
+        }
 
         if (jobRow.extracted_data) {
           Object.assign(existing, jobRow.extracted_data);
@@ -998,16 +1043,17 @@ function useMergedData(
   return { data: mergedData, isFetching };
 }
 
-function DataTable({ sourceId, jobs }: DataTableProps) {
-  const { data: mergedData, isFetching } = useMergedData(sourceId, jobs);
-
-  const columnDefs = useMemo<(ColDef | ColGroupDef)[]>(() => {
-    if (mergedData.sourceColumns.length === 0) return [];
+function useColumnDefs(
+  sourceColumns: string[],
+  enrichedColumns: string[],
+): (ColDef | ColGroupDef)[] {
+  return useMemo<(ColDef | ColGroupDef)[]>(() => {
+    if (sourceColumns.length === 0) return [];
 
     return [
       {
         headerName: "Original Data",
-        children: mergedData.sourceColumns.map(
+        children: sourceColumns.map(
           (col, idx): ColDef => ({
             field: col,
             headerName: col,
@@ -1019,7 +1065,7 @@ function DataTable({ sourceId, jobs }: DataTableProps) {
       },
       {
         headerName: "Enriched Data",
-        children: mergedData.enrichedColumns.map(
+        children: enrichedColumns.map(
           (col): ColDef => ({
             field: col,
             headerName: col,
@@ -1030,33 +1076,104 @@ function DataTable({ sourceId, jobs }: DataTableProps) {
         ),
       },
     ];
-  }, [mergedData.sourceColumns, mergedData.enrichedColumns]);
+  }, [sourceColumns, enrichedColumns]);
+}
+
+function GridToolbar({
+  rowCount,
+  isFetching,
+  onQuickFilter,
+  onExport,
+  onAutoSize,
+}: {
+  rowCount: number;
+  isFetching: boolean;
+  onQuickFilter: (value: string) => void;
+  onExport: () => void;
+  onAutoSize: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0">
+      <span className="text-xs font-black uppercase tracking-widest text-slate-400 shrink-0">
+        Merged Data View
+      </span>
+      {isFetching && <RefreshCw className="w-3 h-3 text-blue-600 animate-spin shrink-0" />}
+      <div className="flex-1" />
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search all columns..."
+          onChange={(e) => onQuickFilter(e.target.value)}
+          className="h-8 pl-8 pr-3 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary/50 w-52 placeholder:text-slate-400"
+        />
+      </div>
+      <button
+        onClick={onAutoSize}
+        title="Auto-size columns"
+        className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+      >
+        <Maximize2 className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={onExport}
+        title="Export CSV"
+        className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+      >
+        <Download className="w-3.5 h-3.5" />
+        <span>Export CSV</span>
+      </button>
+      <span className="text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0">
+        {rowCount} rows
+      </span>
+    </div>
+  );
+}
+
+function DataTable({ sourceId, jobs }: DataTableProps) {
+  const { data: mergedData, isFetching } = useMergedData(sourceId, jobs);
+  const gridRef = useRef<AgGridReact>(null);
+  const columnDefs = useColumnDefs(
+    mergedData.sourceColumns,
+    mergedData.enrichedColumns,
+  );
+
+  const getApi = (): GridApi | undefined => gridRef.current?.api;
+
+  const handleQuickFilter = (value: string) =>
+    getApi()?.setGridOption("quickFilterText", value);
+
+  const handleExport = () => getApi()?.exportDataAsCsv();
+
+  const handleAutoSize = () => getApi()?.autoSizeAllColumns();
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50 shrink-0">
-        <span className="text-xs font-black uppercase tracking-widest text-slate-400">
-          Merged Data View
-        </span>
-        {isFetching && (
-          <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />
-        )}
-      </div>
+      <GridToolbar
+        rowCount={mergedData.rows.length}
+        isFetching={isFetching}
+        onQuickFilter={handleQuickFilter}
+        onExport={handleExport}
+        onAutoSize={handleAutoSize}
+      />
       <div className="w-full flex-1 min-h-0">
         <AgGridReact
+          ref={gridRef}
           rowData={mergedData.rows}
           columnDefs={columnDefs}
           theme={gridTheme}
           pagination
           paginationPageSize={100}
           paginationPageSizeSelector={[50, 100, 200, 500]}
-          defaultColDef={{ resizable: true, sortable: true, filter: true }}
+          animateRows
+          enableCellTextSelection
+          defaultColDef={{
+            resizable: true,
+            sortable: true,
+            filter: true,
+            floatingFilter: true,
+          }}
         />
-      </div>
-      <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-          {mergedData.rows.length} total records
-        </div>
       </div>
     </div>
   );
@@ -1127,19 +1244,7 @@ function SourceDetailPage() {
           </div>
         </div>
 
-        {source.jobs.length > 0 ? (
-          <DataTable sourceId={sourceId} jobs={source.jobs} />
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center text-slate-400">
-              <Settings2 className="w-12 h-12 mx-auto mb-3 opacity-40" />
-              <p className="font-bold">No enrichment runs yet</p>
-              <p className="text-sm mt-1">
-                Click "ADD COLUMNS" to start your first enrichment.
-              </p>
-            </div>
-          </div>
-        )}
+        <DataTable sourceId={sourceId} jobs={source.jobs} />
       </div>
 
       {/* Sidebar */}
@@ -1152,6 +1257,14 @@ function SourceDetailPage() {
       >
         {sidebarOpen && (
           <>
+            <div className="p-3 border-b border-slate-100 bg-white/50 backdrop-blur-sm shrink-0 flex items-center">
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="bg-white border border-slate-200 p-1.5 rounded-md shadow-sm hover:bg-slate-50 transition-all text-slate-400 hover:text-slate-700 active:scale-95"
+              >
+                <PanelRightClose className="w-3.5 h-3.5" />
+              </button>
+            </div>
             {activeJob && <JobStats jobId={activeJob.job_id} />}
             <JobRunsSidebar
               jobs={source.jobs}
