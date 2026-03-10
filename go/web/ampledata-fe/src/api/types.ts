@@ -15,18 +15,45 @@ export interface ColumnMetadata {
   description?: string | null;
 }
 
-export interface JobSummary {
+export interface SourceJobSummary {
   job_id: string;
   status: JobStatus;
   total_rows: number;
-  file_path: string;
+  key_columns?: string[] | null;
+  key_column_description?: string | null;
+  columns_metadata?: ColumnMetadata[] | null;
   created_at: string;
   started_at?: string | null;
 }
 
-export interface JobListResponse {
-  jobs: JobSummary[];
+export interface SourceSummary {
+  source_id: string;
+  type: string;
+  created_at: string;
+  job_count: number;
+  latest_job_status?: JobStatus | null;
+}
+
+export interface SourceDetail {
+  source_id: string;
+  type: string;
+  created_at: string;
+  jobs: SourceJobSummary[];
+}
+
+export interface SourceListResponse {
+  sources: SourceSummary[];
   total_count: number;
+}
+
+export interface EnrichRequest {
+  columns_metadata: ColumnMetadata[];
+  key_columns?: string[] | null;
+  key_column_description?: string | null;
+}
+
+export interface EnrichResponse {
+  job_id: string;
 }
 
 export interface JobProgressResponse {
@@ -79,11 +106,11 @@ export interface SignedURLRequest {
 
 export interface SignedURLResponse {
   url: string;
-  jobId: string;
+  sourceId: string;
 }
 
 export interface SelectKeyRequest {
-  job_id: string;
+  source_id: string;
   columns_metadata?: ColumnMetadata[] | null;
 }
 
@@ -91,15 +118,4 @@ export interface SelectKeyResponse {
   selected_key: string;
   all_keys: string[];
   reasoning: string;
-}
-
-export interface StartJobRequest {
-  key_columns: string[];
-  columns_metadata: ColumnMetadata[];
-  key_column_description?: string | null;
-}
-
-export interface StartJobResponse {
-  job_id: string;
-  message: string;
 }

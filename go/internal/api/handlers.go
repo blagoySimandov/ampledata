@@ -12,7 +12,6 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
-	"github.com/blagoySimandov/ampledata/go/internal/user"
 )
 
 func (s *Server) UploadFileForEnrichment(ctx context.Context, req UploadFileForEnrichmentRequestObject) (UploadFileForEnrichmentResponseObject, error) {
@@ -26,30 +25,26 @@ func (s *Server) UploadFileForEnrichment(ctx context.Context, req UploadFileForE
 	if req.Body.Length <= 0 {
 		return UploadFileForEnrichment400JSONResponse{Message: "invalid length"}, nil
 	}
-	return s.createJobWithSignedURL(ctx, u.ID, string(req.Body.ContentType))
+	return s.createSourceWithSignedURL(ctx, u.ID, string(req.Body.ContentType))
 }
 
-func (s *Server) createJobWithSignedURL(ctx context.Context, userID, contentType string) (UploadFileForEnrichmentResponseObject, error) {
+func (s *Server) createSourceWithSignedURL(ctx context.Context, userID, contentType string) (UploadFileForEnrichmentResponseObject, error) {
 	ext, _ := mime.ExtensionsByType(contentType)
 	extension := ".csv"
 	if len(ext) > 0 {
 		extension = ext[0]
 	}
-	jobID := generateJobId(extension)
-	source, err := s.createCSVSource(ctx, userID, jobID, contentType)
+	fileID := generateJobId(extension)
+	source, err := s.createCSVSource(ctx, userID, fileID, contentType)
 	if err != nil {
 		log.Printf("Failed to create source: %v", err)
 		return UploadFileForEnrichment500JSONResponse{Message: "Failed to create source"}, nil
 	}
-	if err := s.store.CreatePendingJob(ctx, jobID, userID, source.ID); err != nil {
-		log.Printf("Failed to create pending job: %v", err)
-		return UploadFileForEnrichment500JSONResponse{Message: "Failed to create job"}, nil
-	}
-	url, err := generateSignedURL(jobID, contentType)
+	url, err := generateSignedURL(fileID, contentType)
 	if err != nil {
 		return UploadFileForEnrichment500JSONResponse{Message: err.Error()}, nil
 	}
-	return UploadFileForEnrichment200JSONResponse{Url: url, JobId: jobID}, nil
+	return UploadFileForEnrichment200JSONResponse{Url: url, SourceId: source.ID}, nil
 }
 
 func (s *Server) createCSVSource(ctx context.Context, userID, fileURI, contentType string) (*models.SourceDB, error) {
@@ -69,95 +64,6 @@ func (s *Server) createCSVSource(ctx context.Context, userID, fileURI, contentTy
 		return nil, err
 	}
 	return source, nil
-}
-
-func (s *Server) ListJobs(ctx context.Context, req ListJobsRequestObject) (ListJobsResponseObject, error) {
-	u, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return ListJobs401JSONResponse{Message: "Unauthorized"}, nil
-	}
-	offset, limit := 0, 50
-	if req.Params.Offset != nil {
-		offset = *req.Params.Offset
-	}
-	if req.Params.Limit != nil {
-		limit = *req.Params.Limit
-	}
-	jobs, err := s.store.GetJobsByUser(ctx, u.ID, offset, limit)
-	if err != nil {
-		log.Printf("Failed to retrieve jobs: %v", err)
-		return ListJobs500JSONResponse{Message: "Failed to retrieve jobs"}, nil
-	}
-	summaries := make([]JobSummary, len(jobs))
-	for i, job := range jobs {
-		summaries[i] = toAPIJobSummary(models.ToJobSummary(job))
-	}
-	return ListJobs200JSONResponse{Jobs: summaries, TotalCount: len(summaries)}, nil
-}
-
-func (s *Server) StartJob(ctx context.Context, req StartJobRequestObject) (StartJobResponseObject, error) {
-	authUser, ok := auth.GetUserFromContext(ctx)
-	if !ok {
-		return StartJob401JSONResponse{Message: "Unauthorized"}, nil
-	}
-	dbUser, ok := user.GetDBUserFromContext(ctx)
-	if !ok {
-		return StartJob500JSONResponse{Message: "User not found"}, nil
-	}
-	job, errResp := s.validateJobForStart(ctx, req.JobID, authUser.ID)
-	if errResp != nil {
-		return errResp, nil
-	}
-	return s.executeStartJob(ctx, job, dbUser, req.Body)
-}
-
-func (s *Server) validateJobForStart(ctx context.Context, jobID, userID string) (*models.Job, StartJobResponseObject) {
-	job, err := s.store.GetJob(ctx, jobID)
-	if err != nil {
-		return nil, StartJob404JSONResponse{Message: "Job not found"}
-	}
-	if job.UserID != userID {
-		return nil, StartJob403JSONResponse{Message: "Forbidden: You do not own this job"}
-	}
-	if job.Status != models.JobStatusPending {
-		return nil, StartJob400JSONResponse{Message: fmt.Sprintf("Job cannot be started: current status is %s", job.Status)}
-	}
-	return job, nil
-}
-
-func (s *Server) executeStartJob(ctx context.Context, job *models.Job, dbUser *models.User, body *StartJobJSONRequestBody) (StartJobResponseObject, error) {
-	if dbUser.SubscriptionTier == nil {
-		return StartJob402JSONResponse{Message: "Active subscription required"}, nil
-	}
-	csvMeta, ok := sourceCSVMeta(job)
-	if !ok {
-		return StartJob500JSONResponse{Message: "Job source not found"}, nil
-	}
-	cols := toModelColumnMetadataSlice(body.ColumnsMetadata)
-	rowKeys, err := s.readRowKeys(ctx, csvMeta.FileURI, body.KeyColumns, cols)
-	if err != nil {
-		return StartJob400JSONResponse{Message: fmt.Sprintf("Failed to read CSV file: %v", err)}, nil
-	}
-	if len(rowKeys) == 0 {
-		return StartJob400JSONResponse{Message: "No rows found in the specified key column"}, nil
-	}
-	if err := s.configureAndStartJob(ctx, job.JobID, body, cols, len(rowKeys)); err != nil {
-		return StartJob500JSONResponse{Message: err.Error()}, nil
-	}
-	go s.enricher.Enrich(context.Background(), job.JobID, dbUser.ID, stripeCustomerIDOrEmpty(dbUser), rowKeys, cols, body.KeyColumnDescription)
-	return StartJob200JSONResponse{JobId: job.JobID, Message: fmt.Sprintf("Enrichment started with %d rows", len(rowKeys))}, nil
-}
-
-func (s *Server) configureAndStartJob(ctx context.Context, jobID string, body *StartJobJSONRequestBody, cols []*models.ColumnMetadata, rowCount int) error {
-	if err := s.store.UpdateJobConfiguration(ctx, jobID, body.KeyColumns, cols, body.KeyColumnDescription); err != nil {
-		log.Printf("Failed to update job configuration: %v", err)
-		return fmt.Errorf("failed to update job configuration")
-	}
-	if err := s.store.StartJob(ctx, jobID, rowCount); err != nil {
-		log.Printf("Failed to start job: %v", err)
-		return fmt.Errorf("failed to start job")
-	}
-	return nil
 }
 
 func (s *Server) CancelJob(ctx context.Context, req CancelJobRequestObject) (CancelJobResponseObject, error) {
@@ -278,3 +184,5 @@ func stripeCustomerIDOrEmpty(u *models.User) string {
 	}
 	return ""
 }
+
+

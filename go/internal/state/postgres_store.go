@@ -138,6 +138,55 @@ func (s *PostgresStore) CreateSource(ctx context.Context, source *models.SourceD
 	return nil
 }
 
+func (s *PostgresStore) GetSource(ctx context.Context, sourceID uuid.UUID) (*models.Source, error) {
+	var sourceDB models.SourceDB
+	err := s.db.NewSelect().Model(&sourceDB).Where("id = ?", sourceID).Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get source: %w", err)
+	}
+	return sourceDB.ToSource()
+}
+
+func (s *PostgresStore) GetSourcesByUser(ctx context.Context, userID string, offset, limit int) ([]*models.Source, error) {
+	var sourcesDB []*models.SourceDB
+	query := s.db.NewSelect().Model(&sourcesDB).Where("src.user_id = ?", userID).Order("src.created_at DESC")
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Scan(ctx); err != nil {
+		return nil, fmt.Errorf("failed to get sources: %w", err)
+	}
+	sources := make([]*models.Source, len(sourcesDB))
+	for i, src := range sourcesDB {
+		s, err := src.ToSource()
+		if err != nil {
+			return nil, err
+		}
+		sources[i] = s
+	}
+	return sources, nil
+}
+
+func (s *PostgresStore) GetJobsBySource(ctx context.Context, sourceID uuid.UUID) ([]*models.Job, error) {
+	var jobsDB []*models.JobDB
+	err := s.db.NewSelect().Model(&jobsDB).Where("j.source_id = ?", sourceID).Order("j.created_at DESC").Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get jobs by source: %w", err)
+	}
+	jobs := make([]*models.Job, len(jobsDB))
+	for i, jobDB := range jobsDB {
+		job, err := jobDB.ToJob()
+		if err != nil {
+			return nil, err
+		}
+		jobs[i] = job
+	}
+	return jobs, nil
+}
+
 func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID string, sourceID uuid.UUID) error {
 	now := time.Now()
 	job := &models.JobDB{

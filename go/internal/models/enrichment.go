@@ -117,6 +117,45 @@ type RowsProgressResponse struct {
 	Pagination *PaginationInfo    `json:"pagination"`
 }
 
+type SourceJobSummary struct {
+	JobID                string            `json:"job_id"`
+	Status               JobStatus         `json:"status"`
+	TotalRows            int               `json:"total_rows"`
+	KeyColumns           []string          `json:"key_columns,omitempty"`
+	KeyColumnDescription *string           `json:"key_column_description,omitempty"`
+	ColumnsMetadata      []*ColumnMetadata `json:"columns_metadata,omitempty"`
+	CreatedAt            time.Time         `json:"created_at"`
+	StartedAt            *time.Time        `json:"started_at,omitempty"`
+}
+
+type SourceSummary struct {
+	SourceID        uuid.UUID  `json:"source_id"`
+	Type            string     `json:"type"`
+	CreatedAt       time.Time  `json:"created_at"`
+	JobCount        int        `json:"job_count"`
+	LatestJobStatus *JobStatus `json:"latest_job_status,omitempty"`
+}
+
+type SourceDetail struct {
+	SourceID  uuid.UUID          `json:"source_id"`
+	Type      string             `json:"type"`
+	CreatedAt time.Time          `json:"created_at"`
+	Jobs      []*SourceJobSummary `json:"jobs"`
+}
+
+func ToSourceJobSummary(job *Job) *SourceJobSummary {
+	return &SourceJobSummary{
+		JobID:                job.JobID,
+		Status:               job.Status,
+		TotalRows:            job.TotalRows,
+		KeyColumns:           job.KeyColumns,
+		KeyColumnDescription: job.KeyColumnDescription,
+		ColumnsMetadata:      job.ColumnsMetadata,
+		CreatedAt:            job.CreatedAt,
+		StartedAt:            job.StartedAt,
+	}
+}
+
 func ToRowProgressItem(row *RowState) *RowProgressItem {
 	sources := row.Sources
 	if sources == nil {

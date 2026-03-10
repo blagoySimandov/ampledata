@@ -5,6 +5,8 @@ import (
 	"log"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
+	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/google/uuid"
 )
 
 func (s *Server) SelectKey(ctx context.Context, req SelectKeyRequestObject) (SelectKeyResponseObject, error) {
@@ -12,16 +14,16 @@ func (s *Server) SelectKey(ctx context.Context, req SelectKeyRequestObject) (Sel
 	if !ok {
 		return SelectKey401JSONResponse{Message: "Unauthorized"}, nil
 	}
-	job, err := s.store.GetJob(ctx, req.Body.JobId)
+	source, err := s.store.GetSource(ctx, uuid.UUID(req.Body.SourceId))
 	if err != nil {
-		return SelectKey404JSONResponse{Message: "Job not found"}, nil
+		return SelectKey404JSONResponse{Message: "Source not found"}, nil
 	}
-	if job.UserID != u.ID {
-		return SelectKey403JSONResponse{Message: "Forbidden: You do not own this job"}, nil
+	if source.UserID != u.ID {
+		return SelectKey403JSONResponse{Message: "Forbidden: You do not own this source"}, nil
 	}
-	csvMeta, ok := sourceCSVMeta(job)
+	csvMeta, ok := source.Metadata.(*models.CSVSourceMetadata)
 	if !ok {
-		return SelectKey500JSONResponse{Message: "Job source not found"}, nil
+		return SelectKey500JSONResponse{Message: "Source metadata not found"}, nil
 	}
 	return s.selectKeyForJob(ctx, csvMeta.FileURI, req.Body.ColumnsMetadata)
 }
