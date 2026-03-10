@@ -19,6 +19,7 @@ type CrawlDecision struct {
 	URLsToCrawl    []string               `json:"urls_to_crawl"`
 	ExtractedData  map[string]interface{} `json:"extracted_data"`
 	Reasoning      string                 `json:"reasoning"`
+	SourceURLs     []string               `json:"source_urls"`
 	MissingColumns []string               `json:"-"`
 }
 
@@ -174,6 +175,7 @@ When search results contain information about MULTIPLE entities:
    - For boolean types: use true/false without quotes
    - For date types: use ISO 8601 format (YYYY-MM-DD)
    - If unsure whether data applies to target entity, do NOT extract it
+   - For every value you extract from a snippet, add the URL of that organic result to source_urls
 
 2. For columns you CANNOT extract from snippets:
    - ALWAYS select URLs to crawl that are likely to contain the missing data
@@ -204,23 +206,24 @@ Before responding:
 
 Example 1 - Data visible in snippets:
 - Column needed: employee_count (number)
-- Snippet: "Microsoft had 228,000 employees as of June 2025"
-- Response: {"urls_to_crawl": [], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count directly from snippet"}
+- Snippet at URL "https://en.wikipedia.org/wiki/Microsoft": "Microsoft had 228,000 employees as of June 2025"
+- Response: {"urls_to_crawl": [], "extracted_data": {"employee_count": 228000}, "source_urls": ["https://en.wikipedia.org/wiki/Microsoft"], "reasoning": "Extracted employee count directly from snippet"}
 
 Example 2 - Data not in snippets but URLs available:
 - Column needed: founder_picture_url (string)
 - Snippets: "Getty Images has photos of Microsoft founder", "Shutterstock Microsoft founder images"
-- Response: {"urls_to_crawl": ["https://www.gettyimages.com/photos/microsoft-founder", "https://news.microsoft.com/..."], "extracted_data": null, "reasoning": "Cannot extract image URL from snippets, but Getty Images and official Microsoft site likely contain founder photos"}
+- Response: {"urls_to_crawl": ["https://www.gettyimages.com/photos/microsoft-founder", "https://news.microsoft.com/..."], "extracted_data": null, "source_urls": [], "reasoning": "Cannot extract image URL from snippets, but Getty Images and official Microsoft site likely contain founder photos"}
 
 Example 3 - Mixed scenario:
 - Columns needed: employee_count, founder_picture_url
 - Snippets show employee count but not picture URL
-- Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
+- Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "source_urls": ["url_of_snippet_with_employee_count"], "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
 
 ## Response Format (JSON only, no markdown)
 {
     "urls_to_crawl": ["url1", "url2"] or [],
     "extracted_data": {"column_name": value_with_correct_type} or null,
+    "source_urls": ["url_whose_snippet_contained_extracted_data"] or [],
     "reasoning": "Explanation of what was extracted, what needs crawling, and any entity disambiguation performed"
 }`, entityContext, entityContext, entity, columnsText, organicResults, peopleAlsoAsk, entityContext, maxURLs, entity, entityContext, entityContext, entityContext)
 }
@@ -377,6 +380,7 @@ When search results contain information about MULTIPLE entities:
    - For boolean types: use true/false without quotes
    - For date types: use ISO 8601 format (YYYY-MM-DD)
    - If unsure whether data applies to target entity, do NOT extract it
+   - For every value you extract from a snippet, add the URL of that organic result to source_urls
 
 2. For columns you CANNOT extract from snippets:
    - ALWAYS select URLs to crawl that are likely to contain the missing data
@@ -407,23 +411,24 @@ Before responding:
 
 Example 1 - Data visible in snippets:
 - Column needed: employee_count (number)
-- Snippet: "Microsoft had 228,000 employees as of June 2025"
-- Response: {"urls_to_crawl": [], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count directly from snippet"}
+- Snippet at URL "https://en.wikipedia.org/wiki/Microsoft": "Microsoft had 228,000 employees as of June 2025"
+- Response: {"urls_to_crawl": [], "extracted_data": {"employee_count": 228000}, "source_urls": ["https://en.wikipedia.org/wiki/Microsoft"], "reasoning": "Extracted employee count directly from snippet"}
 
 Example 2 - Data not in snippets but URLs available:
 - Column needed: founder_picture_url (string)
 - Snippets: "Getty Images has photos of Microsoft founder", "Shutterstock Microsoft founder images"
-- Response: {"urls_to_crawl": ["https://www.gettyimages.com/photos/microsoft-founder", "https://news.microsoft.com/..."], "extracted_data": null, "reasoning": "Cannot extract image URL from snippets, but Getty Images and official Microsoft site likely contain founder photos"}
+- Response: {"urls_to_crawl": ["https://www.gettyimages.com/photos/microsoft-founder", "https://news.microsoft.com/..."], "extracted_data": null, "source_urls": [], "reasoning": "Cannot extract image URL from snippets, but Getty Images and official Microsoft site likely contain founder photos"}
 
 Example 3 - Mixed scenario:
 - Columns needed: employee_count, founder_picture_url
 - Snippets show employee count but not picture URL
-- Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
+- Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "source_urls": ["url_of_snippet_with_employee_count"], "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
 
 ## Response Format (JSON only, no markdown)
 {
     "urls_to_crawl": ["url1", "url2"] or [],
     "extracted_data": {"column_name": value_with_correct_type} or null,
+    "source_urls": ["url_whose_snippet_contained_extracted_data"] or [],
     "reasoning": "Explanation of what was extracted, what needs crawling, and any entity disambiguation performed"
 }`, entityContext, entityContext, entity, columnsText, organicResults, peopleAlsoAsk, entityContext, maxURLs, entity, entityContext, entityContext, entityContext)
 }

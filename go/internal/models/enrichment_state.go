@@ -53,6 +53,7 @@ type Decision struct {
 	URLsToCrawl    []string               `json:"urls_to_crawl"`
 	ExtractedData  map[string]interface{} `json:"extracted_data,omitempty"`
 	Reasoning      string                 `json:"reasoning"`
+	SourceURLs     []string               `json:"source_urls,omitempty"`
 	MissingColumns []string               `json:"missing_columns"`
 }
 

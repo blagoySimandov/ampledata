@@ -35,6 +35,24 @@ type EnrichmentWorkflowOutput struct {
 	IterationCount int
 }
 
+func mergeSources(serpSources, crawlSources []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, s := range serpSources {
+		if s != "" && !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	for _, s := range crawlSources {
+		if s != "" && !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
 func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*EnrichmentWorkflowOutput, error) {
 	info := workflow.GetInfo(ctx)
 	event := logger.NewEnrichmentEvent(input.JobID, input.RowKey, "")
@@ -227,8 +245,9 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	if extractOutput.Confidence != nil {
 		enrichedData.Confidence = extractOutput.Confidence
 	}
-	if crawlOutput.CrawlResults != nil && crawlOutput.CrawlResults.Sources != nil {
-		enrichedData.Sources = crawlOutput.CrawlResults.Sources
+	allSources := mergeSources(decisionOutput.Decision.SourceURLs, crawlOutput.CrawlResults.Sources)
+	if len(allSources) > 0 {
+		enrichedData.Sources = allSources
 	}
 
 	workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
@@ -240,7 +259,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 
 	output.ExtractedData = extractOutput.ExtractedData
 	output.Confidence = extractOutput.Confidence
-	output.Sources = crawlOutput.CrawlResults.Sources
+	output.Sources = allSources
 	output.Success = true
 
 	var feedbackOutput activities.FeedbackAnalysisOutput
@@ -312,9 +331,11 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 				output.Confidence[k] = v
 			}
 		}
-		if retryOutput.Sources != nil {
-			output.Sources = append(output.Sources, retryOutput.Sources...)
-		}
+		// Deduplicate: the retry may select the same SERP URLs or crawl targets as the
+		// initial attempt if the same sources are relevant to the missing columns.
+		// This shouldn't usually happen since the feedback loop generates different query
+		// patterns specifically to find better sources for the missing/low-confidence columns.
+		output.Sources = mergeSources(output.Sources, retryOutput.Sources)
 
 		output.IterationCount = retryOutput.IterationCount
 

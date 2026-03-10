@@ -241,6 +241,7 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 		URLsToCrawl:    crawlDecision.URLsToCrawl,
 		ExtractedData:  crawlDecision.ExtractedData,
 		Reasoning:      crawlDecision.Reasoning,
+		SourceURLs:     crawlDecision.SourceURLs,
 		MissingColumns: crawlDecision.MissingColumns,
 	}
 
