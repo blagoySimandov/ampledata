@@ -65,6 +65,11 @@ export class ApiClient {
     return decodeSourceDetail(data);
   }
 
+  public async getSourceData(sourceId: string): Promise<import('./types').SourceDataResponse> {
+    // Assuming simple JSON decode is fine here or we can define a decoder. We'll cast for now.
+    return this.request<import('./types').SourceDataResponse>(`/sources/${sourceId}/data`);
+  }
+
   public async enrich(sourceId: string, req: EnrichRequest): Promise<EnrichResponse> {
     return this.request<EnrichResponse>(`/sources/${sourceId}/enrich`, {
       method: 'POST',

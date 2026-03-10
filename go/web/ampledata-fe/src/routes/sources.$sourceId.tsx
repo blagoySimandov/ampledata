@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useApi, useSource, useEnrich, useJobRows, useJobProgress } from '../hooks';
+import { useApi, useSource, useEnrich, useAllJobsRows, useJobProgress, useSourceData } from '../hooks';
 import { useMemo, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { type ColDef, type ColGroupDef, themeQuartz } from 'ag-grid-community';
@@ -38,52 +38,6 @@ const myTheme = themeQuartz.withParams({
   wrapperBorderRadius: '12px',
 });
 
-function SourcesRenderer(params: { value: string[] }) {
-  const sources: string[] = params.value;
-  if (!sources || sources.length === 0) {
-    return <div className="text-slate-400 text-xs italic mt-1.5 opacity-50">-</div>;
-  }
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className="flex items-center gap-1.5 h-full px-2 hover:bg-slate-100 rounded text-slate-500 hover:text-primary transition-colors focus:outline-none">
-          <Link2 className="w-3.5 h-3.5" />
-          <span className="text-xs font-bold">{sources.length}</span>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-0 shadow-xl border-slate-200 overflow-hidden z-50">
-        <div className="bg-slate-50 border-b border-slate-100 px-3 py-2 flex items-center justify-between">
-          <span className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
-            <Link2 className="w-3 h-3" /> Data Sources
-          </span>
-          <Badge variant="secondary" className="text-[10px] font-bold px-1.5 py-0 h-4 min-h-0">
-            {sources.length} LINKS
-          </Badge>
-        </div>
-        <div className="max-h-[300px] overflow-y-auto p-2 space-y-1">
-          {sources.map((src, i) => {
-            let domain = src;
-            try { domain = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
-            return (
-              <a key={i} href={src} target="_blank" rel="noopener noreferrer"
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors group">
-                <div className="flex items-center gap-2 truncate min-w-0">
-                  <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                    <img src={`https://icon.horse/icon/${domain}`} alt="" className="w-3 h-3 opacity-70"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                  </div>
-                  <span className="text-xs font-medium text-slate-700 truncate group-hover:text-primary transition-colors">{domain}</span>
-                </div>
-                <ExternalLink className="w-3 h-3 text-slate-300 group-hover:text-primary shrink-0 ml-2 transition-colors" />
-              </a>
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function getConfidenceConfig(score: number) {
   if (score >= 0.8) return { label: "Very High", color: "text-emerald-500", bg: "bg-emerald-500", borderColor: "border-emerald-200" };
   if (score >= 0.7) return { label: "High", color: "text-green-500", bg: "bg-green-500", borderColor: "border-green-200" };
@@ -93,13 +47,14 @@ function getConfidenceConfig(score: number) {
 
 function ConfidenceDataRenderer(params: {
   colDef: { field: string };
-  data: { __confidence?: Record<string, { score: number; reason: string }>; __stage: string };
+  data: { __confidence?: Record<string, { score: number; reason: string }>; __stages?: Record<string, string>; __sources?: string[] };
   value: unknown;
 }) {
   const field = params.colDef.field;
   const confidence = params.data.__confidence?.[field];
   const hasValue = params.value !== undefined && params.value !== null && params.value !== "";
-  const stage = params.data.__stage;
+  const stage = params.data.__stages?.[field];
+  const sources = params.data.__sources;
   const confConfig = confidence
     ? getConfidenceConfig(confidence.score)
     : { label: "Unknown", color: "text-slate-400", bg: "bg-slate-200", borderColor: "border-slate-200" };
@@ -107,9 +62,21 @@ function ConfidenceDataRenderer(params: {
   let content;
   if (hasValue) {
     content = <span className="font-medium text-slate-900">{String(params.value)}</span>;
-  } else if (stage === 'COMPLETED' || stage === 'FAILED') {
+  } else if (stage && stage !== 'COMPLETED' && stage !== 'FAILED' && stage !== 'CANCELLED') {
     content = (
-      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-bold uppercase tracking-tight bg-amber-50 text-amber-700 border-amber-200">
+      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-bold uppercase tracking-tight bg-blue-50 text-blue-700 border-blue-200 w-fit">
+        <RefreshCw className="w-3 h-3 animate-spin" /> {stage.replace('_', ' ')}
+      </div>
+    );
+  } else if (stage === 'FAILED' || stage === 'CANCELLED') {
+    content = (
+      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-bold uppercase tracking-tight bg-red-50 text-red-700 border-red-200 w-fit">
+        <AlertCircle className="w-3 h-3" /> FAILED
+      </div>
+    );
+  } else if (stage === 'COMPLETED' && !hasValue) {
+    content = (
+      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-bold uppercase tracking-tight bg-amber-50 text-amber-700 border-amber-200 w-fit">
         <AlertCircle className="w-3 h-3" /> Missing
       </div>
     );
@@ -122,30 +89,67 @@ function ConfidenceDataRenderer(params: {
       <PopoverTrigger asChild>
         <button className="flex items-center justify-between w-full group cursor-pointer text-left focus:outline-none h-full min-h-[32px]">
           <div className="flex-1 truncate mr-2">{content}</div>
-          {confidence && (
+          {(confidence || (sources && sources.length > 0)) && (
             <div className={`flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity ${confConfig.color}`}>
-              <span className="text-xs font-black uppercase tracking-wider">{confConfig.label}</span>
-              <Info className="w-3 h-3" />
+              {sources && sources.length > 0 && <Link2 className="w-3.5 h-3.5 text-slate-400" />}
+              {confidence && <Info className="w-3.5 h-3.5" />}
             </div>
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 shadow-2xl border-slate-200 p-0 overflow-hidden">
+      <PopoverContent className="w-80 shadow-2xl border-slate-200 p-0 overflow-hidden z-50">
         <div className={`h-1.5 w-full ${confConfig.bg}`} />
-        <div className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="font-black text-xs uppercase tracking-widest text-slate-400">Field Intelligence</h4>
-            <Badge variant="outline" className={`text-xs font-black ${confConfig.color} ${confConfig.borderColor} bg-white`}>
-              {confConfig.label} CONFIDENCE
-            </Badge>
+        <div className="p-4 space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-black text-xs uppercase tracking-widest text-slate-400">Field Intelligence</h4>
+              <Badge variant="outline" className={`text-xs font-black ${confConfig.color} ${confConfig.borderColor} bg-white`}>
+                {confConfig.label} CONFIDENCE
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed italic">
+              {confidence ? `"${confidence.reason}"` : "No rationale captured."}
+            </p>
           </div>
-          <p className="text-xs text-slate-500 leading-relaxed italic">
-            {confidence ? `"${confidence.reason}"` : "No rationale captured."}
-          </p>
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-tight">Stage</span>
-            <span className="text-xs font-black text-slate-900 uppercase tracking-widest">{stage}</span>
-          </div>
+          
+          {sources && sources.length > 0 && (
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-black text-xs uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                  <Link2 className="w-3 h-3" /> Sources
+                </h4>
+                <Badge variant="secondary" className="text-[10px] font-bold px-1.5 py-0 h-4 min-h-0">
+                  {sources.length} LINKS
+                </Badge>
+              </div>
+              <div className="max-h-[150px] overflow-y-auto space-y-1 pr-1">
+                {sources.map((src, i) => {
+                  let domain = src;
+                  try { domain = new URL(src).hostname.replace(/^www\./, ''); } catch { /* ignore */ }
+                  return (
+                    <a key={i} href={src} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors group">
+                      <div className="flex items-center gap-2 truncate min-w-0">
+                        <div className="w-6 h-6 rounded bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
+                          <img src={`https://icon.horse/icon/${domain}`} alt="" className="w-3 h-3 opacity-70"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                        </div>
+                        <span className="text-xs font-medium text-slate-700 truncate group-hover:text-primary transition-colors">{domain}</span>
+                      </div>
+                      <ExternalLink className="w-3 h-3 text-slate-300 group-hover:text-primary shrink-0 ml-2 transition-colors" />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {stage && (
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-tight">Stage</span>
+              <span className="text-xs font-black text-slate-900 uppercase tracking-widest">{stage}</span>
+            </div>
+          )}
         </div>
       </PopoverContent>
     </Popover>
@@ -427,91 +431,136 @@ function JobRunsSidebar({ jobs, selectedJobId, onSelect, onClose }: {
   );
 }
 
-function DataTable({ jobId }: { jobId: string }) {
+function DataTable({ sourceId, jobs }: { sourceId: string; jobs: SourceJobSummary[] }) {
   const api = useApi();
-  const [page, setPage] = useState(0);
-  const pageSize = 50;
-  const { data: rowsData, isFetching } = useJobRows(api, jobId, page * pageSize, pageSize);
+  const { data: sourceData, isFetching: sourceFetching } = useSourceData(api, sourceId);
+  const jobQueries = useAllJobsRows(api, jobs);
 
-  const enrichedColumns = useMemo(() => {
+  const isFetching = sourceFetching || jobQueries.some(q => q.isFetching);
+  
+  const mergedData = useMemo(() => {
+    if (!sourceData) return { rows: [], sourceColumns: [], enrichedColumns: [] };
+
+    const rowMap = new Map<string, any>();
     const cols = new Set<string>();
-    rowsData?.rows.forEach(row => {
-      if (row.extracted_data) Object.keys(row.extracted_data).forEach(k => cols.add(k));
-      if (row.confidence) Object.keys(row.confidence).forEach(k => cols.add(k));
+
+    // We process sourceData.rows first
+    sourceData.rows.forEach((csvRow, index) => {
+      const rowObj: any = { __index: index.toString() };
+      sourceData.headers.forEach((header, i) => {
+        rowObj[header] = csvRow[i];
+      });
+      // We will identify rows by their index for the grid
+      rowMap.set(index.toString(), rowObj);
     });
-    return Array.from(cols).sort();
-  }, [rowsData]);
 
-  const columnDefs = useMemo<(ColDef | ColGroupDef)[]>(() => [
-    {
-      headerName: 'Original Data',
-      children: [{ field: '__key', headerName: 'Source Key', pinned: 'left', width: 200, cellClass: 'bg-slate-50 font-medium' }],
-    },
-    {
-      headerName: 'Enriched Data',
-      children: enrichedColumns.map(col => ({
-        field: col,
-        headerName: col.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-        flex: 1,
-        minWidth: 150,
-        cellRenderer: ConfidenceDataRenderer,
-      })),
-    },
-    {
-      headerName: 'System',
-      children: [
-        {
-          field: '__stage', headerName: 'Stage', width: 120,
-          cellRenderer: (params: { value: string }) => {
-            let color = "bg-slate-100 text-slate-600";
-            if (params.value === 'COMPLETED') color = "bg-emerald-50 text-emerald-700 border-emerald-100";
-            else if (params.value === 'FAILED') color = "bg-red-50 text-red-700 border-red-100";
-            return (
-              <div className="flex items-center h-full">
-                <Badge variant="secondary" className={`${color} border font-black text-xs px-2 py-0 h-4.5 min-h-0 leading-none tracking-tighter uppercase`}>
-                  {params.value}
-                </Badge>
-              </div>
-            );
-          },
-        },
-        { field: '__sources', headerName: 'Sources', width: 100, cellRenderer: SourcesRenderer },
-      ],
-    },
-  ], [enrichedColumns]);
+    // Process from oldest to newest so newer runs overwrite data
+    const sortedQueries = [...jobQueries].reverse();
+    const sortedJobs = [...jobs].reverse();
 
-  const rowData = useMemo(() => rowsData?.rows.map(row => ({
-    __key: row.key,
-    __stage: row.stage,
-    __confidence: row.confidence,
-    __sources: row.sources,
-    ...row.extracted_data,
-  })), [rowsData]);
+    sortedQueries.forEach((query, qIndex) => {
+      if (!query.data) return;
+      const job = sortedJobs[qIndex];
+      const keyCols = job.key_columns || [];
+      if (keyCols.length === 0) return;
+
+      // Find indices of key columns in source headers
+      const keyIndices = keyCols.map(kc => sourceData.headers.indexOf(kc));
+      
+      const jobRowsByKey = new Map<string, any>();
+      query.data.rows.forEach(r => jobRowsByKey.set(r.key, r));
+
+      sourceData.rows.forEach((csvRow, rowIndex) => {
+        const rowKeyParts = keyIndices.map(idx => idx !== -1 && idx < csvRow.length ? csvRow[idx] : "");
+        const jobKey = rowKeyParts.join("||");
+        
+        const jobRowData = jobRowsByKey.get(jobKey);
+        if (jobRowData) {
+          const existing = rowMap.get(rowIndex.toString());
+          if (!existing) return;
+
+          if (jobRowData.extracted_data) {
+            Object.assign(existing, jobRowData.extracted_data);
+          }
+          
+          if (!existing.__confidence) existing.__confidence = {};
+          if (jobRowData.confidence) {
+            Object.assign(existing.__confidence, jobRowData.confidence);
+          }
+
+          if (!existing.__sources) existing.__sources = [];
+          if (jobRowData.sources) {
+            existing.__sources.push(...jobRowData.sources);
+            existing.__sources = Array.from(new Set(existing.__sources));
+          }
+
+          if (!existing.__stages) existing.__stages = {};
+          if (job.columns_metadata) {
+            job.columns_metadata.forEach(c => {
+              existing.__stages[c.name] = jobRowData.stage;
+            });
+          }
+          
+          if (jobRowData.extracted_data) Object.keys(jobRowData.extracted_data).forEach(k => cols.add(k));
+          if (jobRowData.confidence) Object.keys(jobRowData.confidence).forEach(k => cols.add(k));
+        }
+      });
+    });
+
+    return {
+      rows: Array.from(rowMap.values()),
+      sourceColumns: sourceData.headers,
+      enrichedColumns: Array.from(cols).sort()
+    };
+  }, [sourceData, jobQueries, jobs]);
+
+  const columnDefs = useMemo<(ColDef | ColGroupDef)[]>(() => {
+    if (!mergedData.sourceColumns.length) return [];
+    
+    return [
+      {
+        headerName: 'Original Data',
+        children: mergedData.sourceColumns.map((col, idx) => ({
+          field: col,
+          headerName: col,
+          pinned: idx === 0 ? 'left' : null,
+          minWidth: 150,
+          cellClass: 'bg-slate-50 font-medium'
+        })),
+      },
+      {
+        headerName: 'Enriched Data',
+        children: mergedData.enrichedColumns.map(col => ({
+          field: col,
+          headerName: col.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          flex: 1,
+          minWidth: 150,
+          cellRenderer: ConfidenceDataRenderer,
+        })),
+      }
+    ];
+  }, [mergedData.sourceColumns, mergedData.enrichedColumns]);
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 min-h-0">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50 shrink-0">
-        <span className="text-xs font-black uppercase tracking-widest text-slate-400">Data</span>
+        <span className="text-xs font-black uppercase tracking-widest text-slate-400">Merged Data View</span>
         {isFetching && <RefreshCw className="w-3 h-3 text-blue-600 animate-spin" />}
       </div>
       <div className="w-full flex-1 min-h-0">
-        <AgGridReact rowData={rowData || []} columnDefs={columnDefs} theme={myTheme}
-          suppressPaginationPanel={true} defaultColDef={{ resizable: true, sortable: true }} />
+        <AgGridReact 
+          rowData={mergedData.rows} 
+          columnDefs={columnDefs} 
+          theme={myTheme}
+          pagination={true}
+          paginationPageSize={100}
+          paginationPageSizeSelector={[50, 100, 200, 500]}
+          defaultColDef={{ resizable: true, sortable: true, filter: true }} 
+        />
       </div>
       <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
         <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-          {rowData?.length || 0} of {rowsData?.pagination.total || 0} records
-        </div>
-        <div className="flex items-center gap-2">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)}
-            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40 transition-all">
-            Previous
-          </button>
-          <div className="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-bold">Page {page + 1}</div>
-          <button disabled={!rowsData?.pagination.has_more} onClick={() => setPage(p => p + 1)}
-            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-40 transition-all">
-            Next
-          </button>
+          {mergedData.rows.length} total records
         </div>
       </div>
     </div>
@@ -566,8 +615,8 @@ function SourceDetailPage() {
           </div>
         </div>
 
-        {activeJobId ? (
-          <DataTable jobId={activeJobId} />
+        {source.jobs && source.jobs.length > 0 ? (
+          <DataTable sourceId={sourceId} jobs={source.jobs} />
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-slate-400">

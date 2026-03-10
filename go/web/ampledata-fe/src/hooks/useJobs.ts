@@ -1,7 +1,7 @@
 // src/hooks/useJobs.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import { ApiClient } from '../api';
-import type { SignedURLRequest, SelectKeyRequest } from '../api';
+import type { SignedURLRequest, SelectKeyRequest, SourceJobSummary } from '../api';
 
 export function useJobProgress(api: ApiClient, jobId: string, refetchInterval: number | false = 5000) {
   return useQuery({
@@ -31,6 +31,16 @@ export function useJobResults(api: ApiClient, jobId: string, start = 0, limit = 
   return useQuery({
     queryKey: ['job-results', jobId, start, limit],
     queryFn: () => api.getJobResults(jobId, start, limit),
+  });
+}
+
+export function useAllJobsRows(api: ApiClient, jobs: SourceJobSummary[]) {
+  return useQueries({
+    queries: jobs.map((job) => ({
+      queryKey: ['job-rows', job.job_id, 0, 10000, 'all', 'updated_at_desc'],
+      queryFn: () => api.getJobRows(job.job_id, 0, 10000, 'all', 'updated_at_desc'),
+      refetchInterval: job.status === 'RUNNING' || job.status === 'PENDING' ? 5000 : false,
+    })),
   });
 }
 

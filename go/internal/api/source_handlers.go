@@ -77,6 +77,35 @@ func (s *Server) GetSource(ctx context.Context, req GetSourceRequestObject) (Get
 	return GetSource200JSONResponse(toAPISourceDetail(source, jobs)), nil
 }
 
+func (s *Server) GetSourceData(ctx context.Context, req GetSourceDataRequestObject) (GetSourceDataResponseObject, error) {
+	u, ok := auth.GetUserFromContext(ctx)
+	if !ok {
+		return GetSourceData401JSONResponse{Message: "Unauthorized"}, nil
+	}
+	source, err := s.store.GetSource(ctx, uuid.UUID(req.SourceID))
+	if err != nil {
+		return GetSourceData404JSONResponse{Message: "Source not found"}, nil
+	}
+	if source.UserID != u.ID {
+		return GetSourceData403JSONResponse{Message: "Forbidden"}, nil
+	}
+
+	csvMeta, ok := source.Metadata.(*models.CSVSourceMetadata)
+	if !ok {
+		return GetSourceData500JSONResponse{Message: "Source metadata not found"}, nil
+	}
+
+	result, err := s.gcsReader.ReadCSV(ctx, csvMeta.FileURI)
+	if err != nil {
+		return GetSourceData500JSONResponse{Message: fmt.Sprintf("Failed to read CSV: %v", err)}, nil
+	}
+
+	return GetSourceData200JSONResponse{
+		Headers: result.Headers,
+		Rows:    result.Rows,
+	}, nil
+}
+
 func (s *Server) EnrichSource(ctx context.Context, req EnrichSourceRequestObject) (EnrichSourceResponseObject, error) {
 	authUser, ok := auth.GetUserFromContext(ctx)
 	if !ok {

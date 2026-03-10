@@ -18,6 +18,14 @@ export function useSource(api: ApiClient, sourceId: string) {
   });
 }
 
+export function useSourceData(api: ApiClient, sourceId: string) {
+  return useQuery({
+    queryKey: ['source-data', sourceId],
+    queryFn: () => api.getSourceData(sourceId),
+    staleTime: Infinity, // Source data doesn't change
+  });
+}
+
 function hasRunningJob(source: SourceDetail | undefined): boolean {
   return source?.jobs.some(j => j.status === 'RUNNING' || j.status === 'PENDING') ?? false;
 }

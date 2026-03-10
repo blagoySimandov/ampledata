@@ -556,6 +556,62 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /sources/{sourceID}/data:
+    get:
+      operationId: GetSourceData
+      summary: Get the raw CSV data for a source
+      tags: [sources]
+      parameters:
+        - name: sourceID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Raw CSV data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  headers:
+                    type: array
+                    items:
+                      type: string
+                  rows:
+                    type: array
+                    items:
+                      type: array
+                      items:
+                        type: string
+                required: [headers, rows]
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Source not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /sources/{sourceID}/enrich:
     post:
       operationId: enrichSource

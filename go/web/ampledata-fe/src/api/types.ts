@@ -46,6 +46,11 @@ export interface SourceListResponse {
   total_count: number;
 }
 
+export interface SourceDataResponse {
+  headers: string[];
+  rows: string[][];
+}
+
 export interface EnrichRequest {
   columns_metadata: ColumnMetadata[];
   key_columns?: string[] | null;

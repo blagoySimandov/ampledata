@@ -312,6 +312,9 @@ type ServerInterface interface {
 	// Get source details with all enrichment runs
 	// (GET /sources/{sourceID})
 	GetSource(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID)
+	// Get the raw CSV data for a source
+	// (GET /sources/{sourceID}/data)
+	GetSourceData(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID)
 	// Start a new enrichment run for a source
 	// (POST /sources/{sourceID}/enrich)
 	EnrichSource(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID)
@@ -607,6 +610,34 @@ func (siw *ServerInterfaceWrapper) GetSource(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// GetSourceData operation middleware
+func (siw *ServerInterfaceWrapper) GetSourceData(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "sourceID" -------------
+	var sourceID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sourceID", mux.Vars(r)["sourceID"], &sourceID, runtime.BindStyledParameterOptions{Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sourceID", Err: err})
+		return
+	}
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSourceData(w, r, sourceID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // EnrichSource operation middleware
 func (siw *ServerInterfaceWrapper) EnrichSource(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -876,6 +907,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/sources", wrapper.ListSources).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/sources/{sourceID}", wrapper.GetSource).Methods("GET")
+
+	r.HandleFunc(options.BaseURL+"/sources/{sourceID}/data", wrapper.GetSourceData).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/sources/{sourceID}/enrich", wrapper.EnrichSource).Methods("POST")
 
@@ -1212,6 +1245,62 @@ func (response GetSource500JSONResponse) VisitGetSourceResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetSourceDataRequestObject struct {
+	SourceID openapi_types.UUID `json:"sourceID"`
+}
+
+type GetSourceDataResponseObject interface {
+	VisitGetSourceDataResponse(w http.ResponseWriter) error
+}
+
+type GetSourceData200JSONResponse struct {
+	Headers []string   `json:"headers"`
+	Rows    [][]string `json:"rows"`
+}
+
+func (response GetSourceData200JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData401JSONResponse ErrorResponse
+
+func (response GetSourceData401JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData403JSONResponse ErrorResponse
+
+func (response GetSourceData403JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData404JSONResponse ErrorResponse
+
+func (response GetSourceData404JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceData500JSONResponse ErrorResponse
+
+func (response GetSourceData500JSONResponse) VisitGetSourceDataResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type EnrichSourceRequestObject struct {
 	SourceID openapi_types.UUID `json:"sourceID"`
 	Body     *EnrichSourceJSONRequestBody
@@ -1466,6 +1555,9 @@ type StrictServerInterface interface {
 	// Get source details with all enrichment runs
 	// (GET /sources/{sourceID})
 	GetSource(ctx context.Context, request GetSourceRequestObject) (GetSourceResponseObject, error)
+	// Get the raw CSV data for a source
+	// (GET /sources/{sourceID}/data)
+	GetSourceData(ctx context.Context, request GetSourceDataRequestObject) (GetSourceDataResponseObject, error)
 	// Start a new enrichment run for a source
 	// (POST /sources/{sourceID}/enrich)
 	EnrichSource(ctx context.Context, request EnrichSourceRequestObject) (EnrichSourceResponseObject, error)
@@ -1735,6 +1827,32 @@ func (sh *strictHandler) GetSource(w http.ResponseWriter, r *http.Request, sourc
 	}
 }
 
+// GetSourceData operation middleware
+func (sh *strictHandler) GetSourceData(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID) {
+	var request GetSourceDataRequestObject
+
+	request.SourceID = sourceID
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSourceData(ctx, request.(GetSourceDataRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSourceData")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSourceDataResponseObject); ok {
+		if err := validResponse.VisitGetSourceDataResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // EnrichSource operation middleware
 func (sh *strictHandler) EnrichSource(w http.ResponseWriter, r *http.Request, sourceID openapi_types.UUID) {
 	var request EnrichSourceRequestObject
@@ -1902,48 +2020,49 @@ func (sh *strictHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"MG28deVBAAA=",
+	"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",
+	"AAAA//9EQsm77UUAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
