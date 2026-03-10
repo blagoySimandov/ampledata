@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useApi, useSource, useEnrich, useJobRows } from '../hooks';
+import { useApi, useSource, useEnrich, useJobRows, useJobProgress } from '../hooks';
 import { useMemo, useState } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { type ColDef, type ColGroupDef, themeQuartz } from 'ag-grid-community';
 import {
   ArrowLeft, RefreshCw, AlertCircle, Info, PanelRightOpen, PanelRightClose,
-  Link2, ExternalLink, Plus, Trash2, Settings2, Loader2,
+  Link2, ExternalLink, Plus, Trash2, Settings2, Loader2, PlayCircle, StopCircle, CheckCircle2, XCircle
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
@@ -152,11 +152,13 @@ function ConfidenceDataRenderer(params: {
   );
 }
 
-function AddColumnsDialog({ sourceId, hasExistingJob }: { sourceId: string; hasExistingJob: boolean }) {
+function AddColumnsDialog({ sourceId, mostRecentJob }: { sourceId: string; mostRecentJob?: SourceJobSummary }) {
   const api = useApi();
   const enrich = useEnrich(api, sourceId);
   const [open, setOpen] = useState(false);
   const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
+  const [keyColumns, setKeyColumns] = useState<string>('');
+  const [keyColumnDescription, setKeyColumnDescription] = useState<string>('');
 
   const addColumn = () => setColumnsMetadata(prev => [...prev, { name: '', type: 'string', job_type: 'enrichment' }]);
   const removeColumn = (i: number) => setColumnsMetadata(prev => prev.filter((_, idx) => idx !== i));
@@ -165,16 +167,36 @@ function AddColumnsDialog({ sourceId, hasExistingJob }: { sourceId: string; hasE
 
   const handleEnrich = async () => {
     try {
-      await enrich.mutateAsync({ columns_metadata: columnsMetadata });
+      const payload: any = { columns_metadata: columnsMetadata };
+      
+      const keys = keyColumns.split(',').map(k => k.trim()).filter(Boolean);
+      if (keys.length > 0) payload.key_columns = keys;
+      if (keyColumnDescription.trim()) payload.key_column_description = keyColumnDescription.trim();
+
+      await enrich.mutateAsync(payload);
       setOpen(false);
       setColumnsMetadata([]);
+      setKeyColumns('');
+      setKeyColumnDescription('');
     } catch (e) { console.error('Enrich failed', e); }
   };
 
+  const hasExistingJob = !!mostRecentJob;
   const canStart = columnsMetadata.length > 0 && columnsMetadata.every(c => c.name) && hasExistingJob;
 
   return (
-    <Dialog open={open} onOpenChange={(val) => { setOpen(val); if (!val) setColumnsMetadata([]); }}>
+    <Dialog open={open} onOpenChange={(val) => { 
+      setOpen(val); 
+      if (!val) {
+        setColumnsMetadata([]);
+        setKeyColumns('');
+        setKeyColumnDescription('');
+      } else {
+        if (mostRecentJob?.key_columns) {
+          setKeyColumns(mostRecentJob.key_columns.join(', '));
+        }
+      }
+    }}>
       <DialogTrigger asChild>
         <Button className="font-bold gap-2" disabled={!hasExistingJob}>
           <Plus className="w-4 h-4" /> ADD COLUMNS
@@ -185,67 +207,96 @@ function AddColumnsDialog({ sourceId, hasExistingJob }: { sourceId: string; hasE
           <DialogTitle className="text-2xl font-black">Add Enrichment Columns</DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-1 px-6">
-          <div className="py-6 space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="py-6 space-y-6">
+            <div className="space-y-4">
               <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                <Settings2 className="w-3 h-3" /> New Fields
+                <Settings2 className="w-3 h-3" /> Key Column Settings
               </Label>
-              <Button variant="ghost" size="sm" onClick={addColumn} className="h-7 text-xs font-black px-2 hover:bg-slate-100">
-                <Plus className="w-3 h-3 mr-1" /> ADD FIELD
-              </Button>
-            </div>
-            {columnsMetadata.length === 0 ? (
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 flex flex-col items-center text-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
-                  <Settings2 className="w-5 h-5 text-slate-400" />
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-slate-500 font-bold">Key Columns (comma separated)</Label>
+                  <Input 
+                    placeholder="e.g. company_name, domain" 
+                    value={keyColumns}
+                    onChange={(e) => setKeyColumns(e.target.value)}
+                    className="text-sm font-medium h-9"
+                  />
+                  <p className="text-[10px] text-slate-400">Leave exactly as is to reuse the previous run's keys.</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-slate-900">Define new fields</p>
-                  <p className="text-xs text-slate-500 max-w-[280px] leading-relaxed">
-                    Add columns to enrich. Previous runs are not re-processed.
-                  </p>
+                  <Label className="text-xs text-slate-500 font-bold">Key Column Definition (AI Context)</Label>
+                  <Input 
+                    placeholder="Optional rules to locate the key columns in raw text..." 
+                    value={keyColumnDescription}
+                    onChange={(e) => setKeyColumnDescription(e.target.value)}
+                    className="text-sm h-9"
+                  />
                 </div>
-                <Button variant="outline" size="sm" onClick={addColumn} className="mt-1 font-bold h-8 px-4 border-slate-200">
-                  <Plus className="w-3 h-3 mr-2" /> ADD YOUR FIRST FIELD
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                  <Settings2 className="w-3 h-3" /> New Fields
+                </Label>
+                <Button variant="ghost" size="sm" onClick={addColumn} className="h-7 text-xs font-black px-2 hover:bg-slate-100">
+                  <Plus className="w-3 h-3 mr-1" /> ADD FIELD
                 </Button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {columnsMetadata.map((col, index) => (
-                  <div key={index} className="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <Input placeholder="Field name" value={col.name}
-                        onChange={(e) => updateColumn(index, { name: e.target.value })}
-                        className="h-9 text-xs font-medium" />
-                      <Select value={col.job_type} onValueChange={(v: 'enrichment' | 'imputation') => updateColumn(index, { job_type: v })}>
-                        <SelectTrigger className="h-9 w-[120px] text-xs font-medium bg-slate-50 border-transparent"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="enrichment">Enrich</SelectItem>
-                          <SelectItem value="imputation">Impute</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={col.type} onValueChange={(v: 'string' | 'number' | 'boolean' | 'date') => updateColumn(index, { type: v })}>
-                        <SelectTrigger className="h-9 w-[100px] text-xs font-medium bg-slate-50 border-transparent"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="string">String</SelectItem>
-                          <SelectItem value="number">Number</SelectItem>
-                          <SelectItem value="boolean">Bool</SelectItem>
-                          <SelectItem value="date">Date</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button variant="ghost" size="icon" onClick={() => removeColumn(index)}
-                        className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <Input placeholder="Optional AI instructions"
-                      value={col.description || ''}
-                      onChange={(e) => updateColumn(index, { description: e.target.value })}
-                      className="h-8 text-xs bg-slate-50/50 border-slate-100 placeholder:text-slate-400" />
+              {columnsMetadata.length === 0 ? (
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 flex flex-col items-center text-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                    <Settings2 className="w-5 h-5 text-slate-400" />
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-slate-900">Define new fields</p>
+                    <p className="text-xs text-slate-500 max-w-[280px] leading-relaxed">
+                      Add columns to enrich. Previous runs are not re-processed.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={addColumn} className="mt-1 font-bold h-8 px-4 border-slate-200">
+                    <Plus className="w-3 h-3 mr-2" /> ADD YOUR FIRST FIELD
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {columnsMetadata.map((col, index) => (
+                    <div key={index} className="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Input placeholder="Field name" value={col.name}
+                          onChange={(e) => updateColumn(index, { name: e.target.value })}
+                          className="h-9 text-xs font-medium" />
+                        <Select value={col.job_type} onValueChange={(v: 'enrichment' | 'imputation') => updateColumn(index, { job_type: v })}>
+                          <SelectTrigger className="h-9 w-[120px] text-xs font-medium bg-slate-50 border-transparent"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="enrichment">Enrich</SelectItem>
+                            <SelectItem value="imputation">Impute</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select value={col.type} onValueChange={(v: 'string' | 'number' | 'boolean' | 'date') => updateColumn(index, { type: v })}>
+                          <SelectTrigger className="h-9 w-[100px] text-xs font-medium bg-slate-50 border-transparent"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="string">String</SelectItem>
+                            <SelectItem value="number">Number</SelectItem>
+                            <SelectItem value="boolean">Bool</SelectItem>
+                            <SelectItem value="date">Date</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="icon" onClick={() => removeColumn(index)}
+                          className="h-9 w-9 text-slate-400 hover:text-red-500 hover:bg-red-50 shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <Input placeholder="Optional AI instructions"
+                        value={col.description || ''}
+                        onChange={(e) => updateColumn(index, { description: e.target.value })}
+                        className="h-8 text-xs bg-slate-50/50 border-slate-100 placeholder:text-slate-400" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <Button className="w-full font-black h-12" onClick={handleEnrich} disabled={!canStart || enrich.isPending}>
               {enrich.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />STARTING...</> : 'START ENRICHMENT'}
             </Button>
@@ -256,6 +307,74 @@ function AddColumnsDialog({ sourceId, hasExistingJob }: { sourceId: string; hasE
   );
 }
 
+function JobStats({ jobId }: { jobId: string }) {
+  const api = useApi();
+  const { data: progress } = useJobProgress(api, jobId);
+
+  if (!progress) {
+    return (
+      <div className="p-4 border-b border-slate-100 bg-slate-50/50 shrink-0 flex items-center justify-center h-24">
+        <Loader2 className="w-5 h-5 text-slate-400 animate-spin" />
+      </div>
+    );
+  }
+
+  const stages = progress.rows_by_stage || {};
+  const completed = stages['COMPLETED'] || 0;
+  const failed = stages['FAILED'] || 0;
+  const inProgress = progress.total_rows - completed - failed - (stages['PENDING'] || 0);
+  
+  const pctCompleted = progress.total_rows > 0 ? (completed / progress.total_rows) * 100 : 0;
+  
+  let StatusIcon = PlayCircle;
+  let statusColor = "text-blue-500";
+  if (progress.status === 'COMPLETED') { StatusIcon = CheckCircle2; statusColor = "text-emerald-500"; }
+  else if (progress.status === 'CANCELLED') { StatusIcon = XCircle; statusColor = "text-red-500"; }
+  else if (progress.status === 'PAUSED') { StatusIcon = StopCircle; statusColor = "text-amber-500"; }
+
+  return (
+    <div className="p-6 border-b border-slate-100 bg-white shrink-0 space-y-4 shadow-sm relative z-10">
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <StatusIcon className={`w-5 h-5 ${statusColor}`} />
+            <h3 className="text-sm font-black text-slate-900 tracking-tight">{progress.status}</h3>
+          </div>
+          <p className="text-xs text-slate-500 font-medium ml-7">
+            Started {new Date(progress.started_at).toLocaleString()}
+          </p>
+        </div>
+        <Badge variant="secondary" className="font-bold bg-slate-100 text-slate-700">
+          {progress.total_rows} ROWS
+        </Badge>
+      </div>
+
+      <div className="space-y-2 pt-2">
+        <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+          <span>Overall Progress</span>
+          <span className="text-slate-900">{pctCompleted.toFixed(1)}%</span>
+        </div>
+        <Progress value={pctCompleted} className="h-2.5 bg-slate-100" />
+      </div>
+
+      <div className="grid grid-cols-3 gap-2 pt-2">
+        <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 flex flex-col items-center justify-center">
+          <span className="text-lg font-black text-emerald-600">{completed}</span>
+          <span className="text-[10px] font-bold text-emerald-700/70 uppercase tracking-widest mt-0.5">Done</span>
+        </div>
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-2.5 flex flex-col items-center justify-center">
+          <span className="text-lg font-black text-blue-600">{inProgress}</span>
+          <span className="text-[10px] font-bold text-blue-700/70 uppercase tracking-widest mt-0.5">Active</span>
+        </div>
+        <div className="bg-red-50 border border-red-100 rounded-lg p-2.5 flex flex-col items-center justify-center">
+          <span className="text-lg font-black text-red-600">{failed}</span>
+          <span className="text-[10px] font-bold text-red-700/70 uppercase tracking-widest mt-0.5">Failed</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function JobRunsSidebar({ jobs, selectedJobId, onSelect, onClose }: {
   jobs: SourceJobSummary[];
   selectedJobId: string | null;
@@ -263,14 +382,16 @@ function JobRunsSidebar({ jobs, selectedJobId, onSelect, onClose }: {
   onClose: () => void;
 }) {
   return (
-    <div className="w-[400px] h-full flex flex-col min-h-0 absolute top-0 left-0 bottom-0">
-      <div className="p-6 border-b border-slate-100 bg-slate-50/50 shrink-0 flex items-center justify-between">
-        <h2 className="text-sm font-black uppercase tracking-widest text-slate-500">Enrichment Runs</h2>
-        <button onClick={onClose} className="bg-white border border-slate-200 p-2 rounded-lg shadow-sm hover:bg-slate-50 transition-all text-slate-400 hover:text-slate-700 active:scale-95">
-          <PanelRightClose className="w-4 h-4" />
+    <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50">
+      <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+        <h2 className="text-xs font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+          <Settings2 className="w-3.5 h-3.5" /> All Runs
+        </h2>
+        <button onClick={onClose} className="bg-white border border-slate-200 p-1.5 rounded-md shadow-sm hover:bg-slate-50 transition-all text-slate-400 hover:text-slate-700 active:scale-95">
+          <PanelRightClose className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
         {jobs.map((job) => {
           const isSelected = job.job_id === selectedJobId;
           const cols = job.columns_metadata?.map(c => c.name).join(', ') || '—';
@@ -280,17 +401,24 @@ function JobRunsSidebar({ jobs, selectedJobId, onSelect, onClose }: {
           else if (job.status === 'CANCELLED') statusColor = 'bg-red-50 text-red-700 border-red-200';
           return (
             <button key={job.job_id} onClick={() => onSelect(job.job_id)}
-              className={`w-full text-left p-3 rounded-xl border transition-all ${isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'}`}>
-              <div className="flex items-center justify-between mb-1">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${statusColor}`}>
+              className={`w-full text-left p-3.5 rounded-xl border transition-all ${isSelected ? 'border-primary bg-white shadow-md ring-1 ring-primary/10' : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${statusColor}`}>
                   {job.status}
                 </span>
-                <span className="text-[11px] text-slate-400">{new Date(job.created_at).toLocaleDateString()}</span>
+                <span className="text-[11px] font-medium text-slate-400">{new Date(job.created_at).toLocaleDateString()}</span>
               </div>
-              <p className="text-xs text-slate-500 truncate mt-1.5">
-                <span className="font-semibold text-slate-700">Columns: </span>{cols}
-              </p>
-              <p className="text-xs text-slate-400">{job.total_rows} rows</p>
+              <div className="space-y-1.5">
+                <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
+                  <span className="font-bold text-slate-900">Fields: </span>{cols}
+                </p>
+                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 min-h-0 bg-slate-50 text-slate-500">{job.total_rows} rows</Badge>
+                  {job.key_columns && job.key_columns.length > 0 && (
+                    <span className="truncate">Key: {job.key_columns.join(', ')}</span>
+                  )}
+                </div>
+              </div>
             </button>
           );
         })}
@@ -400,10 +528,6 @@ function SourceDetailPage() {
   const mostRecentJob = source?.jobs[0];
   const activeJobId = selectedJobId ?? mostRecentJob?.job_id ?? null;
   const activeJob = source?.jobs.find(j => j.job_id === activeJobId);
-  const hasCompletedJob = source?.jobs.some(j => j.status === 'COMPLETED') ?? false;
-
-  const completedRows = activeJob?.status === 'COMPLETED' ? activeJob.total_rows : 0;
-  const progressPercent = activeJob && activeJob.total_rows > 0 ? (completedRows / activeJob.total_rows) * 100 : 0;
 
   if (isLoading) {
     return (
@@ -432,7 +556,7 @@ function SourceDetailPage() {
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">Dataset Explorer</h2>
           </div>
           <div className="flex items-center gap-2">
-            <AddColumnsDialog sourceId={sourceId} hasExistingJob={hasCompletedJob} />
+            <AddColumnsDialog sourceId={sourceId} mostRecentJob={mostRecentJob} />
             {!sidebarOpen && (
               <button onClick={() => setSidebarOpen(true)}
                 className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg shadow-sm hover:bg-slate-50 transition-all active:scale-95 flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
@@ -461,22 +585,7 @@ function SourceDetailPage() {
         {sidebarOpen && (
           <>
             {activeJob && (
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50 shrink-0 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="px-3 py-1.5 font-black tracking-widest text-xs uppercase border-slate-300 bg-white">
-                    {activeJob.status}
-                  </Badge>
-                  <span className="text-xs font-bold text-slate-400">{activeJob.total_rows} rows</span>
-                </div>
-                {activeJob.status === 'RUNNING' && (
-                  <div className="space-y-1">
-                    <Progress value={progressPercent} className="h-2 bg-slate-200/60" />
-                    <div className="flex justify-end">
-                      <span className="text-xs font-black text-primary">{progressPercent.toFixed(0)}% COMPLETE</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <JobStats jobId={activeJob.job_id} />
             )}
             <JobRunsSidebar
               jobs={source.jobs}
