@@ -808,7 +808,6 @@ function JobRunsSidebar({
   jobs,
   selectedJobId,
   onSelect,
-  onClose,
 }: JobRunsSidebarProps) {
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-slate-50/50">
@@ -1097,7 +1096,9 @@ function GridToolbar({
       <span className="text-xs font-black uppercase tracking-widest text-slate-400 shrink-0">
         Merged Data View
       </span>
-      {isFetching && <RefreshCw className="w-3 h-3 text-blue-600 animate-spin shrink-0" />}
+      {isFetching && (
+        <RefreshCw className="w-3 h-3 text-blue-600 animate-spin shrink-0" />
+      )}
       <div className="flex-1" />
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />

@@ -1,5 +1,3 @@
-// src/api/types.ts
-
 export type JobStatus =
   | "PENDING"
   | "RUNNING"
