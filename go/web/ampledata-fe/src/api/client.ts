@@ -1,4 +1,3 @@
-// src/api/client.ts
 import {
   decodeSourceList,
   decodeSourceDetail,
@@ -26,6 +25,21 @@ export class ApiClient {
 
   private getToken(): string {
     return "mock-token";
+  }
+
+  private buildUrl(
+    endpoint: string,
+    params?: Record<string, string | number | undefined>,
+  ): string {
+    const url = new URL(endpoint, "http://localhost");
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+    return url.pathname + url.search;
   }
 
   private async request<T>(
@@ -56,39 +70,38 @@ export class ApiClient {
   }
 
   public async getSources(offset = 0, limit = 50): Promise<SourceListResponse> {
-    const data = await this.request<unknown>(
-      `${ENDPOINTS.SOURCES_LIST}?offset=${offset}&limit=${limit}`,
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_LIST, { offset, limit });
+    const data = await this.request<SourceListResponse>(endpoint);
     return decodeSourceList(data);
   }
 
   public async getSource(sourceId: string): Promise<SourceDetail> {
-    const data = await this.request<unknown>(
-      ENDPOINTS.SOURCES_DETAIL(sourceId),
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_DETAIL(sourceId));
+    const data = await this.request<SourceDetail>(endpoint);
     return decodeSourceDetail(data);
   }
 
   public async getSourceData(
     sourceId: string,
   ): Promise<import("./types").SourceDataResponse> {
-    return this.request<import("./types").SourceDataResponse>(
-      ENDPOINTS.SOURCES_DATA(sourceId),
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_DATA(sourceId));
+    return this.request<import("./types").SourceDataResponse>(endpoint);
   }
 
   public async enrich(
     sourceId: string,
     req: EnrichRequest,
   ): Promise<EnrichResponse> {
-    return this.request<EnrichResponse>(ENDPOINTS.SOURCES_ENRICH(sourceId), {
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_ENRICH(sourceId));
+    return this.request<EnrichResponse>(endpoint, {
       method: "POST",
       body: JSON.stringify(req),
     });
   }
 
   public async getJobProgress(jobId: string): Promise<JobProgressResponse> {
-    const data = await this.request<unknown>(ENDPOINTS.JOBS_PROGRESS(jobId));
+    const endpoint = this.buildUrl(ENDPOINTS.JOBS_PROGRESS(jobId));
+    const data = await this.request<JobProgressResponse>(endpoint);
     return decodeJobProgress(data);
   }
 
@@ -99,9 +112,13 @@ export class ApiClient {
     stage = "all",
     sort = "updated_at_desc",
   ): Promise<RowsProgressResponse> {
-    const data = await this.request<unknown>(
-      `${ENDPOINTS.JOBS_ROWS(jobId)}?offset=${offset}&limit=${limit}&stage=${stage}&sort=${sort}`,
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.JOBS_ROWS(jobId), {
+      offset,
+      limit,
+      stage,
+      sort,
+    });
+    const data = await this.request<RowsProgressResponse>(endpoint);
     return decodeRowsProgress(data);
   }
 
@@ -110,20 +127,24 @@ export class ApiClient {
     start = 0,
     limit = 0,
   ): Promise<EnrichmentResult[]> {
-    const data = await this.request<unknown>(
-      `${ENDPOINTS.JOBS_RESULTS(jobId)}?start=${start}&limit=${limit}`,
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.JOBS_RESULTS(jobId), {
+      start,
+      limit,
+    });
+    const data = await this.request<EnrichmentResult[]>(endpoint);
     return decodeEnrichmentResults(data);
   }
 
   public async cancelJob(jobId: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>(ENDPOINTS.JOBS_CANCEL(jobId), {
+    const endpoint = this.buildUrl(ENDPOINTS.JOBS_CANCEL(jobId));
+    return this.request<{ message: string }>(endpoint, {
       method: "POST",
     });
   }
 
   public async getSignedUrl(req: SignedURLRequest): Promise<SignedURLResponse> {
-    return this.request<SignedURLResponse>(ENDPOINTS.ENRICHMENT_SIGNED_URL, {
+    const endpoint = this.buildUrl(ENDPOINTS.ENRICHMENT_SIGNED_URL);
+    return this.request<SignedURLResponse>(endpoint, {
       method: "POST",
       body: JSON.stringify(req),
     });
@@ -140,7 +161,8 @@ export class ApiClient {
   }
 
   public async selectKey(req: SelectKeyRequest): Promise<SelectKeyResponse> {
-    return this.request<SelectKeyResponse>(ENDPOINTS.SELECT_KEY, {
+    const endpoint = this.buildUrl(ENDPOINTS.SELECT_KEY);
+    return this.request<SelectKeyResponse>(endpoint, {
       method: "POST",
       body: JSON.stringify(req),
     });
