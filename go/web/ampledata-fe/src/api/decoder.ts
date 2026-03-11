@@ -5,7 +5,6 @@ import type {
   SourceDetail,
   JobProgressResponse,
   RowsProgressResponse,
-  EnrichmentResult,
 } from "./types";
 
 export function decodeSourceList(data: unknown): SourceListResponse {
@@ -22,8 +21,4 @@ export function decodeJobProgress(data: unknown): JobProgressResponse {
 
 export function decodeRowsProgress(data: unknown): RowsProgressResponse {
   return data as RowsProgressResponse;
-}
-
-export function decodeEnrichmentResults(data: unknown): EnrichmentResult[] {
-  return data as EnrichmentResult[];
 }

@@ -1,0 +1,12 @@
+export const ENDPOINTS = {
+  SOURCES_LIST: "/sources",
+  SOURCES_DETAIL: (sourceId: string) => `/sources/${sourceId}`,
+  SOURCES_DATA: (sourceId: string) => `/sources/${sourceId}/data`,
+  SOURCES_ENRICH: (sourceId: string) => `/sources/${sourceId}/enrich`,
+  JOBS_PROGRESS: (jobId: string) => `/jobs/${jobId}/progress`,
+  JOBS_ROWS: (jobId: string) => `/jobs/${jobId}/rows`,
+  JOBS_RESULTS: (jobId: string) => `/jobs/${jobId}/results`,
+  JOBS_CANCEL: (jobId: string) => `/jobs/${jobId}/cancel`,
+  ENRICHMENT_SIGNED_URL: "/enrichment-signed-url",
+  SELECT_KEY: "/select-key",
+} as const;

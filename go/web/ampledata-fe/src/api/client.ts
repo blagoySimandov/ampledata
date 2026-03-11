@@ -1,18 +1,14 @@
-// src/api/client.ts
-
 import {
   decodeSourceList,
   decodeSourceDetail,
   decodeJobProgress,
   decodeRowsProgress,
-  decodeEnrichmentResults,
 } from "./decoder";
 import type {
   SourceListResponse,
   SourceDetail,
   JobProgressResponse,
   RowsProgressResponse,
-  EnrichmentResult,
   SignedURLRequest,
   SignedURLResponse,
   SelectKeyRequest,
@@ -20,6 +16,7 @@ import type {
   EnrichRequest,
   EnrichResponse,
 } from "./types";
+import { ENDPOINTS } from "./endpoints";
 
 export class ApiClient {
   private baseUrl = "/api/v1";
@@ -28,76 +25,81 @@ export class ApiClient {
     return "mock-token";
   }
 
+  private buildUrl(
+    endpoint: string,
+    params?: Record<string, string | number | undefined>,
+  ): string {
+    const url = new URL(endpoint, "http://localhost");
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+    return url.pathname + url.search;
+  }
+
   private async request<T>(
     endpoint: string,
     options?: RequestInit,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-
     const headers = new Headers(options?.headers);
-    if (
-      !headers.has("Content-Type") &&
-      (!options?.method ||
-        options.method === "GET" ||
-        options.method === "POST")
-    ) {
-      headers.set("Content-Type", "application/json");
-    }
-
     headers.set("Authorization", `Bearer ${this.getToken()}`);
 
-    const config: RequestInit = { ...options, headers };
+    const config: RequestInit = {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...Object.fromEntries(headers),
+      },
+    };
+
     const response = await fetch(url, config);
 
     if (!response.ok) {
-      let errorMessage = response.statusText;
-      try {
-        const errorData = await response.json();
-        if (errorData.message) errorMessage = errorData.message;
-      } catch {
-        /* fallback to statusText */
-      }
-      throw new Error(errorMessage);
+      const errorData = await response.json();
+      throw new Error(errorData.message || response.statusText);
     }
 
     const text = await response.text();
-    if (!text) return {} as T;
-    return JSON.parse(text) as T;
+    return text ? (JSON.parse(text) as T) : ({} as T);
   }
 
   public async getSources(offset = 0, limit = 50): Promise<SourceListResponse> {
-    const data = await this.request<unknown>(
-      `/sources?offset=${offset}&limit=${limit}`,
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_LIST, { offset, limit });
+    const data = await this.request<SourceListResponse>(endpoint);
     return decodeSourceList(data);
   }
 
   public async getSource(sourceId: string): Promise<SourceDetail> {
-    const data = await this.request<unknown>(`/sources/${sourceId}`);
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_DETAIL(sourceId));
+    const data = await this.request<SourceDetail>(endpoint);
     return decodeSourceDetail(data);
   }
 
   public async getSourceData(
     sourceId: string,
   ): Promise<import("./types").SourceDataResponse> {
-    // Assuming simple JSON decode is fine here or we can define a decoder. We'll cast for now.
-    return this.request<import("./types").SourceDataResponse>(
-      `/sources/${sourceId}/data`,
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_DATA(sourceId));
+    return this.request<import("./types").SourceDataResponse>(endpoint);
   }
 
   public async enrich(
     sourceId: string,
     req: EnrichRequest,
   ): Promise<EnrichResponse> {
-    return this.request<EnrichResponse>(`/sources/${sourceId}/enrich`, {
+    const endpoint = this.buildUrl(ENDPOINTS.SOURCES_ENRICH(sourceId));
+    return this.request<EnrichResponse>(endpoint, {
       method: "POST",
       body: JSON.stringify(req),
     });
   }
 
   public async getJobProgress(jobId: string): Promise<JobProgressResponse> {
-    const data = await this.request<unknown>(`/jobs/${jobId}/progress`);
+    const endpoint = this.buildUrl(ENDPOINTS.JOBS_PROGRESS(jobId));
+    const data = await this.request<JobProgressResponse>(endpoint);
     return decodeJobProgress(data);
   }
 
@@ -108,31 +110,26 @@ export class ApiClient {
     stage = "all",
     sort = "updated_at_desc",
   ): Promise<RowsProgressResponse> {
-    const data = await this.request<unknown>(
-      `/jobs/${jobId}/rows?offset=${offset}&limit=${limit}&stage=${stage}&sort=${sort}`,
-    );
+    const endpoint = this.buildUrl(ENDPOINTS.JOBS_ROWS(jobId), {
+      offset,
+      limit,
+      stage,
+      sort,
+    });
+    const data = await this.request<RowsProgressResponse>(endpoint);
     return decodeRowsProgress(data);
   }
 
-  public async getJobResults(
-    jobId: string,
-    start = 0,
-    limit = 0,
-  ): Promise<EnrichmentResult[]> {
-    const data = await this.request<unknown>(
-      `/jobs/${jobId}/results?start=${start}&limit=${limit}`,
-    );
-    return decodeEnrichmentResults(data);
-  }
-
   public async cancelJob(jobId: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/jobs/${jobId}/cancel`, {
+    const endpoint = this.buildUrl(ENDPOINTS.JOBS_CANCEL(jobId));
+    return this.request<{ message: string }>(endpoint, {
       method: "POST",
     });
   }
 
   public async getSignedUrl(req: SignedURLRequest): Promise<SignedURLResponse> {
-    return this.request<SignedURLResponse>("/enrichment-signed-url", {
+    const endpoint = this.buildUrl(ENDPOINTS.ENRICHMENT_SIGNED_URL);
+    return this.request<SignedURLResponse>(endpoint, {
       method: "POST",
       body: JSON.stringify(req),
     });
@@ -149,7 +146,8 @@ export class ApiClient {
   }
 
   public async selectKey(req: SelectKeyRequest): Promise<SelectKeyResponse> {
-    return this.request<SelectKeyResponse>("/select-key", {
+    const endpoint = this.buildUrl(ENDPOINTS.SELECT_KEY);
+    return this.request<SelectKeyResponse>(endpoint, {
       method: "POST",
       body: JSON.stringify(req),
     });

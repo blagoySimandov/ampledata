@@ -23,34 +23,6 @@ export function useJobProgress(
   });
 }
 
-export function useJobRows(
-  api: ApiClient,
-  jobId: string,
-  offset = 0,
-  limit = 50,
-  stage = "all",
-  sort = "updated_at_desc",
-  refetchInterval: number | false = 5000,
-) {
-  return useQuery({
-    queryKey: ["job-rows", jobId, offset, limit, stage, sort],
-    queryFn: () => api.getJobRows(jobId, offset, limit, stage, sort),
-    refetchInterval,
-  });
-}
-
-export function useJobResults(
-  api: ApiClient,
-  jobId: string,
-  start = 0,
-  limit = 0,
-) {
-  return useQuery({
-    queryKey: ["job-results", jobId, start, limit],
-    queryFn: () => api.getJobResults(jobId, start, limit),
-  });
-}
-
 export function useAllJobsRows(api: ApiClient, jobs: SourceJobSummary[]) {
   return useQueries({
     queries: jobs.map((job) => ({
@@ -63,6 +35,7 @@ export function useAllJobsRows(api: ApiClient, jobs: SourceJobSummary[]) {
   });
 }
 
+//TODO: currently unused could be useful in the future...
 export function useCancelJob(api: ApiClient) {
   const queryClient = useQueryClient();
   return useMutation({

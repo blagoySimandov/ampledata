@@ -1,5 +1,3 @@
-// src/api/types.ts
-
 export type JobStatus =
   | "PENDING"
   | "RUNNING"
@@ -107,14 +105,6 @@ export interface PaginationInfo {
 export interface RowsProgressResponse {
   rows: RowProgressItem[];
   pagination: PaginationInfo;
-}
-
-export interface EnrichmentResult {
-  key: string;
-  extracted_data: Record<string, unknown>;
-  sources: string[];
-  confidence?: Record<string, FieldConfidenceInfo> | null;
-  error?: string | null;
 }
 
 export interface SignedURLRequest {
