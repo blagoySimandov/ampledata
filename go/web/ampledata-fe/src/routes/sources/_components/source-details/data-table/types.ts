@@ -1,5 +1,3 @@
-import type { ColumnMetadata } from "@/api";
-
 export interface ConfidenceEntry {
   score: number;
   reason: string;
@@ -24,10 +22,4 @@ export interface MergedDataResult {
   rows: RowData[];
   sourceColumns: string[];
   enrichedColumns: string[];
-}
-
-export interface EnrichPayload {
-  columns_metadata: ColumnMetadata[];
-  key_columns?: string[];
-  key_column_description?: string;
 }

@@ -1,7 +1,7 @@
 import { SourceDetailHeader } from "./_components/source-details/header";
 import { JobRunsSidebarPanel } from "./_components/source-details/jobs-runs-sidepanel";
 import { LoadingState, ErrorState } from "./_components/source-details/state";
-import { DataTable } from "./data-table";
+import { DataTable } from "./_components/source-details/data-table";
 import { useSourceDetail } from "./_hooks";
 
 export function SourceDetail({ sourceId }: { sourceId: string }) {

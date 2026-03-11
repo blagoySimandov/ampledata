@@ -1,7 +1,7 @@
 import type { SourceJobSummary } from "@/api";
 import { useApi, useSourceData, useAllJobsRows } from "@/hooks";
 import { useMemo } from "react";
-import type { RowData, MergedDataResult } from "./types";
+import type { RowData, MergedDataResult } from "../types";
 
 function seedEnrichedColsFromMetadata(
   job: SourceJobSummary,

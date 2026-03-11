@@ -1,7 +1,7 @@
 import { PanelRightClose } from "lucide-react";
 import type { SourceJobSummary } from "@/api";
-import { JobRunsSidebar } from "../../job-sidebar";
-import { JobStats } from "../../job-stats";
+import { JobRunsSidebar } from "./job-runs-sidebar";
+import { JobStats } from "./job-stats";
 
 export function JobRunsSidebarPanel({
   open,
@@ -41,7 +41,6 @@ export function JobRunsSidebarPanel({
             jobs={jobs}
             selectedJobId={selectedJobId}
             onSelect={onSelect}
-            onClose={onClose}
           />
         </>
       )}

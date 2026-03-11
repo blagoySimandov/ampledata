@@ -25,7 +25,11 @@ import {
 import { useApi, useEnrich, useSourceData } from "@/hooks";
 import { Plus, Settings2, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { EnrichPayload } from "./types";
+interface EnrichPayload {
+  columns_metadata: ColumnMetadata[];
+  key_columns?: string[];
+  key_column_description?: string;
+}
 
 interface AddColumnsDialogProps {
   sourceId: string;
