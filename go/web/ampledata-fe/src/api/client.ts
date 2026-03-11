@@ -122,19 +122,6 @@ export class ApiClient {
     return decodeRowsProgress(data);
   }
 
-  public async getJobResults(
-    jobId: string,
-    start = 0,
-    limit = 0,
-  ): Promise<EnrichmentResult[]> {
-    const endpoint = this.buildUrl(ENDPOINTS.JOBS_RESULTS(jobId), {
-      start,
-      limit,
-    });
-    const data = await this.request<EnrichmentResult[]>(endpoint);
-    return decodeEnrichmentResults(data);
-  }
-
   public async cancelJob(jobId: string): Promise<{ message: string }> {
     const endpoint = this.buildUrl(ENDPOINTS.JOBS_CANCEL(jobId));
     return this.request<{ message: string }>(endpoint, {

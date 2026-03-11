@@ -39,18 +39,6 @@ export function useJobRows(
   });
 }
 
-export function useJobResults(
-  api: ApiClient,
-  jobId: string,
-  start = 0,
-  limit = 0,
-) {
-  return useQuery({
-    queryKey: ["job-results", jobId, start, limit],
-    queryFn: () => api.getJobResults(jobId, start, limit),
-  });
-}
-
 export function useAllJobsRows(api: ApiClient, jobs: SourceJobSummary[]) {
   return useQueries({
     queries: jobs.map((job) => ({
