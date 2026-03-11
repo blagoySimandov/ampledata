@@ -33,33 +33,22 @@ export class ApiClient {
     options?: RequestInit,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-
     const headers = new Headers(options?.headers);
-    if (
-      !headers.has("Content-Type") &&
-      (!options?.method ||
-        options.method === "GET" ||
-        options.method === "POST")
-    ) {
-      headers.set("Content-Type", "application/json");
-    }
-
     headers.set("Authorization", `Bearer ${this.getToken()}`);
 
-    const config: RequestInit = { ...options, headers };
+    const config: RequestInit = {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...Object.fromEntries(headers),
+      },
+    };
+
     const response = await fetch(url, config);
-
     if (!response.ok) {
-      let errorMessage = response.statusText;
-      try {
-        const errorData = await response.json();
-        if (errorData.message) errorMessage = errorData.message;
-      } catch {
-        /* fallback to statusText */
-      }
-      throw new Error(errorMessage);
+      const errorData = await response.json();
+      throw new Error(errorData.message || response.statusText);
     }
-
     const text = await response.text();
     if (!text) return {} as T;
     return JSON.parse(text) as T;
