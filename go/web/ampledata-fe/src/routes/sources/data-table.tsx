@@ -2,7 +2,7 @@ import type { GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { Download, Maximize2, RefreshCw, Search } from "lucide-react";
 import { useRef } from "react";
-import { useColumnDefs } from "./columns/";
+import { useColumnDefs } from "./_columns";
 import type { SourceJobSummary } from "@/api";
 import { useMergedData } from "./use-merged";
 import { agtheme } from "@/lib/ag-theme";

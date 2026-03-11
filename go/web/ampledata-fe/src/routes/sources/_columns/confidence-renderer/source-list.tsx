@@ -1,6 +1,5 @@
-import { Badge } from "@/components/ui/badge";
 import { Link2, ExternalLink } from "lucide-react";
-import type { ConfidenceConfig, ConfidenceEntry } from "../types";
+import { Badge } from "@/components/ui/badge";
 
 function extractDomain(url: string): string {
   try {
@@ -8,32 +7,6 @@ function extractDomain(url: string): string {
   } catch {
     return url;
   }
-}
-export function ConfidenceHeader({
-  config,
-  confidence,
-}: {
-  config: ConfidenceConfig;
-  confidence: ConfidenceEntry | undefined;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="font-black text-xs uppercase tracking-widest text-slate-400">
-          Field Intelligence
-        </h4>
-        <Badge
-          variant="outline"
-          className={`text-xs font-black ${config.color} ${config.borderColor} bg-white`}
-        >
-          {config.label} CONFIDENCE
-        </Badge>
-      </div>
-      <p className="text-xs text-slate-500 leading-relaxed italic">
-        {confidence ? `"${confidence.reason}"` : "No rationale captured."}
-      </p>
-    </div>
-  );
 }
 
 export function SourcesList({ sources }: { sources: string[] }) {
@@ -82,19 +55,6 @@ export function SourcesList({ sources }: { sources: string[] }) {
           );
         })}
       </div>
-    </div>
-  );
-}
-
-export function StageFooter({ stage }: { stage: string }) {
-  return (
-    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-      <span className="text-xs font-bold text-slate-400 uppercase tracking-tight">
-        Stage
-      </span>
-      <span className="text-xs font-black text-slate-900 uppercase tracking-widest">
-        {stage}
-      </span>
     </div>
   );
 }

@@ -3,11 +3,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { SourcesList } from "@/routes/_components";
-import { Info, Link2 } from "lucide-react";
-import { ConfidenceHeader, StageFooter } from "../_components";
-import type { ConfidenceConfig, RowData } from "../types";
+import type { RowData, ConfidenceConfig } from "../../types";
+import { Link2, Info } from "lucide-react";
+import { ConfidenceHeader } from "./header";
+import { SourcesList } from "./source-list";
 import { CellContent } from "./cell-content";
+import { StageFooter } from "./stage-footer";
 
 interface ConfidenceDataRendererParams {
   colDef: { field: string };
@@ -89,7 +90,7 @@ export function ConfidenceDataRenderer(params: ConfidenceDataRendererParams) {
         <div className={`h-1.5 w-full ${confConfig.bg}`} />
         <div className="p-4 space-y-4">
           <ConfidenceHeader config={confConfig} confidence={confidence} />
-          {sources && sources.length > 0 && <SourcesList />}
+          {sources && sources.length > 0 && <SourcesList sources={sources} />}
           {stage && <StageFooter stage={stage} />}
         </div>
       </PopoverContent>
