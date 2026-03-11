@@ -3,14 +3,12 @@ import {
   decodeSourceDetail,
   decodeJobProgress,
   decodeRowsProgress,
-  decodeEnrichmentResults,
 } from "./decoder";
 import type {
   SourceListResponse,
   SourceDetail,
   JobProgressResponse,
   RowsProgressResponse,
-  EnrichmentResult,
   SignedURLRequest,
   SignedURLResponse,
   SelectKeyRequest,

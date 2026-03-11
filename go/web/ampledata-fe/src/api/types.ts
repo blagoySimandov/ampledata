@@ -109,14 +109,6 @@ export interface RowsProgressResponse {
   pagination: PaginationInfo;
 }
 
-export interface EnrichmentResult {
-  key: string;
-  extracted_data: Record<string, unknown>;
-  sources: string[];
-  confidence?: Record<string, FieldConfidenceInfo> | null;
-  error?: string | null;
-}
-
 export interface SignedURLRequest {
   contentType: "text/csv" | "application/json";
   length: number;
