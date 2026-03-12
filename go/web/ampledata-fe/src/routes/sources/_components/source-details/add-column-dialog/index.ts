@@ -1,1 +1,1 @@
-export { AddColumnsDialog } from "./AddColumnsDialog";
+export { AddColumnsDialog } from "./add-columns-dialog";
