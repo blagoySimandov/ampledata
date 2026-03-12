@@ -1,6 +1,6 @@
 import { Link, ArrowLeft, PanelRightOpen } from "lucide-react";
-import { AddColumnsDialog } from "../add-column-dialog";
 import type { SourceJobSummary } from "@/api";
+import { AddColumnsDialog } from "./add-column-dialog";
 
 type SourceDetailProps = {
   sourceId: string;

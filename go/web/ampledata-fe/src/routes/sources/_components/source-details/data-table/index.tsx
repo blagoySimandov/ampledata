@@ -44,6 +44,7 @@ export function DataTable({ sourceId, jobs }: DataTableProps) {
           rowData={mergedData.rows}
           columnDefs={columnDefs}
           theme={agtheme}
+          loading={isFetching}
           pagination
           paginationPageSize={100}
           paginationPageSizeSelector={[50, 100, 200, 500]}

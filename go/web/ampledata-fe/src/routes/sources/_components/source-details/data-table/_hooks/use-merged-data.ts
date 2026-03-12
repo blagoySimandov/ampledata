@@ -197,8 +197,23 @@ function applyJobToRows(
   applyJobResultsToRows(job, query.data.rows, sourceData, rowMap, enrichedCols);
 }
 
-// ─── Hook ────────────────────────────────────────────────────────────────────
-
+/**
+ * Merges CSV source data with enrichment job results into a unified row set.
+ *
+ * Fetches the raw source rows for `sourceId` and overlays enriched columns
+ * from each job in `jobs`. Newer jobs take precedence over older ones for
+ * overlapping columns. Rows with no matching job result are marked as PENDING.
+ *
+ * @param sourceId - The ID of the source CSV to fetch
+ * @param jobs     - Ordered list of enrichment jobs (newest first)
+ * @returns        - Merged rows, original source columns, enriched column names,
+ *                   and a combined fetching flag
+ *
+ * @example
+ * const { data, isFetching } = useMergedData("src_123", jobs);
+ * // data.rows        → all rows with enriched fields merged in
+ * // data.enrichedColumns → ["email", "company", ...]
+ */
 export function useMergedData(
   sourceId: string,
   jobs: SourceJobSummary[],
