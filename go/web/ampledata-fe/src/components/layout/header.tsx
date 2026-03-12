@@ -1,14 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Database } from "lucide-react";
+import logo from "../../../assets/ampledata-logo.png";
 
 export function Header() {
   return (
     <header className="sticky top-0 z-10 w-full border-b bg-white border-gray-200 shadow-sm">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl">
-          <Database className="w-6 h-6" />
-          <Link to="/">AmpleData</Link>
-        </div>
+      <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+        <Link to="/">
+          <img src={logo} alt="AmpleData" className="h-12 w-auto" />
+        </Link>
         <nav>
           <Link
             to="/"
