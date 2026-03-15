@@ -12,11 +12,12 @@ export function useColumnDefs(
     return [
       {
         headerName: "Original Data",
+        openByDefault: true,
         children: sourceColumns.map(
           (col, idx): ColDef => ({
             field: col,
             headerName: col,
-            pinned: idx === 0 ? "left" : undefined,
+            columnGroupShow: idx === 0 ? undefined : "open",
             minWidth: 150,
             cellClass: "bg-slate-50 font-medium",
           }),
