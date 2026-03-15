@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -21,21 +22,23 @@ const (
 )
 
 type WorkOSUser struct {
-	ID        string `json:"id"`
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	ID                string `json:"id"`
+	Email             string `json:"email"`
+	FirstName         string `json:"first_name"`
+	LastName          string `json:"last_name"`
+	ProfilePictureURL string `json:"profile_picture_url"`
 }
 
 func (w *WorkOSUser) ToUser() *models.User {
 	return &models.User{
-		ID:               w.ID,
-		Email:            w.Email,
-		FirstName:        w.FirstName,
-		LastName:         w.LastName,
-		StripeCustomerID: nil,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		ID:                w.ID,
+		Email:             w.Email,
+		FirstName:         w.FirstName,
+		LastName:          w.LastName,
+		ProfilePictureURL: w.ProfilePictureURL,
+		StripeCustomerID:  nil,
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
 	}
 }
 
@@ -138,14 +141,17 @@ func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 					http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
 					return
 				}
+				spew.Dump("Token", token)
 
 				claims := token.PrivateClaims()
+				spew.Dump(claims)
 
 				workosUser = &WorkOSUser{
-					ID:        getStringClaim(claims, "sid"),
-					Email:     getStringClaim(claims, "email"),
-					FirstName: getStringClaim(claims, "first_name"),
-					LastName:  getStringClaim(claims, "last_name"),
+					ID:                token.Subject(),
+					Email:             getStringClaim(claims, "email"),
+					FirstName:         getStringClaim(claims, "firstName"),
+					LastName:          getStringClaim(claims, "lastName"),
+					ProfilePictureURL: getStringClaim(claims, "profilePictureUrl"),
 				}
 			}
 

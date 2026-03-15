@@ -117,6 +117,7 @@ type UserDB struct {
 	Email                string     `bun:"email,notnull" json:"email"`
 	FirstName            string     `bun:"first_name" json:"first_name"`
 	LastName             string     `bun:"last_name" json:"last_name"`
+	ProfilePictureURL    string     `bun:"profile_picture_url" json:"profile_picture_url"`
 	StripeCustomerID     *string    `bun:"stripe_customer_id" json:"stripe_customer_id"`
 	TokensUsed           int64      `bun:"tokens_used,notnull,default:0" json:"tokens_used"`
 	SubscriptionTier     *string    `bun:"subscription_tier" json:"subscription_tier"`
@@ -135,6 +136,7 @@ func (u *UserDB) ToUser() *User {
 		Email:                u.Email,
 		FirstName:            u.FirstName,
 		LastName:             u.LastName,
+		ProfilePictureURL:    u.ProfilePictureURL,
 		StripeCustomerID:     u.StripeCustomerID,
 		TokensUsed:           u.TokensUsed,
 		SubscriptionTier:     u.SubscriptionTier,
@@ -154,6 +156,7 @@ func UserFromDomain(user *User) *UserDB {
 		Email:                user.Email,
 		FirstName:            user.FirstName,
 		LastName:             user.LastName,
+		ProfilePictureURL:    user.ProfilePictureURL,
 		StripeCustomerID:     user.StripeCustomerID,
 		TokensUsed:           user.TokensUsed,
 		SubscriptionTier:     user.SubscriptionTier,

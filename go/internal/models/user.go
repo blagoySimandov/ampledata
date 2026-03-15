@@ -7,6 +7,7 @@ type User struct {
 	Email                string     `json:"email"`
 	FirstName            string     `json:"first_name"`
 	LastName             string     `json:"last_name"`
+	ProfilePictureURL    string     `json:"profile_picture_url"`
 	StripeCustomerID     *string    `json:"stripe_customer_id,omitempty"`
 	TokensUsed           int64      `json:"tokens_used"`
 	SubscriptionTier     *string    `json:"subscription_tier,omitempty"`

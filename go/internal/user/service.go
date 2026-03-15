@@ -8,7 +8,7 @@ import (
 )
 
 type Service interface {
-	GetOrCreate(ctx context.Context, userID, email, firstName, lastName string) (*models.User, error)
+	GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error)
 }
 
 type UserService struct {
@@ -23,8 +23,8 @@ func NewUserService(repo Repository, billing services.BillingService) *UserServi
 	}
 }
 
-func (s *UserService) GetOrCreate(ctx context.Context, userID, email, firstName, lastName string) (*models.User, error) {
-	user, err := s.repo.GetOrCreate(ctx, userID, email, firstName, lastName)
+func (s *UserService) GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error) {
+	user, err := s.repo.GetOrCreate(ctx, userID, email, firstName, lastName, profilePictureURL)
 	if err != nil {
 		return nil, err
 	}
