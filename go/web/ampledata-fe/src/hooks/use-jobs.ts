@@ -3,6 +3,7 @@ import {
   useMutation,
   useQueryClient,
   useQueries,
+  keepPreviousData,
 } from "@tanstack/react-query";
 import { ApiClient } from "../api";
 import type {
@@ -20,6 +21,7 @@ export function useJobProgress(
     queryKey: ["job-progress", jobId],
     queryFn: () => api.getJobProgress(jobId),
     refetchInterval,
+    placeholderData: keepPreviousData,
   });
 }
 
