@@ -10,9 +10,18 @@ import { GridToolbar } from "./grid-toolbar";
 interface DataTableProps {
   sourceId: string;
   jobs: SourceJobSummary[];
+  mostRecentJob?: SourceJobSummary;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
 }
 
-export function DataTable({ sourceId, jobs }: DataTableProps) {
+export function DataTable({
+  sourceId,
+  jobs,
+  mostRecentJob,
+  sidebarOpen,
+  onToggleSidebar,
+}: DataTableProps) {
   const { data: mergedData, isFetching } = useMergedData(sourceId, jobs);
   const gridRef = useRef<AgGridReact>(null);
   const columnDefs = useColumnDefs(
@@ -30,13 +39,17 @@ export function DataTable({ sourceId, jobs }: DataTableProps) {
   const handleAutoSize = () => getApi()?.autoSizeAllColumns();
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden flex flex-col flex-1 min-h-0">
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col flex-1 min-h-0">
       <GridToolbar
         rowCount={mergedData.rows.length}
         isFetching={isFetching}
         onQuickFilter={handleQuickFilter}
         onExport={handleExport}
         onAutoSize={handleAutoSize}
+        sourceId={sourceId}
+        mostRecentJob={mostRecentJob}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={onToggleSidebar}
       />
       <div className="w-full flex-1 min-h-0">
         <AgGridReact
@@ -50,6 +63,7 @@ export function DataTable({ sourceId, jobs }: DataTableProps) {
           paginationPageSizeSelector={[50, 100, 200, 500]}
           animateRows
           enableCellTextSelection
+          rowHeight={36}
           defaultColDef={{
             resizable: true,
             sortable: true,
