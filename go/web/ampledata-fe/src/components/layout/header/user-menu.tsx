@@ -1,49 +1,14 @@
-import { Link } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
-import { useAuth } from "@workos-inc/authkit-react";
-import logo from "../../../assets/ampledata-logo.png";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { CreditsWidget } from "./credits-widget";
+import { userInitials, userDisplayName } from "@/lib/utils";
+import { useAuth } from "@workos-inc/authkit-react";
+import { Link, LogOut } from "lucide-react";
 
-function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
-  return (
-    <Link
-      to={to}
-      className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-      activeProps={{ className: "text-foreground font-semibold" }}
-    >
-      {children}
-    </Link>
-  );
-}
-
-function userInitials(
-  firstName: string | null,
-  lastName: string | null,
-  email: string,
-) {
-  if (firstName && lastName)
-    return `${firstName[0]}${lastName[0]}`.toUpperCase();
-  if (firstName) return firstName[0].toUpperCase();
-  return email[0].toUpperCase();
-}
-
-function userDisplayName(
-  firstName: string | null,
-  lastName: string | null,
-  email: string,
-) {
-  if (firstName || lastName)
-    return [firstName, lastName].filter(Boolean).join(" ");
-  return email;
-}
-
-function UserMenu() {
+export function UserMenu() {
   const { user, signOut } = useAuth();
   if (!user) return null;
 
@@ -91,22 +56,5 @@ function UserMenu() {
         </div>
       </PopoverContent>
     </Popover>
-  );
-}
-
-export function Header() {
-  return (
-    <header className="sticky top-0 z-10 w-full border-b bg-background border-border shadow-sm">
-      <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-        <Link to="/">
-          <img src={logo} alt="AmpleData" className="h-12 w-auto" />
-        </Link>
-        <nav className="flex items-center gap-4">
-          <NavLink to="/">Jobs</NavLink>
-          <CreditsWidget />
-          <UserMenu />
-        </nav>
-      </div>
-    </header>
   );
 }
