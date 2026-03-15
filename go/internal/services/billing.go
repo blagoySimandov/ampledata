@@ -12,6 +12,7 @@ type BillingService interface {
 	CreateSubscriptionCheckout(ctx context.Context, customerID, tierID, successURL, cancelURL string) (*stripe.CheckoutSession, error)
 	GetSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error)
 	CancelSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error)
+	CreatePortalSession(ctx context.Context, customerID, returnURL string) (*stripe.BillingPortalSession, error)
 	CreateCreditGrant(ctx context.Context, customerID string, amountCents int64, idempotencyKey string) (*stripe.BillingCreditGrant, error)
 	VerifyWebhookSignature(payload []byte, signature string) (*stripe.Event, error)
 }

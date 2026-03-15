@@ -2,12 +2,12 @@ import { useBilling } from "@/hooks";
 import { SubscriptionSummary } from "./_components/subscription-summary";
 import { TierSelector } from "./_components/tier-selector";
 
-function handleManagePortal() {
-  // TODO: redirect to Stripe customer portal once backend endpoint is ready
-}
-
 export function BillingPage() {
-  const { tiers, subscription, subscribe } = useBilling();
+  const { tiers, subscription, subscribe, portal } = useBilling();
+
+  function handleManagePortal() {
+    portal.mutate(window.location.href);
+  }
 
   if (tiers.isLoading || subscription.isLoading) {
     return <div className="text-xs text-muted-foreground py-4">Loading...</div>;

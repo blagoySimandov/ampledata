@@ -140,8 +140,13 @@ export interface SubscriptionStatusResponse {
   tier: string;
   tokens_included: number;
   tokens_used: number;
+  cancel_at_period_end: boolean;
   current_period_start: string;
   current_period_end: string;
+}
+
+export interface PortalSessionResponse {
+  url: string;
 }
 
 export interface CreateSubscriptionRequest {

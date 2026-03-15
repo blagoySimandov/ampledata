@@ -37,6 +37,7 @@ type Repository interface {
 	UpdateSubscription(ctx context.Context, stripeCustomerID, tier, subscriptionID string, tokensIncluded int64, periodStart, periodEnd time.Time) error
 	ResetBillingCycle(ctx context.Context, stripeCustomerID string, periodStart, periodEnd time.Time) error
 	ClearSubscription(ctx context.Context, stripeCustomerID string) error
+	SetCancelAtPeriodEnd(ctx context.Context, stripeCustomerID string, value bool) error
 }
 
 type UserRepository struct {
@@ -178,6 +179,7 @@ func (r *UserRepository) UpdateSubscription(ctx context.Context, stripeCustomerI
 		Set("tokens_included = ?", tokensIncluded).
 		Set("current_period_start = ?", periodStart).
 		Set("current_period_end = ?", periodEnd).
+		Set("cancel_at_period_end = false").
 		Set("updated_at = ?", time.Now()).
 		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)
@@ -205,6 +207,17 @@ func (r *UserRepository) ClearSubscription(ctx context.Context, stripeCustomerID
 		Set("tokens_used = 0").
 		Set("current_period_start = NULL").
 		Set("current_period_end = NULL").
+		Set("cancel_at_period_end = false").
+		Set("updated_at = ?", time.Now()).
+		Where("stripe_customer_id = ?", stripeCustomerID).
+		Exec(ctx)
+	return checkRowsAffected(res, err, stripeCustomerID)
+}
+
+func (r *UserRepository) SetCancelAtPeriodEnd(ctx context.Context, stripeCustomerID string, value bool) error {
+	res, err := r.db.NewUpdate().
+		Model((*models.UserDB)(nil)).
+		Set("cancel_at_period_end = ?", value).
 		Set("updated_at = ?", time.Now()).
 		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)

@@ -40,6 +40,8 @@ func (s *Server) handleWebhookEvent(ctx context.Context, event *stripe.Event) er
 		return s.handleInvoicePaid(ctx, event)
 	case "customer.subscription.deleted":
 		return s.handleSubscriptionDeleted(ctx, event)
+	case "customer.subscription.updated":
+		return s.handleSubscriptionUpdated(ctx, event)
 	}
 	return nil
 }
@@ -73,6 +75,20 @@ func validateSubscriptionRequest(body *CreateSubscriptionCheckoutJSONRequestBody
 	return nil
 }
 
+func (s *Server) CreatePortalSession(ctx context.Context, req CreatePortalSessionRequestObject) (CreatePortalSessionResponseObject, error) {
+	dbUser, ok := user.GetDBUserFromContext(ctx)
+	if !ok || dbUser.StripeCustomerID == nil {
+		return CreatePortalSession400JSONResponse{Message: "User not found or missing Stripe customer"}, nil
+	}
+	returnURL := req.Params.ReturnUrl
+	session, err := s.billing.CreatePortalSession(ctx, *dbUser.StripeCustomerID, returnURL)
+	if err != nil {
+		log.Printf("Failed to create portal session for customer %s: %v", *dbUser.StripeCustomerID, err)
+		return CreatePortalSession500JSONResponse{Message: "Failed to create portal session"}, nil
+	}
+	return CreatePortalSession200JSONResponse{Url: session.URL}, nil
+}
+
 func (s *Server) GetSubscriptionStatus(ctx context.Context, req GetSubscriptionStatusRequestObject) (GetSubscriptionStatusResponseObject, error) {
 	dbUser, ok := user.GetDBUserFromContext(ctx)
 	if !ok {
@@ -82,6 +98,7 @@ func (s *Server) GetSubscriptionStatus(ctx context.Context, req GetSubscriptionS
 		Tier:               dbUser.SubscriptionTier,
 		TokensUsed:         dbUser.TokensUsed,
 		TokensIncluded:     dbUser.TokensIncluded,
+		CancelAtPeriodEnd:  dbUser.CancelAtPeriodEnd,
 		CurrentPeriodStart: dbUser.CurrentPeriodStart,
 		CurrentPeriodEnd:   dbUser.CurrentPeriodEnd,
 	}, nil
@@ -89,14 +106,17 @@ func (s *Server) GetSubscriptionStatus(ctx context.Context, req GetSubscriptionS
 
 func (s *Server) CancelSubscription(ctx context.Context, req CancelSubscriptionRequestObject) (CancelSubscriptionResponseObject, error) {
 	dbUser, ok := user.GetDBUserFromContext(ctx)
-	if !ok || dbUser.StripeSubscriptionID == nil {
+	if !ok || dbUser.StripeSubscriptionID == nil || dbUser.StripeCustomerID == nil {
 		return CancelSubscription400JSONResponse{Message: "No active subscription found"}, nil
 	}
 	if _, err := s.billing.CancelSubscription(ctx, *dbUser.StripeSubscriptionID); err != nil {
-		log.Printf("Failed to cancel subscription: %v", err)
+		log.Printf("Failed to schedule subscription cancellation: %v", err)
 		return CancelSubscription500JSONResponse{Message: "Failed to cancel subscription"}, nil
 	}
-	return CancelSubscription200JSONResponse{Message: "Subscription cancelled"}, nil
+	if err := s.userRepo.SetCancelAtPeriodEnd(ctx, *dbUser.StripeCustomerID, true); err != nil {
+		log.Printf("Failed to set cancel_at_period_end for customer %s: %v", *dbUser.StripeCustomerID, err)
+	}
+	return CancelSubscription200JSONResponse{Message: "Subscription will be cancelled at the end of the billing period"}, nil
 }
 
 func (s *Server) ListTiers(ctx context.Context, req ListTiersRequestObject) (ListTiersResponseObject, error) {
@@ -189,6 +209,17 @@ func (s *Server) applyBillingCycleReset(ctx context.Context, invoice *invoiceEve
 	return nil
 }
 
+func (s *Server) handleSubscriptionUpdated(ctx context.Context, event *stripe.Event) error {
+	sub, err := parseEventData[subscriptionUpdatedEvent](event)
+	if err != nil {
+		return fmt.Errorf("failed to parse subscription updated: %w", err)
+	}
+	if err := s.userRepo.SetCancelAtPeriodEnd(ctx, sub.Customer, sub.isCancellationScheduled()); err != nil {
+		return fmt.Errorf("failed to sync cancel_at_period_end for customer %s: %w", sub.Customer, err)
+	}
+	return nil
+}
+
 func (s *Server) handleSubscriptionDeleted(ctx context.Context, event *stripe.Event) error {
 	sub, err := parseEventData[subscriptionEvent](event)
 	if err != nil {
@@ -266,4 +297,14 @@ type invoiceEvent struct {
 type subscriptionEvent struct {
 	ID       string `json:"id"`
 	Customer string `json:"customer"`
+}
+
+type subscriptionUpdatedEvent struct {
+	Customer          string `json:"customer"`
+	CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
+	CancelAt          int64  `json:"cancel_at"`
+}
+
+func (e *subscriptionUpdatedEvent) isCancellationScheduled() bool {
+	return e.CancelAtPeriodEnd || e.CancelAt != 0
 }

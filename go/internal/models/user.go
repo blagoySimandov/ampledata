@@ -14,6 +14,7 @@ type User struct {
 	TokensIncluded       int64      `json:"tokens_included"`
 	CurrentPeriodStart   *time.Time `json:"current_period_start,omitempty"`
 	CurrentPeriodEnd     *time.Time `json:"current_period_end,omitempty"`
+	CancelAtPeriodEnd    bool       `json:"cancel_at_period_end"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }

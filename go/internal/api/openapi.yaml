@@ -353,7 +353,7 @@ components:
 
     SubscriptionStatusResponse:
       type: object
-      required: [tokens_used, tokens_included]
+      required: [tokens_used, tokens_included, cancel_at_period_end]
       properties:
         tier:
           type: string
@@ -364,6 +364,8 @@ components:
         tokens_included:
           type: integer
           format: int64
+        cancel_at_period_end:
+          type: boolean
         current_period_start:
           type: string
           format: date-time
@@ -940,6 +942,41 @@ paths:
                     type: string
         "400":
           description: No active subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /subscription/portal:
+    post:
+      operationId: createPortalSession
+      summary: Create a Stripe customer portal session
+      tags: [billing]
+      parameters:
+        - in: query
+          name: return_url
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Portal session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url]
+                properties:
+                  url:
+                    type: string
+        "400":
+          description: User not found or missing Stripe customer
           content:
             application/json:
               schema:

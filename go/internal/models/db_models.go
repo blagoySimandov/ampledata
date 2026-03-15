@@ -124,6 +124,7 @@ type UserDB struct {
 	TokensIncluded       int64      `bun:"tokens_included,notnull,default:0" json:"tokens_included"`
 	CurrentPeriodStart   *time.Time `bun:"current_period_start" json:"current_period_start"`
 	CurrentPeriodEnd     *time.Time `bun:"current_period_end" json:"current_period_end"`
+	CancelAtPeriodEnd    bool       `bun:"cancel_at_period_end,notnull,default:false" json:"cancel_at_period_end"`
 	CreatedAt            time.Time  `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
 	UpdatedAt            time.Time  `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
@@ -141,6 +142,7 @@ func (u *UserDB) ToUser() *User {
 		TokensIncluded:       u.TokensIncluded,
 		CurrentPeriodStart:   u.CurrentPeriodStart,
 		CurrentPeriodEnd:     u.CurrentPeriodEnd,
+		CancelAtPeriodEnd:    u.CancelAtPeriodEnd,
 		CreatedAt:            u.CreatedAt,
 		UpdatedAt:            u.UpdatedAt,
 	}
@@ -159,6 +161,7 @@ func UserFromDomain(user *User) *UserDB {
 		TokensIncluded:       user.TokensIncluded,
 		CurrentPeriodStart:   user.CurrentPeriodStart,
 		CurrentPeriodEnd:     user.CurrentPeriodEnd,
+		CancelAtPeriodEnd:    user.CancelAtPeriodEnd,
 		CreatedAt:            user.CreatedAt,
 		UpdatedAt:            user.UpdatedAt,
 	}

@@ -125,7 +125,10 @@ func (b *Billing) GetSubscription(ctx context.Context, subscriptionID string) (*
 }
 
 func (b *Billing) CancelSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error) {
-	return b.sc.V1Subscriptions.Cancel(ctx, subscriptionID, nil)
+	params := &stripe.SubscriptionUpdateParams{
+		CancelAtPeriodEnd: stripe.Bool(true),
+	}
+	return b.sc.V1Subscriptions.Update(ctx, subscriptionID, params)
 }
 
 func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amountCents int64, idempotencyKey string) (*stripe.BillingCreditGrant, error) {
@@ -150,6 +153,14 @@ func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amou
 		params.SetIdempotencyKey(idempotencyKey)
 	}
 	return b.sc.V1BillingCreditGrants.Create(ctx, params)
+}
+
+func (b *Billing) CreatePortalSession(ctx context.Context, customerID, returnURL string) (*stripe.BillingPortalSession, error) {
+	params := &stripe.BillingPortalSessionCreateParams{
+		Customer:  stripe.String(customerID),
+		ReturnURL: stripe.String(returnURL),
+	}
+	return b.sc.V1BillingPortalSessions.Create(ctx, params)
 }
 
 func (b *Billing) VerifyWebhookSignature(payload []byte, signature string) (*stripe.Event, error) {

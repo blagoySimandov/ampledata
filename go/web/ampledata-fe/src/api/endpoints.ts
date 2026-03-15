@@ -12,5 +12,6 @@ export const ENDPOINTS = {
   TIERS: "/tiers",
   SUBSCRIPTION: "/subscription",
   SUBSCRIPTION_CANCEL: "/subscription/cancel",
+  SUBSCRIPTION_PORTAL: "/subscription/portal",
   SUBSCRIBE: "/subscribe",
 } as const;

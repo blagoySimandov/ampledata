@@ -42,6 +42,22 @@ function TokenUsageBar({ used, included }: { used: number; included: number }) {
   );
 }
 
+function SubscriptionBadge({ cancelAtPeriodEnd }: { cancelAtPeriodEnd: boolean }) {
+  if (cancelAtPeriodEnd) {
+    return (
+      <Badge variant="secondary" className="w-fit text-xs">
+        Cancels at period end
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="default" className="w-fit gap-1.5 text-xs">
+      <Zap className="size-3" />
+      Active
+    </Badge>
+  );
+}
+
 function ActiveSubscriptionCard({
   subscription,
   currentTierName,
@@ -53,22 +69,25 @@ function ActiveSubscriptionCard({
   currentTierPrice: string | null;
   onManagePortal: () => void;
 }) {
+  const periodLabel = subscription.cancel_at_period_end ? "Access until" : "Renews";
+
   return (
     <Card className="gap-0">
       <CardContent className="pt-5 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1.5">
-            <Badge variant="default" className="w-fit gap-1.5 text-xs">
-              <Zap className="size-3" />
-              Active
-            </Badge>
+            <SubscriptionBadge cancelAtPeriodEnd={subscription.cancel_at_period_end} />
             <span className="text-xl font-black tracking-tight">
               {currentTierName}
             </span>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {currentTierPrice && <span>{currentTierPrice} / month</span>}
-              {currentTierPrice && <span>&middot;</span>}
-              <span>Renews {formatDate(subscription.current_period_end)}</span>
+              {currentTierPrice && !subscription.cancel_at_period_end && (
+                <>
+                  <span>{currentTierPrice} / month</span>
+                  <span>&middot;</span>
+                </>
+              )}
+              <span>{periodLabel} {formatDate(subscription.current_period_end)}</span>
             </div>
           </div>
           <Button

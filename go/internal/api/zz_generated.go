@@ -233,6 +233,7 @@ type SourceSummary struct {
 
 // SubscriptionStatusResponse defines model for SubscriptionStatusResponse.
 type SubscriptionStatusResponse struct {
+	CancelAtPeriodEnd  bool       `json:"cancel_at_period_end"`
 	CurrentPeriodEnd   *time.Time `json:"current_period_end"`
 	CurrentPeriodStart *time.Time `json:"current_period_start"`
 	Tier               *string    `json:"tier"`
@@ -267,6 +268,11 @@ type GetRowsProgressParams struct {
 type ListSourcesParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreatePortalSessionParams defines parameters for CreatePortalSession.
+type CreatePortalSessionParams struct {
+	ReturnUrl string `form:"return_url" json:"return_url"`
 }
 
 // HandleStripeWebhookParams defines parameters for HandleStripeWebhook.
@@ -327,6 +333,9 @@ type ServerInterface interface {
 	// Cancel the current user's subscription
 	// (POST /subscription/cancel)
 	CancelSubscription(w http.ResponseWriter, r *http.Request)
+	// Create a Stripe customer portal session
+	// (POST /subscription/portal)
+	CreatePortalSession(w http.ResponseWriter, r *http.Request, params CreatePortalSessionParams)
 	// List available subscription tiers
 	// (GET /tiers)
 	ListTiers(w http.ResponseWriter, r *http.Request)
@@ -717,6 +726,43 @@ func (siw *ServerInterfaceWrapper) CancelSubscription(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// CreatePortalSession operation middleware
+func (siw *ServerInterfaceWrapper) CreatePortalSession(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreatePortalSessionParams
+
+	// ------------- Required query parameter "return_url" -------------
+
+	if paramValue := r.URL.Query().Get("return_url"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "return_url"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "return_url", r.URL.Query(), &params.ReturnUrl)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "return_url", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePortalSession(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // ListTiers operation middleware
 func (siw *ServerInterfaceWrapper) ListTiers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -917,6 +963,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/subscription", wrapper.GetSubscriptionStatus).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/subscription/cancel", wrapper.CancelSubscription).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/subscription/portal", wrapper.CreatePortalSession).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/tiers", wrapper.ListTiers).Methods("GET")
 
@@ -1469,6 +1517,43 @@ func (response CancelSubscription500JSONResponse) VisitCancelSubscriptionRespons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreatePortalSessionRequestObject struct {
+	Params CreatePortalSessionParams
+}
+
+type CreatePortalSessionResponseObject interface {
+	VisitCreatePortalSessionResponse(w http.ResponseWriter) error
+}
+
+type CreatePortalSession200JSONResponse struct {
+	Url string `json:"url"`
+}
+
+func (response CreatePortalSession200JSONResponse) VisitCreatePortalSessionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePortalSession400JSONResponse ErrorResponse
+
+func (response CreatePortalSession400JSONResponse) VisitCreatePortalSessionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePortalSession500JSONResponse ErrorResponse
+
+func (response CreatePortalSession500JSONResponse) VisitCreatePortalSessionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListTiersRequestObject struct {
 }
 
@@ -1570,6 +1655,9 @@ type StrictServerInterface interface {
 	// Cancel the current user's subscription
 	// (POST /subscription/cancel)
 	CancelSubscription(ctx context.Context, request CancelSubscriptionRequestObject) (CancelSubscriptionResponseObject, error)
+	// Create a Stripe customer portal session
+	// (POST /subscription/portal)
+	CreatePortalSession(ctx context.Context, request CreatePortalSessionRequestObject) (CreatePortalSessionResponseObject, error)
 	// List available subscription tiers
 	// (GET /tiers)
 	ListTiers(ctx context.Context, request ListTiersRequestObject) (ListTiersResponseObject, error)
@@ -1965,6 +2053,32 @@ func (sh *strictHandler) CancelSubscription(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// CreatePortalSession operation middleware
+func (sh *strictHandler) CreatePortalSession(w http.ResponseWriter, r *http.Request, params CreatePortalSessionParams) {
+	var request CreatePortalSessionRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePortalSession(ctx, request.(CreatePortalSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePortalSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePortalSessionResponseObject); ok {
+		if err := validResponse.VisitCreatePortalSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListTiers operation middleware
 func (sh *strictHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
 	var request ListTiersRequestObject
@@ -2020,49 +2134,50 @@ func (sh *strictHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"AAAA//9EQsm77UUAAA==",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

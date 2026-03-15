@@ -19,6 +19,7 @@ import type {
   SubscriptionStatusResponse,
   CreateSubscriptionRequest,
   CreateCheckoutResponse,
+  PortalSessionResponse,
 } from "./types";
 import { ENDPOINTS } from "./endpoints";
 
@@ -178,5 +179,10 @@ export class ApiClient {
     return this.request<{ message: string }>(ENDPOINTS.SUBSCRIPTION_CANCEL, {
       method: "POST",
     });
+  }
+
+  public async createPortalSession(returnUrl: string): Promise<PortalSessionResponse> {
+    const endpoint = this.buildUrl(ENDPOINTS.SUBSCRIPTION_PORTAL, { return_url: returnUrl });
+    return this.request<PortalSessionResponse>(endpoint, { method: "POST" });
   }
 }
