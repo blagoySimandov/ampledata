@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { TierResponse } from "@/api";
-import { formatDollars } from "@/lib/formatters";
+import { formatDollars, formatOveragePrice } from "@/lib/formatters";
 
 interface Props {
   tier: TierResponse;
@@ -20,7 +20,6 @@ interface Props {
   onManagePortal: () => void;
   isPending?: boolean;
 }
-
 function TierFeatures({ tier }: { tier: TierResponse }) {
   return (
     <ul className="space-y-1.5 mt-3">
@@ -29,9 +28,8 @@ function TierFeatures({ tier }: { tier: TierResponse }) {
         {tier.included_tokens.toLocaleString()} cells enriched / month
       </li>
       <li className="flex items-center gap-2 text-xs">
-        <Check className="size-3 text-primary shrink-0" />$
-        {(parseFloat(tier.overage_price_cents_decimal) / 100).toFixed(3)} per
-        extra token
+        <Check className="size-3 text-primary shrink-0" />
+        {formatOveragePrice(tier.overage_price_cents_decimal)} per extra token
       </li>
     </ul>
   );

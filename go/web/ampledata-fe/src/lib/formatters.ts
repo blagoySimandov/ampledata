@@ -9,3 +9,11 @@ export function formatDate(dateStr: string) {
     year: "numeric",
   });
 }
+
+export function formatOveragePrice(centsDecimal: string) {
+  return `$${(parseFloat(centsDecimal) / 100).toFixed(3)}`;
+}
+
+export function usePct(used: number, included: number) {
+  return Math.min((used / included) * 100, 100);
+}
