@@ -159,3 +159,9 @@ export interface CreateCheckoutResponse {
   checkout_url: string;
   session_id: string;
 }
+
+export interface UserResponse {
+  first_name: string;
+  last_name: string;
+  email: string;
+}
