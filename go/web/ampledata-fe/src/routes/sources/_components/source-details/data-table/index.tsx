@@ -54,7 +54,6 @@ export function DataTable({ sourceId, jobs }: DataTableProps) {
             resizable: true,
             sortable: true,
             filter: true,
-            floatingFilter: true,
           }}
         />
       </div>

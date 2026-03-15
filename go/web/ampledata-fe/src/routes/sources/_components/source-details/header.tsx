@@ -28,7 +28,7 @@ export function SourceDetailHeader({
         <AddColumnsDialog sourceId={sourceId} mostRecentJob={mostRecentJob} />
         {!sidebarOpen && (
           <button onClick={onOpenSidebar} className="...">
-            <PanelRightOpen className="w-4 h-4" /> RUNS
+            <PanelRightOpen className="w-4 h-4" />
           </button>
         )}
       </div>

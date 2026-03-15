@@ -31,6 +31,7 @@ export function SourceDetail({ sourceId }: { sourceId: string }) {
         />
         <DataTable sourceId={sourceId} jobs={source.jobs} />
       </div>
+
       <JobRunsSidebarPanel
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}

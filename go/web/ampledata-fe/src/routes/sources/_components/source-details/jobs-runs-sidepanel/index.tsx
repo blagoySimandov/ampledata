@@ -20,7 +20,7 @@ export function JobRunsSidebarPanel({
 }) {
   return (
     <div
-      className={`shrink-0 bg-white border-l border-slate-200 shadow-2xl transition-all duration-300 ease-in-out h-full flex flex-col z-10 relative overflow-hidden ${
+      className={`shrink-0 bg-white border-l border-slate-200 shadow-2xl transition-all duration-300 ease-in-out h-full flex flex-col z-10 relative overflow-hidden pt-4 sm:pt-6 lg:pt-8 ${
         open
           ? "w-[400px] opacity-100"
           : "w-0 opacity-0 border-transparent pointer-events-none"

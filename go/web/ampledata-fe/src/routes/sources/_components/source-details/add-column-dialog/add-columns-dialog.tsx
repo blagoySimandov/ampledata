@@ -93,7 +93,10 @@ export function AddColumnsDialog({
           <Plus className="w-4 h-4" /> ADD COLUMNS
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+      <DialogContent
+        className="sm:max-w-[560px] max-h-[90vh] flex flex-col p-0 overflow-hidden"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-2xl font-black">
             Add Enrichment Columns
