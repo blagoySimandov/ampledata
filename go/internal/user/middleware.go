@@ -35,6 +35,7 @@ func UserMiddleware(userService Service) func(http.Handler) http.Handler {
 				workosUser.Email,
 				workosUser.FirstName,
 				workosUser.LastName,
+				workosUser.ProfilePictureURL,
 			)
 			if err != nil {
 				// TODO: better log

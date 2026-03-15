@@ -30,7 +30,7 @@ type Repository interface {
 	GetByStripeCustomerID(ctx context.Context, stripeCustomerID string) (*models.User, error)
 	Create(ctx context.Context, user *models.User) error
 	Update(ctx context.Context, user *models.User) error
-	GetOrCreate(ctx context.Context, userID, email, firstName, lastName string) (*models.User, error)
+	GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error)
 	UpdateStripeCustomerID(ctx context.Context, userID, stripeCustomerID string) error
 	GetAvailableCredits(ctx context.Context, userID string) (int64, error)
 	IncrementTokensUsed(ctx context.Context, stripeCustomerID string, amount int64) error
@@ -106,17 +106,18 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	return err
 }
 
-func (r *UserRepository) GetOrCreate(ctx context.Context, userID, email, firstName, lastName string) (*models.User, error) {
+func (r *UserRepository) GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error) {
 	user, err := r.GetByID(ctx, userID)
 	if err == nil {
 		return user, nil
 	}
 
 	newUser := &models.User{
-		ID:        userID,
-		Email:     email,
-		FirstName: firstName,
-		LastName:  lastName,
+		ID:                userID,
+		Email:             email,
+		FirstName:         firstName,
+		LastName:          lastName,
+		ProfilePictureURL: profilePictureURL,
 	}
 
 	if err := r.Create(ctx, newUser); err != nil {

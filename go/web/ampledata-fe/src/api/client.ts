@@ -26,9 +26,10 @@ import { ENDPOINTS } from "./endpoints";
 
 export class ApiClient {
   private baseUrl = "/api/v1";
+  private getToken: () => Promise<string | null>;
 
-  private getToken(): string {
-    return "mock-token";
+  constructor(getToken: () => Promise<string | null>) {
+    this.getToken = getToken;
   }
 
   private buildUrl(
@@ -51,8 +52,10 @@ export class ApiClient {
     options?: RequestInit,
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
+    const token = await this.getToken();
+    console.log(token);
     const headers = new Headers(options?.headers);
-    headers.set("Authorization", `Bearer ${this.getToken()}`);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
 
     const config: RequestInit = {
       ...options,
@@ -182,8 +185,12 @@ export class ApiClient {
     });
   }
 
-  public async createPortalSession(returnUrl: string): Promise<PortalSessionResponse> {
-    const endpoint = this.buildUrl(ENDPOINTS.SUBSCRIPTION_PORTAL, { return_url: returnUrl });
+  public async createPortalSession(
+    returnUrl: string,
+  ): Promise<PortalSessionResponse> {
+    const endpoint = this.buildUrl(ENDPOINTS.SUBSCRIPTION_PORTAL, {
+      return_url: returnUrl,
+    });
     return this.request<PortalSessionResponse>(endpoint, { method: "POST" });
   }
 

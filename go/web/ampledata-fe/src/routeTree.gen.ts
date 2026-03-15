@@ -9,12 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountIndexRouteImport } from './routes/account/index'
 import { Route as SourcesSourceIdRouteImport } from './routes/sources/$sourceId'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AccountBillingIndexRouteImport } from './routes/account/billing/index'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
@@ -35,6 +42,11 @@ const SourcesSourceIdRoute = SourcesSourceIdRouteImport.update({
   path: '/sources/$sourceId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountBillingIndexRoute = AccountBillingIndexRouteImport.update({
   id: '/billing/',
   path: '/billing/',
@@ -44,12 +56,16 @@ const AccountBillingIndexRoute = AccountBillingIndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRouteWithChildren
+  '/login': typeof LoginRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account/': typeof AccountIndexRoute
   '/account/billing/': typeof AccountBillingIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account': typeof AccountIndexRoute
   '/account/billing': typeof AccountBillingIndexRoute
@@ -58,6 +74,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRouteWithChildren
+  '/login': typeof LoginRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account/': typeof AccountIndexRoute
   '/account/billing/': typeof AccountBillingIndexRoute
@@ -67,15 +85,25 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account'
+    | '/login'
+    | '/auth/callback'
     | '/sources/$sourceId'
     | '/account/'
     | '/account/billing/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sources/$sourceId' | '/account' | '/account/billing'
+  to:
+    | '/'
+    | '/login'
+    | '/auth/callback'
+    | '/sources/$sourceId'
+    | '/account'
+    | '/account/billing'
   id:
     | '__root__'
     | '/'
     | '/account'
+    | '/login'
+    | '/auth/callback'
     | '/sources/$sourceId'
     | '/account/'
     | '/account/billing/'
@@ -84,11 +112,20 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   SourcesSourceIdRoute: typeof SourcesSourceIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account': {
       id: '/account'
       path: '/account'
@@ -117,6 +154,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SourcesSourceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/account/billing/': {
       id: '/account/billing/'
       path: '/billing'
@@ -143,6 +187,8 @@ const AccountRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRouteWithChildren,
+  LoginRoute: LoginRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   SourcesSourceIdRoute: SourcesSourceIdRoute,
 }
 export const routeTree = rootRouteImport
