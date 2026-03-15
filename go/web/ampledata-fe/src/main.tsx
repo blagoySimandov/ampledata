@@ -9,11 +9,6 @@ import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 const router = createRouter({ routeTree });
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: typeof router;
-  }
-}
 
 const queryClient = new QueryClient({
   defaultOptions: {
