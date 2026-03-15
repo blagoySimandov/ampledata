@@ -127,3 +127,30 @@ export interface SelectKeyResponse {
   all_keys: string[];
   reasoning: string;
 }
+
+export interface TierResponse {
+  id: string;
+  display_name: string;
+  monthly_price_cents: number;
+  included_tokens: number;
+  overage_price_cents_decimal: string;
+}
+
+export interface SubscriptionStatusResponse {
+  tier: string;
+  tokens_included: number;
+  tokens_used: number;
+  current_period_start: string;
+  current_period_end: string;
+}
+
+export interface CreateSubscriptionRequest {
+  success_url: string;
+  cancel_url: string;
+  tier_id: string;
+}
+
+export interface CreateCheckoutResponse {
+  checkout_url: string;
+  session_id: string;
+}

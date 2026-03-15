@@ -9,54 +9,106 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountIndexRouteImport } from './routes/account/index'
 import { Route as SourcesSourceIdRouteImport } from './routes/sources/$sourceId'
+import { Route as AccountBillingIndexRouteImport } from './routes/account/billing/index'
 
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AccountIndexRoute = AccountIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AccountRoute,
 } as any)
 const SourcesSourceIdRoute = SourcesSourceIdRouteImport.update({
   id: '/sources/$sourceId',
   path: '/sources/$sourceId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountBillingIndexRoute = AccountBillingIndexRouteImport.update({
+  id: '/billing/',
+  path: '/billing/',
+  getParentRoute: () => AccountRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRouteWithChildren
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/account/': typeof AccountIndexRoute
+  '/account/billing/': typeof AccountBillingIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/account': typeof AccountIndexRoute
+  '/account/billing': typeof AccountBillingIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRouteWithChildren
   '/sources/$sourceId': typeof SourcesSourceIdRoute
+  '/account/': typeof AccountIndexRoute
+  '/account/billing/': typeof AccountBillingIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sources/$sourceId'
+  fullPaths:
+    | '/'
+    | '/account'
+    | '/sources/$sourceId'
+    | '/account/'
+    | '/account/billing/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/sources/$sourceId'
-  id: '__root__' | '/' | '/sources/$sourceId'
+  to: '/' | '/sources/$sourceId' | '/account' | '/account/billing'
+  id:
+    | '__root__'
+    | '/'
+    | '/account'
+    | '/sources/$sourceId'
+    | '/account/'
+    | '/account/billing/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRouteWithChildren
   SourcesSourceIdRoute: typeof SourcesSourceIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/account/': {
+      id: '/account/'
+      path: '/'
+      fullPath: '/account/'
+      preLoaderRoute: typeof AccountIndexRouteImport
+      parentRoute: typeof AccountRoute
     }
     '/sources/$sourceId': {
       id: '/sources/$sourceId'
@@ -65,11 +117,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SourcesSourceIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account/billing/': {
+      id: '/account/billing/'
+      path: '/billing'
+      fullPath: '/account/billing/'
+      preLoaderRoute: typeof AccountBillingIndexRouteImport
+      parentRoute: typeof AccountRoute
+    }
   }
 }
 
+interface AccountRouteChildren {
+  AccountIndexRoute: typeof AccountIndexRoute
+  AccountBillingIndexRoute: typeof AccountBillingIndexRoute
+}
+
+const AccountRouteChildren: AccountRouteChildren = {
+  AccountIndexRoute: AccountIndexRoute,
+  AccountBillingIndexRoute: AccountBillingIndexRoute,
+}
+
+const AccountRouteWithChildren =
+  AccountRoute._addFileChildren(AccountRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRouteWithChildren,
   SourcesSourceIdRoute: SourcesSourceIdRoute,
 }
 export const routeTree = rootRouteImport

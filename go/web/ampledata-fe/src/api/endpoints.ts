@@ -9,4 +9,8 @@ export const ENDPOINTS = {
   JOBS_CANCEL: (jobId: string) => `/jobs/${jobId}/cancel`,
   ENRICHMENT_SIGNED_URL: "/enrichment-signed-url",
   SELECT_KEY: "/select-key",
+  TIERS: "/tiers",
+  SUBSCRIPTION: "/subscription",
+  SUBSCRIPTION_CANCEL: "/subscription/cancel",
+  SUBSCRIBE: "/subscribe",
 } as const;

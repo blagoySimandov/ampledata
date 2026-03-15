@@ -15,6 +15,10 @@ import type {
   SelectKeyResponse,
   EnrichRequest,
   EnrichResponse,
+  TierResponse,
+  SubscriptionStatusResponse,
+  CreateSubscriptionRequest,
+  CreateCheckoutResponse,
 } from "./types";
 import { ENDPOINTS } from "./endpoints";
 
@@ -150,6 +154,29 @@ export class ApiClient {
     return this.request<SelectKeyResponse>(endpoint, {
       method: "POST",
       body: JSON.stringify(req),
+    });
+  }
+
+  public async listTiers(): Promise<TierResponse[]> {
+    return this.request<TierResponse[]>(ENDPOINTS.TIERS);
+  }
+
+  public async getSubscriptionStatus(): Promise<SubscriptionStatusResponse> {
+    return this.request<SubscriptionStatusResponse>(ENDPOINTS.SUBSCRIPTION);
+  }
+
+  public async createSubscriptionCheckout(
+    req: CreateSubscriptionRequest,
+  ): Promise<CreateCheckoutResponse> {
+    return this.request<CreateCheckoutResponse>(ENDPOINTS.SUBSCRIBE, {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  public async cancelSubscription(): Promise<{ message: string }> {
+    return this.request<{ message: string }>(ENDPOINTS.SUBSCRIPTION_CANCEL, {
+      method: "POST",
     });
   }
 }
