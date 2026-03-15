@@ -6,8 +6,7 @@ import { ApiClient } from "../api";
 const ApiContext = createContext<ApiClient | null>(null);
 
 export function ApiProvider({ children }: { children: ReactNode }) {
-  const { getAccessToken, user } = useAuth();
-  console.log(user);
+  const { getAccessToken } = useAuth();
   const api = useMemo(() => new ApiClient(getAccessToken), [getAccessToken]);
   return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;
 }

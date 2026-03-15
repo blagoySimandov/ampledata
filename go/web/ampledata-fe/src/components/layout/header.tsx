@@ -27,7 +27,8 @@ function userInitials(
   lastName: string | null,
   email: string,
 ) {
-  if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  if (firstName && lastName)
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
   if (firstName) return firstName[0].toUpperCase();
   return email[0].toUpperCase();
 }
@@ -37,7 +38,8 @@ function userDisplayName(
   lastName: string | null,
   email: string,
 ) {
-  if (firstName || lastName) return [firstName, lastName].filter(Boolean).join(" ");
+  if (firstName || lastName)
+    return [firstName, lastName].filter(Boolean).join(" ");
   return email;
 }
 
@@ -46,7 +48,11 @@ function UserMenu() {
   if (!user) return null;
 
   const initials = userInitials(user.firstName, user.lastName, user.email);
-  const displayName = userDisplayName(user.firstName, user.lastName, user.email);
+  const displayName = userDisplayName(
+    user.firstName,
+    user.lastName,
+    user.email,
+  );
 
   return (
     <Popover>
@@ -77,7 +83,7 @@ function UserMenu() {
             variant="ghost"
             size="sm"
             className="w-full justify-start text-sm text-destructive hover:text-destructive"
-            onClick={() => signOut()}
+            onClick={() => signOut({ returnTo: "/" })}
           >
             <LogOut className="size-3.5 mr-2" />
             Sign out
