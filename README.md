@@ -1,13 +1,30 @@
 # AmpleData
 
-A service for enriching data using web search, crawling, and LLM extraction.
+Enrich your datasets without writing code.
 
-## Overview
+Upload a CSV with company names, product SKUs, or any key column. Tell AmpleData which columns you want filled in — revenue, headcount, website, whatever. It searches the web, decides whether a full page crawl is worth it, and uses an LLM to pull out the values you asked for.
 
-AmpleData takes a dataset with key columns (e.g., company names) and columns to enrich (e.g., revenue, employee count), then:
+## How it works
 
-1. Builds search queries from keys + target columns
-2. Searches the web
-3. Decides whether to crawl — skips crawling if SERP snippets contain the answer
-4. Crawls selected URL with if needed
-5. Extracts structured data using LLM
+1. Upload a dataset (CSV or JSON)
+2. Pick the key column (or let it guess)
+3. Choose which columns to enrich
+4. Watch rows move through: search → decide → crawl if needed → extract
+
+Each row runs independently. You can cancel mid-job. Results include confidence scores and the URLs they came from.
+
+## Stack
+
+**Frontend** — React 19, TypeScript, Vite, TanStack Router + Query, Tailwind CSS v4, shadcn, AG Grid
+
+**Backend** — Go, PostgreSQL, Serper API (search), Crawl4ai (crawling), worker-based pipeline
+
+## Running locally
+
+```bash
+cd go/web/ampledata-fe
+bun install
+bun dev
+```
+
+The frontend proxies `/api/v1` to `localhost:8080`. You'll need PostgreSQL running, a Serper API key, and a Crawl4ai instance on port 8000. Tables are created automatically on first run.
