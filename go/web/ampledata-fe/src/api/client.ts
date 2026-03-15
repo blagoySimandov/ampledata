@@ -20,6 +20,7 @@ import type {
   CreateSubscriptionRequest,
   CreateCheckoutResponse,
   PortalSessionResponse,
+  UserResponse,
 } from "./types";
 import { ENDPOINTS } from "./endpoints";
 
@@ -184,5 +185,9 @@ export class ApiClient {
   public async createPortalSession(returnUrl: string): Promise<PortalSessionResponse> {
     const endpoint = this.buildUrl(ENDPOINTS.SUBSCRIPTION_PORTAL, { return_url: returnUrl });
     return this.request<PortalSessionResponse>(endpoint, { method: "POST" });
+  }
+
+  public async getMe(): Promise<UserResponse> {
+    return this.request<UserResponse>(ENDPOINTS.ME);
   }
 }

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { UserRound } from "lucide-react";
 import logo from "../../../assets/ampledata-logo.png";
 import { Button } from "@/components/ui/button";
+import { CreditsWidget } from "./credits-widget";
 
 function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
@@ -24,6 +25,7 @@ export function Header() {
         </Link>
         <nav className="flex items-center gap-4">
           <NavLink to="/">Jobs</NavLink>
+          <CreditsWidget />
           <Button variant="ghost" size="icon" asChild>
             <Link to="/account" aria-label="Account">
               <UserRound className="size-5" />
