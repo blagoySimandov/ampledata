@@ -1,4 +1,4 @@
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,11 +15,14 @@ import { formatDollars, formatOveragePrice } from "@/lib/formatters";
 interface Props {
   tier: TierResponse;
   isCurrent: boolean;
+  isUpgrade: boolean;
   hasActiveSubscription: boolean;
   onSubscribe: (tierId: string) => void;
+  onUpgrade: (tierId: string) => void;
   onManagePortal: () => void;
   isPending?: boolean;
 }
+
 function TierFeatures({ tier }: { tier: TierResponse }) {
   return (
     <ul className="space-y-1.5 mt-3">
@@ -38,19 +41,16 @@ function TierFeatures({ tier }: { tier: TierResponse }) {
 function TierCta({
   tier,
   isCurrent,
+  isUpgrade,
   hasActiveSubscription,
   onSubscribe,
+  onUpgrade,
   onManagePortal,
   isPending,
 }: Props) {
   if (!hasActiveSubscription) {
     return (
-      <Button
-        className="w-full mt-4"
-        size="sm"
-        onClick={() => onSubscribe(tier.id)}
-        disabled={isPending}
-      >
+      <Button className="w-full mt-4" size="sm" onClick={() => onSubscribe(tier.id)} disabled={isPending}>
         Subscribe
       </Button>
     );
@@ -58,13 +58,17 @@ function TierCta({
 
   if (isCurrent) return null;
 
+  if (isUpgrade) {
+    return (
+      <Button className="w-full mt-4 gap-1.5" size="sm" onClick={() => onUpgrade(tier.id)} disabled={isPending}>
+        <ArrowUp className="size-3" />
+        Upgrade to {tier.display_name}
+      </Button>
+    );
+  }
+
   return (
-    <Button
-      className="w-full mt-4 gap-1.5"
-      variant="outline"
-      size="sm"
-      onClick={onManagePortal}
-    >
+    <Button className="w-full mt-4 gap-1.5" variant="outline" size="sm" onClick={onManagePortal}>
       Switch plan
       <ExternalLink className="size-3" />
     </Button>

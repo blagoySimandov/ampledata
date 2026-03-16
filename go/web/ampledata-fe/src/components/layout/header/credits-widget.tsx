@@ -47,11 +47,13 @@ function PopoverDetails({
     <div className="space-y-3 p-1">
       <div className="space-y-0.5">
         <p className="text-xs font-semibold">
-          Free cells included in your plan
+          {subscription.tier ? "Free cells included in your plan" : "Free plan credits"}
         </p>
-        <p className="text-xs text-muted-foreground">
-          Resets {formatDate(current_period_end)}
-        </p>
+        {current_period_end && (
+          <p className="text-xs text-muted-foreground">
+            Resets {formatDate(current_period_end)}
+          </p>
+        )}
       </div>
       <div className="space-y-1.5">
         <MiniBar pct={pct} />
@@ -64,36 +66,24 @@ function PopoverDetails({
           </span>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground border-t pt-2">
-        {pct >= 100 ? (
-          <>
-            Per-cell billing is now active
-            {tier && (
-              <>
-                {" "}
-                at {formatOveragePrice(tier.overage_price_cents_decimal)}/cell
-              </>
-            )}
-            .
-          </>
-        ) : (
-          <>
-            After your free cells run out, you're billed
-            {tier && (
-              <>
-                {" "}
-                at {formatOveragePrice(tier.overage_price_cents_decimal)}/cell
-              </>
-            )}
-            .
-          </>
-        )}
-      </p>
+      {tier ? (
+        <p className="text-xs text-muted-foreground border-t pt-2">
+          {pct >= 100 ? (
+            <>Per-cell billing is now active at {formatOveragePrice(tier.overage_price_cents_decimal)}/cell.</>
+          ) : (
+            <>After your free cells run out, you're billed at {formatOveragePrice(tier.overage_price_cents_decimal)}/cell.</>
+          )}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground border-t pt-2">
+          Upgrade to a plan to get more cells.
+        </p>
+      )}
       <Link
         to="/account"
         className="block text-xs text-primary font-medium hover:underline"
       >
-        Manage billing →
+        {subscription.tier ? "Manage billing →" : "View plans →"}
       </Link>
     </div>
   );
@@ -149,7 +139,7 @@ export function CreditsWidget() {
   const { data: subscription } = useSubscription(api);
   const { data: tiers } = useListTiers(api);
 
-  if (!subscription?.tier) return null;
+  if (!subscription) return null;
 
   const tier = tiers?.find((t) => t.id === subscription.tier);
 

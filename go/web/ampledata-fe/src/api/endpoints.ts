@@ -11,6 +11,7 @@ export const ENDPOINTS = {
   SELECT_KEY: "/select-key",
   TIERS: "/tiers",
   SUBSCRIPTION: "/subscription",
+  SUBSCRIPTION_UPGRADE: "/subscription/upgrade",
   SUBSCRIPTION_CANCEL: "/subscription/cancel",
   SUBSCRIPTION_PORTAL: "/subscription/portal",
   SUBSCRIBE: "/subscribe",

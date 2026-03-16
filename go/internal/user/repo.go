@@ -38,6 +38,7 @@ type Repository interface {
 	ResetBillingCycle(ctx context.Context, stripeCustomerID string, periodStart, periodEnd time.Time) error
 	ClearSubscription(ctx context.Context, stripeCustomerID string) error
 	SetCancelAtPeriodEnd(ctx context.Context, stripeCustomerID string, value bool) error
+	UpdateSubscriptionTier(ctx context.Context, stripeCustomerID, tier string, tokensIncluded int64) error
 }
 
 type UserRepository struct {
@@ -219,6 +220,17 @@ func (r *UserRepository) SetCancelAtPeriodEnd(ctx context.Context, stripeCustome
 	res, err := r.db.NewUpdate().
 		Model((*models.UserDB)(nil)).
 		Set("cancel_at_period_end = ?", value).
+		Set("updated_at = ?", time.Now()).
+		Where("stripe_customer_id = ?", stripeCustomerID).
+		Exec(ctx)
+	return checkRowsAffected(res, err, stripeCustomerID)
+}
+
+func (r *UserRepository) UpdateSubscriptionTier(ctx context.Context, stripeCustomerID, tier string, tokensIncluded int64) error {
+	res, err := r.db.NewUpdate().
+		Model((*models.UserDB)(nil)).
+		Set("subscription_tier = ?", tier).
+		Set("tokens_included = ?", tokensIncluded).
 		Set("updated_at = ?", time.Now()).
 		Where("stripe_customer_id = ?", stripeCustomerID).
 		Exec(ctx)

@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/blagoySimandov/ampledata/go/internal/config"
+)
 
 type User struct {
 	ID                   string     `json:"id"`
@@ -12,10 +16,22 @@ type User struct {
 	TokensUsed           int64      `json:"tokens_used"`
 	SubscriptionTier     *string    `json:"subscription_tier,omitempty"`
 	StripeSubscriptionID *string    `json:"stripe_subscription_id,omitempty"`
-	TokensIncluded       int64      `json:"tokens_included"`
+	tokensIncluded       int64      `json:"tokens_included"`
 	CurrentPeriodStart   *time.Time `json:"current_period_start,omitempty"`
 	CurrentPeriodEnd     *time.Time `json:"current_period_end,omitempty"`
 	CancelAtPeriodEnd    bool       `json:"cancel_at_period_end"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
+func (u *User) CanEnrichCells(count int64) bool {
+	return u.CreditsRemaining() >= count
+}
+
+func (u *User) TokensIncluded() int64 {
+	return u.tokensIncluded + config.Load().FreeTierCredits
+}
+
+func (u *User) CreditsRemaining() int64 {
+	return u.TokensIncluded() - u.TokensUsed
 }

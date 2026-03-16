@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useApi, useEnrich, useSourceData } from "@/hooks";
 import { Plus, Settings2, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import type { AddColumnsDialogProps } from "./types";
 import { ColumnEditor } from "./column-editor";
 import { EmptyFieldsPlaceholder } from "./empty-fields-placeholder";
@@ -82,7 +83,7 @@ export function AddColumnsDialog({
       setOpen(false);
       resetForm();
     } catch (e) {
-      console.error("Enrich failed", e);
+      toast.error(e instanceof Error ? e.message : "Failed to start enrichment");
     }
   };
 

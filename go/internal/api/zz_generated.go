@@ -250,6 +250,11 @@ type TierResponse struct {
 	OveragePriceCentsDecimal string `json:"overage_price_cents_decimal"`
 }
 
+// UpgradeSubscriptionRequest defines model for UpgradeSubscriptionRequest.
+type UpgradeSubscriptionRequest struct {
+	TierId string `json:"tier_id"`
+}
+
 // UserResponse defines model for UserResponse.
 type UserResponse struct {
 	Email     string `json:"email"`
@@ -299,6 +304,9 @@ type EnrichSourceJSONRequestBody = EnrichRequest
 // CreateSubscriptionCheckoutJSONRequestBody defines body for CreateSubscriptionCheckout for application/json ContentType.
 type CreateSubscriptionCheckoutJSONRequestBody = CreateSubscriptionRequest
 
+// UpgradeSubscriptionJSONRequestBody defines body for UpgradeSubscription for application/json ContentType.
+type UpgradeSubscriptionJSONRequestBody = UpgradeSubscriptionRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Create a pending enrichment job and get a signed upload URL
@@ -346,6 +354,9 @@ type ServerInterface interface {
 	// Create a Stripe customer portal session
 	// (POST /subscription/portal)
 	CreatePortalSession(w http.ResponseWriter, r *http.Request, params CreatePortalSessionParams)
+	// Upgrade the current user's subscription to a higher tier
+	// (POST /subscription/upgrade)
+	UpgradeSubscription(w http.ResponseWriter, r *http.Request)
 	// List available subscription tiers
 	// (GET /tiers)
 	ListTiers(w http.ResponseWriter, r *http.Request)
@@ -790,6 +801,23 @@ func (siw *ServerInterfaceWrapper) CreatePortalSession(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// UpgradeSubscription operation middleware
+func (siw *ServerInterfaceWrapper) UpgradeSubscription(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpgradeSubscription(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // ListTiers operation middleware
 func (siw *ServerInterfaceWrapper) ListTiers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -994,6 +1022,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/subscription/cancel", wrapper.CancelSubscription).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/subscription/portal", wrapper.CreatePortalSession).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/subscription/upgrade", wrapper.UpgradeSubscription).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/tiers", wrapper.ListTiers).Methods("GET")
 
@@ -1608,6 +1638,43 @@ func (response CreatePortalSession500JSONResponse) VisitCreatePortalSessionRespo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpgradeSubscriptionRequestObject struct {
+	Body *UpgradeSubscriptionJSONRequestBody
+}
+
+type UpgradeSubscriptionResponseObject interface {
+	VisitUpgradeSubscriptionResponse(w http.ResponseWriter) error
+}
+
+type UpgradeSubscription200JSONResponse struct {
+	Message string `json:"message"`
+}
+
+func (response UpgradeSubscription200JSONResponse) VisitUpgradeSubscriptionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpgradeSubscription400JSONResponse ErrorResponse
+
+func (response UpgradeSubscription400JSONResponse) VisitUpgradeSubscriptionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpgradeSubscription500JSONResponse ErrorResponse
+
+func (response UpgradeSubscription500JSONResponse) VisitUpgradeSubscriptionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListTiersRequestObject struct {
 }
 
@@ -1715,6 +1782,9 @@ type StrictServerInterface interface {
 	// Create a Stripe customer portal session
 	// (POST /subscription/portal)
 	CreatePortalSession(ctx context.Context, request CreatePortalSessionRequestObject) (CreatePortalSessionResponseObject, error)
+	// Upgrade the current user's subscription to a higher tier
+	// (POST /subscription/upgrade)
+	UpgradeSubscription(ctx context.Context, request UpgradeSubscriptionRequestObject) (UpgradeSubscriptionResponseObject, error)
 	// List available subscription tiers
 	// (GET /tiers)
 	ListTiers(ctx context.Context, request ListTiersRequestObject) (ListTiersResponseObject, error)
@@ -2160,6 +2230,37 @@ func (sh *strictHandler) CreatePortalSession(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// UpgradeSubscription operation middleware
+func (sh *strictHandler) UpgradeSubscription(w http.ResponseWriter, r *http.Request) {
+	var request UpgradeSubscriptionRequestObject
+
+	var body UpgradeSubscriptionJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpgradeSubscription(ctx, request.(UpgradeSubscriptionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpgradeSubscription")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpgradeSubscriptionResponseObject); ok {
+		if err := validResponse.VisitUpgradeSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListTiers operation middleware
 func (sh *strictHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
 	var request ListTiersRequestObject
@@ -2215,51 +2316,52 @@ func (sh *strictHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

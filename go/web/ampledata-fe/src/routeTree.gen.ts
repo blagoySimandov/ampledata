@@ -15,7 +15,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountIndexRouteImport } from './routes/account/index'
 import { Route as SourcesSourceIdRouteImport } from './routes/sources/$sourceId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
-import { Route as AccountBillingIndexRouteImport } from './routes/account/billing/index'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -47,11 +46,6 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AccountBillingIndexRoute = AccountBillingIndexRouteImport.update({
-  id: '/billing/',
-  path: '/billing/',
-  getParentRoute: () => AccountRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,7 +54,6 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account/': typeof AccountIndexRoute
-  '/account/billing/': typeof AccountBillingIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -68,7 +61,6 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account': typeof AccountIndexRoute
-  '/account/billing': typeof AccountBillingIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,7 +70,6 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account/': typeof AccountIndexRoute
-  '/account/billing/': typeof AccountBillingIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -89,15 +80,8 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/sources/$sourceId'
     | '/account/'
-    | '/account/billing/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/login'
-    | '/auth/callback'
-    | '/sources/$sourceId'
-    | '/account'
-    | '/account/billing'
+  to: '/' | '/login' | '/auth/callback' | '/sources/$sourceId' | '/account'
   id:
     | '__root__'
     | '/'
@@ -106,7 +90,6 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/sources/$sourceId'
     | '/account/'
-    | '/account/billing/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -161,24 +144,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/account/billing/': {
-      id: '/account/billing/'
-      path: '/billing'
-      fullPath: '/account/billing/'
-      preLoaderRoute: typeof AccountBillingIndexRouteImport
-      parentRoute: typeof AccountRoute
-    }
   }
 }
 
 interface AccountRouteChildren {
   AccountIndexRoute: typeof AccountIndexRoute
-  AccountBillingIndexRoute: typeof AccountBillingIndexRoute
 }
 
 const AccountRouteChildren: AccountRouteChildren = {
   AccountIndexRoute: AccountIndexRoute,
-  AccountBillingIndexRoute: AccountBillingIndexRoute,
 }
 
 const AccountRouteWithChildren =

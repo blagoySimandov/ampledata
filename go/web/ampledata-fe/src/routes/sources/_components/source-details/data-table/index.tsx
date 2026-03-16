@@ -57,7 +57,8 @@ export function DataTable({
           rowData={mergedData.rows}
           columnDefs={columnDefs}
           theme={agtheme}
-          loading={isFetching}
+          loading={isFetching && mergedData.rows.length === 0}
+          getRowId={(params) => params.data.__index}
           pagination
           paginationPageSize={100}
           paginationPageSizeSelector={[50, 100, 200, 500]}

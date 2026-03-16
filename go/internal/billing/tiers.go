@@ -39,3 +39,12 @@ var TierOrder = []string{"starter", "pro", "enterprise"}
 func GetTier(id string) *SubscriptionTier {
 	return Tiers[id]
 }
+
+func TierFromPriceID(priceID string) *SubscriptionTier {
+	for _, t := range Tiers {
+		if t.BasePriceID == priceID || t.MeteredPriceID == priceID {
+			return t
+		}
+	}
+	return nil
+}

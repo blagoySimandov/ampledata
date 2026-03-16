@@ -177,6 +177,13 @@ export class ApiClient {
     });
   }
 
+  public async upgradeSubscription(tierId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(ENDPOINTS.SUBSCRIPTION_UPGRADE, {
+      method: "POST",
+      body: JSON.stringify({ tier_id: tierId }),
+    });
+  }
+
   public async cancelSubscription(): Promise<{ message: string }> {
     return this.request<{ message: string }>(ENDPOINTS.SUBSCRIPTION_CANCEL, {
       method: "POST",

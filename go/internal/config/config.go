@@ -47,6 +47,8 @@ type Config struct {
 	ProMeteredPriceID        string
 	EnterpriseBasePriceID    string
 	EnterpriseMeteredPriceID string
+
+	FreeTierCredits int64
 }
 
 const (
@@ -98,6 +100,8 @@ var cfg Config = Config{
 	ProMeteredPriceID:        getEnv("STRIPE_PRO_METERED_PRICE_ID", ""),
 	EnterpriseBasePriceID:    getEnv("STRIPE_ENTERPRISE_BASE_PRICE_ID", ""),
 	EnterpriseMeteredPriceID: getEnv("STRIPE_ENTERPRISE_METERED_PRICE_ID", ""),
+
+	FreeTierCredits: int64(getEnvInt("FREE_TIER_CREDITS", 100)),
 }
 
 func Load() *Config {

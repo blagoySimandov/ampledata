@@ -12,14 +12,23 @@ interface Props {
   onManagePortal: () => void;
 }
 
-function NoSubscriptionState() {
+function FreeTierCard({ subscription }: { subscription: SubscriptionStatusResponse }) {
   return (
-    <div className="rounded-lg border border-dashed px-5 py-7 text-center space-y-1.5">
-      <p className="text-sm font-semibold">No active subscription</p>
-      <p className="text-xs text-muted-foreground">
-        Choose a plan below to start enriching your data.
-      </p>
-    </div>
+    <Card className="gap-0">
+      <CardContent className="pt-5 space-y-4">
+        <div className="flex flex-col gap-1.5">
+          <Badge variant="secondary" className="w-fit text-xs">Free plan</Badge>
+          <span className="text-xl font-black tracking-tight">Free Tier</span>
+          <p className="text-xs text-muted-foreground">
+            Upgrade to a plan to unlock more cells and per-cell billing.
+          </p>
+        </div>
+        <TokenUsageBar
+          used={subscription.tokens_used}
+          included={subscription.tokens_included}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -87,7 +96,9 @@ function ActiveSubscriptionCard({
                   <span>&middot;</span>
                 </>
               )}
-              <span>{periodLabel} {formatDate(subscription.current_period_end)}</span>
+              {subscription.current_period_end && (
+                <span>{periodLabel} {formatDate(subscription.current_period_end)}</span>
+              )}
             </div>
           </div>
           <Button
@@ -110,7 +121,8 @@ function ActiveSubscriptionCard({
 }
 
 export function SubscriptionSummary({ subscription, tiers, onManagePortal }: Props) {
-  if (!subscription?.tier) return <NoSubscriptionState />;
+  if (!subscription) return null;
+  if (!subscription.tier) return <FreeTierCard subscription={subscription} />;
 
   const currentTier = tiers.find((t) => t.id === subscription.tier);
 

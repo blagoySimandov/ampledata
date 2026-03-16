@@ -124,11 +124,54 @@ func (b *Billing) GetSubscription(ctx context.Context, subscriptionID string) (*
 	return b.sc.V1Subscriptions.Retrieve(ctx, subscriptionID, nil)
 }
 
+func findSubscriptionItems(sub *stripe.Subscription) (baseItemID, meteredItemID string) {
+	for _, item := range sub.Items.Data {
+		if item.Price.Recurring.UsageType == stripe.PriceRecurringUsageTypeMetered {
+			meteredItemID = item.ID
+		} else {
+			baseItemID = item.ID
+		}
+	}
+	return
+}
+
+func (b *Billing) UpgradeSubscription(ctx context.Context, subscriptionID, newTierID string) (*stripe.Subscription, error) {
+	newTier := GetTier(newTierID)
+	if newTier == nil {
+		return nil, fmt.Errorf("unknown tier: %s", newTierID)
+	}
+	sub, err := b.sc.V1Subscriptions.Retrieve(ctx, subscriptionID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve subscription: %w", err)
+	}
+	baseItemID, meteredItemID := findSubscriptionItems(sub)
+	if baseItemID == "" || meteredItemID == "" {
+		return nil, fmt.Errorf("could not identify subscription items for %s", subscriptionID)
+	}
+	params := &stripe.SubscriptionUpdateParams{
+		ProrationBehavior: stripe.String("always_invoice"),
+		PaymentBehavior:   stripe.String("error_if_incomplete"),
+		Items: []*stripe.SubscriptionUpdateItemParams{
+			{ID: stripe.String(baseItemID), Price: stripe.String(newTier.BasePriceID)},
+			{ID: stripe.String(meteredItemID), Price: stripe.String(newTier.MeteredPriceID)},
+		},
+		Metadata: map[string]string{config.StripeTierIDKey: newTier.ID},
+	}
+	return b.sc.V1Subscriptions.Update(ctx, subscriptionID, params)
+}
+
 func (b *Billing) CancelSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error) {
 	params := &stripe.SubscriptionUpdateParams{
 		CancelAtPeriodEnd: stripe.Bool(true),
 	}
 	return b.sc.V1Subscriptions.Update(ctx, subscriptionID, params)
+}
+
+func (b *Billing) CancelSubscriptionImmediately(ctx context.Context, subscriptionID string) (*stripe.Subscription, error) {
+	params := &stripe.SubscriptionCancelParams{
+		Prorate: stripe.Bool(true),
+	}
+	return b.sc.V1Subscriptions.Cancel(ctx, subscriptionID, params)
 }
 
 func (b *Billing) CreateCreditGrant(ctx context.Context, customerID string, amountCents int64, idempotencyKey string) (*stripe.BillingCreditGrant, error) {

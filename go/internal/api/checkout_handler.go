@@ -97,7 +97,7 @@ func (s *Server) GetSubscriptionStatus(ctx context.Context, req GetSubscriptionS
 	return GetSubscriptionStatus200JSONResponse{
 		Tier:               dbUser.SubscriptionTier,
 		TokensUsed:         dbUser.TokensUsed,
-		TokensIncluded:     dbUser.TokensIncluded,
+		TokensIncluded:     dbUser.TokensIncluded(),
 		CancelAtPeriodEnd:  dbUser.CancelAtPeriodEnd,
 		CurrentPeriodStart: dbUser.CurrentPeriodStart,
 		CurrentPeriodEnd:   dbUser.CurrentPeriodEnd,
@@ -150,6 +150,7 @@ func (s *Server) applySubscription(ctx context.Context, session *checkoutSession
 	if err != nil {
 		return err
 	}
+	s.cancelPreviousSubscription(ctx, session.Customer, session.Subscription)
 	periodStart, periodEnd, err := subscriptionPeriod(sub)
 	if err != nil {
 		return fmt.Errorf("subscription %s: %w", session.Subscription, err)
@@ -160,6 +161,19 @@ func (s *Server) applySubscription(ctx context.Context, session *checkoutSession
 	s.issueCreditGrant(ctx, session.Customer, tier, eventID)
 	log.Printf("Subscription created for customer %s: tier=%s", session.Customer, tier.ID)
 	return nil
+}
+
+func (s *Server) cancelPreviousSubscription(ctx context.Context, customerID, newSubscriptionID string) {
+	existing, err := s.userRepo.GetByStripeCustomerID(ctx, customerID)
+	if err != nil || existing.StripeSubscriptionID == nil {
+		return
+	}
+	if *existing.StripeSubscriptionID == newSubscriptionID {
+		return
+	}
+	if _, err := s.billing.CancelSubscriptionImmediately(ctx, *existing.StripeSubscriptionID); err != nil {
+		log.Printf("Failed to cancel previous subscription %s for customer %s: %v", *existing.StripeSubscriptionID, customerID, err)
+	}
 }
 
 func (s *Server) getSubscriptionAndTier(ctx context.Context, subscriptionID, sessionID string) (*stripe.Subscription, *billing.SubscriptionTier, error) {
@@ -183,7 +197,7 @@ func (s *Server) handleInvoicePaid(ctx context.Context, event *stripe.Event) err
 	if err != nil {
 		return fmt.Errorf("failed to parse invoice: %w", err)
 	}
-	if invoice.Subscription == "" || invoice.BillingReason == "subscription_create" {
+	if invoice.BillingReason != "subscription_cycle" {
 		return nil
 	}
 	return s.applyBillingCycleReset(ctx, invoice, event.ID)
@@ -194,18 +208,80 @@ func (s *Server) applyBillingCycleReset(ctx context.Context, invoice *invoiceEve
 	if err != nil {
 		return fmt.Errorf("failed to retrieve subscription %s: %w", invoice.Subscription, err)
 	}
-	tier, err := s.lookupUserTier(ctx, invoice.Customer)
-	if err != nil {
-		return err
+	tier := tierFromStripeItems(sub)
+	if tier == nil {
+		return fmt.Errorf("could not determine tier for subscription %s", invoice.Subscription)
 	}
 	periodStart, periodEnd, err := subscriptionPeriod(sub)
 	if err != nil {
 		return fmt.Errorf("subscription %s: %w", invoice.Subscription, err)
 	}
+	if err := s.userRepo.UpdateSubscriptionTier(ctx, invoice.Customer, tier.ID, tier.IncludedTokens); err != nil {
+		log.Printf("Failed to sync tier on billing cycle reset for customer %s: %v", invoice.Customer, err)
+	}
 	if err := s.userRepo.ResetBillingCycle(ctx, invoice.Customer, periodStart, periodEnd); err != nil {
 		return fmt.Errorf("failed to reset billing cycle for customer %s: %w", invoice.Customer, err)
 	}
 	s.issueCreditGrant(ctx, invoice.Customer, tier, eventID)
+	return nil
+}
+
+func tierFromStripeItems(sub *stripe.Subscription) *billing.SubscriptionTier {
+	for _, item := range sub.Items.Data {
+		if tier := billing.TierFromPriceID(item.Price.ID); tier != nil {
+			return tier
+		}
+	}
+	return nil
+}
+
+func (s *Server) UpgradeSubscription(ctx context.Context, req UpgradeSubscriptionRequestObject) (UpgradeSubscriptionResponseObject, error) {
+	dbUser, ok := user.GetDBUserFromContext(ctx)
+	if !ok || dbUser.StripeSubscriptionID == nil || dbUser.StripeCustomerID == nil {
+		return UpgradeSubscription400JSONResponse{Message: "No active subscription"}, nil
+	}
+	if err := validateUpgrade(dbUser.SubscriptionTier, req.Body.TierId); err != nil {
+		return UpgradeSubscription400JSONResponse{Message: err.Error()}, nil
+	}
+	newTier := billing.GetTier(req.Body.TierId)
+	if newTier == nil {
+		return UpgradeSubscription400JSONResponse{Message: "Invalid tier"}, nil
+	}
+	if _, err := s.billing.UpgradeSubscription(ctx, *dbUser.StripeSubscriptionID, req.Body.TierId); err != nil {
+		log.Printf("Stripe upgrade failed for customer %s: %v", *dbUser.StripeCustomerID, err)
+		return UpgradeSubscription500JSONResponse{Message: "Failed to upgrade subscription"}, nil
+	}
+	if err := s.userRepo.UpdateSubscriptionTier(ctx, *dbUser.StripeCustomerID, newTier.ID, newTier.IncludedTokens); err != nil {
+		log.Printf("DB update failed post-upgrade for customer %s: %v", *dbUser.StripeCustomerID, err)
+	}
+	return UpgradeSubscription200JSONResponse{Message: "Subscription upgraded successfully"}, nil
+}
+
+func validateUpgrade(currentTierID *string, newTierID string) error {
+	if currentTierID == nil {
+		return fmt.Errorf("no current subscription to upgrade")
+	}
+	if tierIndex(*currentTierID) >= tierIndex(newTierID) {
+		return fmt.Errorf("new tier must be higher than current tier")
+	}
+	return nil
+}
+
+func tierIndex(id string) int {
+	for i, t := range billing.TierOrder {
+		if t == id {
+			return i
+		}
+	}
+	return -1
+}
+
+func tierFromItems(items subscriptionItemList) *billing.SubscriptionTier {
+	for _, item := range items.Data {
+		if tier := billing.TierFromPriceID(item.Price.ID); tier != nil {
+			return tier
+		}
+	}
 	return nil
 }
 
@@ -217,6 +293,11 @@ func (s *Server) handleSubscriptionUpdated(ctx context.Context, event *stripe.Ev
 	if err := s.userRepo.SetCancelAtPeriodEnd(ctx, sub.Customer, sub.isCancellationScheduled()); err != nil {
 		return fmt.Errorf("failed to sync cancel_at_period_end for customer %s: %w", sub.Customer, err)
 	}
+	if tier := tierFromItems(sub.Items); tier != nil {
+		if err := s.userRepo.UpdateSubscriptionTier(ctx, sub.Customer, tier.ID, tier.IncludedTokens); err != nil {
+			log.Printf("Failed to sync tier from webhook for customer %s: %v", sub.Customer, err)
+		}
+	}
 	return nil
 }
 
@@ -225,6 +306,10 @@ func (s *Server) handleSubscriptionDeleted(ctx context.Context, event *stripe.Ev
 	if err != nil {
 		return fmt.Errorf("failed to parse subscription: %w", err)
 	}
+	existing, err := s.userRepo.GetByStripeCustomerID(ctx, sub.Customer)
+	if err != nil || existing.StripeSubscriptionID == nil || *existing.StripeSubscriptionID != sub.ID {
+		return nil
+	}
 	if err := s.userRepo.ClearSubscription(ctx, sub.Customer); err != nil {
 		return fmt.Errorf("failed to clear subscription for customer %s: %w", sub.Customer, err)
 	}
@@ -232,20 +317,6 @@ func (s *Server) handleSubscriptionDeleted(ctx context.Context, event *stripe.Ev
 	return nil
 }
 
-func (s *Server) lookupUserTier(ctx context.Context, stripeCustomerID string) (*billing.SubscriptionTier, error) {
-	usr, err := s.userRepo.GetByStripeCustomerID(ctx, stripeCustomerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find user for customer %s: %w", stripeCustomerID, err)
-	}
-	if usr.SubscriptionTier == nil {
-		return nil, fmt.Errorf("user for customer %s has no subscription tier", stripeCustomerID)
-	}
-	tier := billing.GetTier(*usr.SubscriptionTier)
-	if tier == nil {
-		return nil, fmt.Errorf("unknown tier %s for customer %s", *usr.SubscriptionTier, stripeCustomerID)
-	}
-	return tier, nil
-}
 
 func (s *Server) issueCreditGrant(ctx context.Context, customerID string, tier *billing.SubscriptionTier, eventID string) {
 	amount := creditGrantCentsForTier(tier)
@@ -299,10 +370,24 @@ type subscriptionEvent struct {
 	Customer string `json:"customer"`
 }
 
+type subscriptionItemPrice struct {
+	ID string `json:"id"`
+}
+
+type subscriptionItem struct {
+	Price subscriptionItemPrice `json:"price"`
+}
+
+type subscriptionItemList struct {
+	Data []subscriptionItem `json:"data"`
+}
+
 type subscriptionUpdatedEvent struct {
-	Customer          string `json:"customer"`
-	CancelAtPeriodEnd bool   `json:"cancel_at_period_end"`
-	CancelAt          int64  `json:"cancel_at"`
+	Customer          string               `json:"customer"`
+	CancelAtPeriodEnd bool                 `json:"cancel_at_period_end"`
+	CancelAt          int64                `json:"cancel_at"`
+	Metadata          map[string]string    `json:"metadata"`
+	Items             subscriptionItemList `json:"items"`
 }
 
 func (e *subscriptionUpdatedEvent) isCancellationScheduled() bool {

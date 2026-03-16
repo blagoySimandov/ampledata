@@ -111,12 +111,9 @@ func (s *Server) EnrichSource(ctx context.Context, req EnrichSourceRequestObject
 	if !ok {
 		return EnrichSource401JSONResponse{Message: "Unauthorized"}, nil
 	}
-	dbUser, ok := user.GetDBUserFromContext(ctx)
+	user, ok := user.GetDBUserFromContext(ctx)
 	if !ok {
 		return EnrichSource500JSONResponse{Message: "User not found"}, nil
-	}
-	if dbUser.SubscriptionTier == nil {
-		return EnrichSource402JSONResponse{Message: "Active subscription required"}, nil
 	}
 	source, err := s.store.GetSource(ctx, uuid.UUID(req.SourceID))
 	if err != nil {
@@ -141,14 +138,18 @@ func (s *Server) EnrichSource(ctx context.Context, req EnrichSourceRequestObject
 	if len(rowKeys) == 0 {
 		return EnrichSource400JSONResponse{Message: "No rows found in key column"}, nil
 	}
-	jobID := generateJobId(".csv")
+	cellsToBeEnriched := int64(len(rowKeys) * len(cols))
+	if !user.CanEnrichCells(cellsToBeEnriched) {
+		return EnrichSource402JSONResponse{Message: "Insufficient credits to run this job"}, nil
+	}
+	jobID := generateJobId(".csv") // TODO: Maybe don't append .csv ? idk
 	if err := s.store.CreatePendingJob(ctx, jobID, authUser.ID, source.ID); err != nil {
 		return EnrichSource500JSONResponse{Message: "Failed to create job"}, nil
 	}
 	if err := s.configureAndStartEnrich(ctx, jobID, keyColumns, keyColumnDescription, cols, len(rowKeys)); err != nil {
 		return EnrichSource500JSONResponse{Message: err.Error()}, nil
 	}
-	go s.enricher.Enrich(context.Background(), jobID, dbUser.ID, stripeCustomerIDOrEmpty(dbUser), rowKeys, cols, keyColumnDescription)
+	go s.enricher.Enrich(context.Background(), jobID, user.ID, stripeCustomerIDOrEmpty(user), rowKeys, cols, keyColumnDescription)
 	return EnrichSource200JSONResponse{JobId: jobID}, nil
 }
 

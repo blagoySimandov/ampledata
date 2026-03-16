@@ -1,18 +1,24 @@
+import { useState } from "react";
 import { useBilling, useMe } from "@/hooks";
 import { ProfileCard } from "./_components/profile-card";
 import { PersonalInfoSection } from "./_components/personal-info-section";
-import { SubscriptionSummary } from "./billing/_components/subscription-summary";
-import { TierSelector } from "./billing/_components/tier-selector";
+import { SubscriptionSummary } from "./_components/billing/subscription-summary";
+import { TierSelector } from "./_components/billing/tier-selector";
+import { UpgradeDialog } from "./_components/billing/upgrade-dialog";
 
-function BillingSection({
-  onManagePortal,
-}: {
-  onManagePortal: () => void;
-}) {
-  const { tiers, subscription, subscribe } = useBilling();
+function BillingSection({ onManagePortal }: { onManagePortal: () => void }) {
+  const { tiers, subscription, subscribe, upgrade } = useBilling();
+  const [pendingUpgradeTierId, setPendingUpgradeTierId] = useState<string | null>(null);
 
   const tiersData = tiers.data ?? [];
   const hasActiveSubscription = !!subscription.data?.tier;
+  const currentTier = tiersData.find((t) => t.id === subscription.data?.tier);
+  const pendingUpgradeTier = tiersData.find((t) => t.id === pendingUpgradeTierId);
+
+  const handleUpgradeConfirm = () => {
+    if (!pendingUpgradeTierId) return;
+    upgrade.mutate(pendingUpgradeTierId, { onSuccess: () => setPendingUpgradeTierId(null) });
+  };
 
   return (
     <div className="space-y-3">
@@ -22,7 +28,7 @@ function BillingSection({
         </h2>
         {hasActiveSubscription && (
           <p className="text-xs text-muted-foreground">
-            To switch plans,{" "}
+            To downgrade,{" "}
             <button
               onClick={onManagePortal}
               className="underline underline-offset-2 hover:text-foreground transition-colors"
@@ -42,9 +48,20 @@ function BillingSection({
         currentTierId={subscription.data?.tier ?? null}
         hasActiveSubscription={hasActiveSubscription}
         onSubscribe={(tierId) => subscribe.mutate({ tier_id: tierId })}
+        onUpgrade={setPendingUpgradeTierId}
         onManagePortal={onManagePortal}
         isPending={subscribe.isPending}
       />
+      {pendingUpgradeTierId && currentTier && pendingUpgradeTier && subscription.data && (
+        <UpgradeDialog
+          currentTier={currentTier}
+          newTier={pendingUpgradeTier}
+          subscription={subscription.data}
+          isPending={upgrade.isPending}
+          onConfirm={handleUpgradeConfirm}
+          onClose={() => setPendingUpgradeTierId(null)}
+        />
+      )}
     </div>
   );
 }
