@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
 )
@@ -141,10 +140,8 @@ func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 					http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
 					return
 				}
-				spew.Dump("Token", token)
 
 				claims := token.PrivateClaims()
-				spew.Dump(claims)
 
 				workosUser = &WorkOSUser{
 					ID:                token.Subject(),

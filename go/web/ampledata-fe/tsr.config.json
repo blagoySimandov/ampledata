@@ -1,0 +1,3 @@
+{
+  "routeFileIgnorePattern": "(^|/)_[^_]|page\\.tsx"
+}

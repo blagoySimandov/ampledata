@@ -15,8 +15,11 @@ export function PersonalInfoSection({ user }: Props) {
       description="Your name and email address on this account."
     >
       <div className="space-y-3">
-        <FieldRow label="Full name" value={`${user.first_name} ${user.last_name}`} />
-        <FieldRow label="Email address" value={user.email} verified />
+        <FieldRow
+          label="Full name"
+          value={`${user.first_name} ${user.last_name}`}
+        />
+        <FieldRow label="Email address" value={user.email} />
       </div>
     </SectionCard>
   );

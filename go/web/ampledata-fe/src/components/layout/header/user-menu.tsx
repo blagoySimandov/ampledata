@@ -6,7 +6,8 @@ import {
 } from "@/components/ui/popover";
 import { userInitials, userDisplayName } from "@/lib/utils";
 import { useAuth } from "@workos-inc/authkit-react";
-import { Link, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();

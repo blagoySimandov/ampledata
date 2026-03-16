@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import logo from "../../../assets/ampledata-logo.png";
+import logo from "../../../../assets/ampledata-logo.png";
 import { CreditsWidget } from "./credits-widget";
 import { UserMenu } from "./user-menu";
 import { NavLink } from "./nav-link";

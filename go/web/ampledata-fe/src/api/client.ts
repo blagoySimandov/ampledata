@@ -21,6 +21,7 @@ import type {
   CreateCheckoutResponse,
   PortalSessionResponse,
   UserResponse,
+  SourceDataResponse,
 } from "./types";
 import { ENDPOINTS } from "./endpoints";
 
@@ -53,7 +54,6 @@ export class ApiClient {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const token = await this.getToken();
-    console.log(token);
     const headers = new Headers(options?.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
@@ -88,11 +88,9 @@ export class ApiClient {
     return decodeSourceDetail(data);
   }
 
-  public async getSourceData(
-    sourceId: string,
-  ): Promise<import("./types").SourceDataResponse> {
+  public async getSourceData(sourceId: string): Promise<SourceDataResponse> {
     const endpoint = this.buildUrl(ENDPOINTS.SOURCES_DATA(sourceId));
-    return this.request<import("./types").SourceDataResponse>(endpoint);
+    return this.request<SourceDataResponse>(endpoint);
   }
 
   public async enrich(

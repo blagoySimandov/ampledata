@@ -46,6 +46,7 @@ func (r *CSVReader) ReadCSV(ctx context.Context, objectName string) (*CSVResult,
 	defer reader.Close()
 
 	csvReader := csv.NewReader(reader)
+	csvReader.LazyQuotes = true
 
 	headers, err := csvReader.Read()
 	if err != nil {
