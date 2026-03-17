@@ -70,14 +70,6 @@ func (b *Billing) ReportUsage(ctx context.Context, stripeCustomerID string, cred
 	return nil
 }
 
-func (b *Billing) CreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error) {
-	params := &stripe.CustomerCreateParams{
-		Email:    stripe.String(email),
-		Metadata: map[string]string{"user_id": userID},
-	}
-	return b.sc.V1Customers.Create(ctx, params)
-}
-
 func (b *Billing) CreateSubscriptionCheckout(ctx context.Context, customerID, tierID, successURL, cancelURL string) (*stripe.CheckoutSession, error) {
 	tier := GetTier(tierID)
 	if tier == nil {
@@ -133,6 +125,25 @@ func findSubscriptionItems(sub *stripe.Subscription) (baseItemID, meteredItemID 
 		}
 	}
 	return
+}
+
+func (b *Billing) GetOrCreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error) {
+	listParams := &stripe.CustomerListParams{
+		Email: stripe.String(email),
+	}
+	i := b.sc.V1Customers.List(ctx, listParams)
+	for customer, err := range i {
+		if err != nil {
+			return nil, fmt.Errorf("list customers: %w", err)
+		}
+		return customer, nil
+	}
+
+	params := &stripe.CustomerCreateParams{
+		Email:    stripe.String(email),
+		Metadata: map[string]string{"user_id": userID},
+	}
+	return b.sc.V1Customers.Create(ctx, params)
 }
 
 func (b *Billing) UpgradeSubscription(ctx context.Context, subscriptionID, newTierID string) (*stripe.Subscription, error) {

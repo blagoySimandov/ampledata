@@ -8,7 +8,7 @@ import (
 
 type BillingService interface {
 	ReportUsage(ctx context.Context, stripeCustomerID string, credits int) error
-	CreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error)
+	GetOrCreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error)
 	CreateSubscriptionCheckout(ctx context.Context, customerID, tierID, successURL, cancelURL string) (*stripe.CheckoutSession, error)
 	GetSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error)
 	CancelSubscription(ctx context.Context, subscriptionID string) (*stripe.Subscription, error)

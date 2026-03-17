@@ -108,11 +108,6 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 }
 
 func (r *UserRepository) GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error) {
-	user, err := r.GetByID(ctx, userID)
-	if err == nil {
-		return user, nil
-	}
-
 	newUser := &models.User{
 		ID:                userID,
 		Email:             email,
@@ -120,12 +115,19 @@ func (r *UserRepository) GetOrCreate(ctx context.Context, userID, email, firstNa
 		LastName:          lastName,
 		ProfilePictureURL: profilePictureURL,
 	}
+	userDB := models.UserFromDomain(newUser)
+	userDB.CreatedAt = time.Now()
+	userDB.UpdatedAt = time.Now()
 
-	if err := r.Create(ctx, newUser); err != nil {
+	_, err := r.db.NewInsert().
+		Model(userDB).
+		On("CONFLICT (id) DO NOTHING").
+		Exec(ctx)
+	if err != nil {
 		return nil, err
 	}
 
-	return newUser, nil
+	return r.GetByID(ctx, userID)
 }
 
 func (r *UserRepository) UpdateStripeCustomerID(ctx context.Context, userID, stripeCustomerID string) error {
