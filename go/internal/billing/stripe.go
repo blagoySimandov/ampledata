@@ -143,6 +143,7 @@ func (b *Billing) GetOrCreateCustomer(ctx context.Context, userID, email string)
 		Email:    stripe.String(email),
 		Metadata: map[string]string{"user_id": userID},
 	}
+	params.SetIdempotencyKey("create-customer-" + userID)
 	return b.sc.V1Customers.Create(ctx, params)
 }
 
