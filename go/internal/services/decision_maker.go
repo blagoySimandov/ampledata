@@ -230,13 +230,6 @@ Assign a confidence score to every field you extract into extracted_data:
 - 0.4-0.5: Significant uncertainty, approximate value, or entity unclear
 - <0.4: Wrong unit/format, likely wrong entity, or heavy inference required
 
-⚠️  CRITICAL UNIT/FORMAT RULE: If the column description specifies a unit or currency
-(e.g. "in USD", "in meters", "ISO date format") and the only available data is in a
-DIFFERENT unit (e.g. INR when USD is required), you MUST:
-1. Assign confidence ≤ 0.4 to that field
-2. Explain the mismatch clearly in the reason (e.g. "Found INR price, description requires USD")
-3. Consider marking the column as missing rather than extracting the wrong unit
-
 ## Response Format (JSON only, no markdown)
 {
     "urls_to_crawl": ["url1", "url2"] or [],
@@ -457,13 +450,6 @@ Assign a confidence score to every field you extract into extracted_data:
 - 0.6-0.7: Partial information or mild ambiguity, but unit/format matches description
 - 0.4-0.5: Significant uncertainty, approximate value, or entity unclear
 - <0.4: Wrong unit/format, likely wrong entity, or heavy inference required
-
-⚠️  CRITICAL UNIT/FORMAT RULE: If the column description specifies a unit or currency
-(e.g. "in USD", "in meters", "ISO date format") and the only available data is in a
-DIFFERENT unit (e.g. INR when USD is required), you MUST:
-1. Assign confidence ≤ 0.4 to that field
-2. Explain the mismatch clearly in the reason (e.g. "Found INR price, description requires USD")
-3. Consider marking the column as missing rather than extracting the wrong unit
 
 ## Response Format (JSON only, no markdown)
 {
