@@ -277,6 +277,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			QueryPatterns:        queryPatterns,
 			LowConfidenceColumns: feedbackOutput.LowConfidenceColumns,
 			MissingColumns:       feedbackOutput.MissingColumns,
+			ExtractedData:        extractOutput.ExtractedData,
+			ExtractedConfidence:  extractOutput.Confidence,
 		}
 
 		previousAttempts := append(input.PreviousAttempts, currentAttempt)

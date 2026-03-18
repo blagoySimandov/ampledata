@@ -118,18 +118,40 @@ func (g *PatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.Col
 
 	feedbackText := ""
 	if len(previousAttempts) > 0 {
-		feedbackText = "\n\nPREVIOUS ATTEMPTS THAT FAILED:\n"
+		feedbackText = "\n\nPREVIOUS ATTEMPTS (study these carefully before generating new patterns):\n"
 		for _, attempt := range previousAttempts {
 			feedbackText += fmt.Sprintf("\nAttempt %d:\n", attempt.AttemptNumber)
 			feedbackText += fmt.Sprintf("  Patterns tried: %s\n", strings.Join(attempt.QueryPatterns, ", "))
 			if len(attempt.MissingColumns) > 0 {
-				feedbackText += fmt.Sprintf("  Missing columns: %s\n", strings.Join(attempt.MissingColumns, ", "))
+				feedbackText += fmt.Sprintf("  Columns with NO data found: %s\n", strings.Join(attempt.MissingColumns, ", "))
 			}
 			if len(attempt.LowConfidenceColumns) > 0 {
-				feedbackText += fmt.Sprintf("  Low confidence columns: %s\n", strings.Join(attempt.LowConfidenceColumns, ", "))
+				feedbackText += fmt.Sprintf("  Columns found but with LOW confidence: %s\n", strings.Join(attempt.LowConfidenceColumns, ", "))
+			}
+			if len(attempt.ExtractedData) > 0 {
+				feedbackText += "  What was actually extracted (may be wrong format/unit):\n"
+				for col, val := range attempt.ExtractedData {
+					reason := ""
+					if attempt.ExtractedConfidence != nil {
+						if conf, ok := attempt.ExtractedConfidence[col]; ok && conf != nil {
+							reason = fmt.Sprintf(" (confidence: %.2f - %s)", conf.Score, conf.Reason)
+						}
+					}
+					feedbackText += fmt.Sprintf("    %s = %v%s\n", col, val, reason)
+				}
 			}
 		}
-		feedbackText += "\nYOUR TASK: Generate DIFFERENT query patterns that will help find the missing or low-confidence columns. Try alternative phrasings and search angles.\n"
+		feedbackText += `
+YOUR TASK: Generate DIFFERENT search patterns to find the missing/low-confidence data.
+
+CRITICAL RULES for retry patterns:
+1. Do NOT produce synonym substitutions of previous patterns (e.g. "price" → "pricing" is NOT different enough)
+2. Analyze WHY the previous patterns failed:
+   - If wrong unit/currency was found: search for official sources that use the correct unit
+   - If nothing was found: try a completely different angle (official site, different terminology)
+   - If low confidence: find more authoritative/direct sources
+3. Your patterns must represent a genuinely different search strategy
+`
 	}
 
 	return fmt.Sprintf(`You are a Google search query optimization expert. Your task is to create query PATTERNS
@@ -344,18 +366,40 @@ func (g *GroqPatternGenerator) buildPromptWithFeedback(columnsMetadata []*models
 
 	feedbackText := ""
 	if len(previousAttempts) > 0 {
-		feedbackText = "\n\nPREVIOUS ATTEMPTS THAT FAILED:\n"
+		feedbackText = "\n\nPREVIOUS ATTEMPTS (study these carefully before generating new patterns):\n"
 		for _, attempt := range previousAttempts {
 			feedbackText += fmt.Sprintf("\nAttempt %d:\n", attempt.AttemptNumber)
 			feedbackText += fmt.Sprintf("  Patterns tried: %s\n", strings.Join(attempt.QueryPatterns, ", "))
 			if len(attempt.MissingColumns) > 0 {
-				feedbackText += fmt.Sprintf("  Missing columns: %s\n", strings.Join(attempt.MissingColumns, ", "))
+				feedbackText += fmt.Sprintf("  Columns with NO data found: %s\n", strings.Join(attempt.MissingColumns, ", "))
 			}
 			if len(attempt.LowConfidenceColumns) > 0 {
-				feedbackText += fmt.Sprintf("  Low confidence columns: %s\n", strings.Join(attempt.LowConfidenceColumns, ", "))
+				feedbackText += fmt.Sprintf("  Columns found but with LOW confidence: %s\n", strings.Join(attempt.LowConfidenceColumns, ", "))
+			}
+			if len(attempt.ExtractedData) > 0 {
+				feedbackText += "  What was actually extracted (may be wrong format/unit):\n"
+				for col, val := range attempt.ExtractedData {
+					reason := ""
+					if attempt.ExtractedConfidence != nil {
+						if conf, ok := attempt.ExtractedConfidence[col]; ok && conf != nil {
+							reason = fmt.Sprintf(" (confidence: %.2f - %s)", conf.Score, conf.Reason)
+						}
+					}
+					feedbackText += fmt.Sprintf("    %s = %v%s\n", col, val, reason)
+				}
 			}
 		}
-		feedbackText += "\nYOUR TASK: Generate DIFFERENT query patterns that will help find the missing or low-confidence columns. Try alternative phrasings and search angles.\n"
+		feedbackText += `
+YOUR TASK: Generate DIFFERENT search patterns to find the missing/low-confidence data.
+
+CRITICAL RULES for retry patterns:
+1. Do NOT produce synonym substitutions of previous patterns (e.g. "price" → "pricing" is NOT different enough)
+2. Analyze WHY the previous patterns failed:
+   - If wrong unit/currency was found: search for official sources that use the correct unit
+   - If nothing was found: try a completely different angle (official site, different terminology)
+   - If low confidence: find more authoritative/direct sources
+3. Your patterns must represent a genuinely different search strategy
+`
 	}
 
 	return fmt.Sprintf(`You are a Google search query optimization expert. Your task is to create query PATTERNS
