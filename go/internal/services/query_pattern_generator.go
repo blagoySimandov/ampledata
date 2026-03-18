@@ -130,6 +130,10 @@ func (g *PatternGenerator) buildPromptWithFeedback(columnsMetadata []*models.Col
 			}
 		}
 		feedbackText += "\nYOUR TASK: Generate DIFFERENT query patterns that will help find the missing or low-confidence columns. Try alternative phrasings and search angles.\n"
+		feedbackText += "\nCRITICAL FEEDBACK RULES:\n"
+		feedbackText += "- Read each column description carefully and generate patterns that target EXACTLY what each column is asking for.\n"
+		feedbackText += "- Do NOT generate patterns for service costs, subscription rates, repair costs, maintenance plans, or support unless the column description explicitly mentions these concepts.\n"
+		feedbackText += "- For columns asking for purchase/retail price, generate patterns around buying, pricing pages, and official stores — not service or repair.\n"
 	}
 
 	return fmt.Sprintf(`You are a Google search query optimization expert. Your task is to create query PATTERNS
@@ -159,6 +163,7 @@ CRITICAL RULES:
 - Return ONLY valid JSON array of pattern strings
 - Each pattern max 150 characters
 - Prioritize search accuracy over minimizing queries
+- Match patterns strictly to what the column descriptions ask for — do not generate service/repair/subscription patterns unless the column description mentions those concepts
 
 CORRECT EXAMPLES:
 Input: Columns=[founder, founder_picture_url, website, employee_count]
@@ -356,6 +361,10 @@ func (g *GroqPatternGenerator) buildPromptWithFeedback(columnsMetadata []*models
 			}
 		}
 		feedbackText += "\nYOUR TASK: Generate DIFFERENT query patterns that will help find the missing or low-confidence columns. Try alternative phrasings and search angles.\n"
+		feedbackText += "\nCRITICAL FEEDBACK RULES:\n"
+		feedbackText += "- Read each column description carefully and generate patterns that target EXACTLY what each column is asking for.\n"
+		feedbackText += "- Do NOT generate patterns for service costs, subscription rates, repair costs, maintenance plans, or support unless the column description explicitly mentions these concepts.\n"
+		feedbackText += "- For columns asking for purchase/retail price, generate patterns around buying, pricing pages, and official stores — not service or repair.\n"
 	}
 
 	return fmt.Sprintf(`You are a Google search query optimization expert. Your task is to create query PATTERNS
@@ -380,6 +389,7 @@ RULES:
 - Each pattern max 150 characters
 - Use quotes strategically for exact phrases
 - Prioritize search accuracy over minimizing queries
+- Match patterns strictly to what the column descriptions ask for — do not generate service/repair/subscription patterns unless the column description mentions those concepts
 
 EXAMPLES:
 Input: Columns=[CEO, Revenue, Founded, Employees]

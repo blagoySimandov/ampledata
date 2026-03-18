@@ -56,6 +56,22 @@ Common entity disambiguation scenarios:
 - If extracting about a product: data should be about the PRODUCT, not the manufacturer or similar products
 - If extracting about a location: data should be about THIS LOCATION, not nearby places or regions
 
+## IMPORTANT: Entity Name Matching
+
+Product and entity names appear in many equivalent forms. Treat the following as the same entity:
+- Order variations: "MacBook Pro 14" = "14-inch MacBook Pro" = "MacBook Pro 14-inch"
+- Abbreviations: "MBP14", "MBP 14"
+- Spec suffixes: "MacBook Pro 14 M4" still matches "MacBook Pro 14"
+- Model codes: if the content contains a model SKU (e.g. "MBP14-M5-16GB") alongside a product title that matches the entity, treat that entry as the target entity
+- When in doubt about whether a content entry refers to the target entity, use the surrounding context (page title, headings, product listing) to confirm
+
+## IMPORTANT: Currency Extraction
+
+- If a column description specifies a target currency (e.g. "in american USD", "in USD", "in dollars"), extract a value in THAT currency when it is present in the content.
+- If the content contains BOTH a local-currency price (e.g. ₹1,69,900) AND a USD price (e.g. $1,599 or "1,834 USD"), extract the USD value and ignore the local-currency value.
+- If the content shows a USD price even on a non-US regional page (e.g. a price comparison site showing "1,942 USD → 1,834 USD"), that IS a valid USD value — extract it.
+- Do NOT refuse to extract solely because most prices on the page are in a different currency. Extract whichever value matches the requested currency.
+
 When content mentions MULTIPLE entities:
 - ✓ Extract ONLY data that clearly applies to the target entity "%s"
 - ✗ Do NOT extract data about related/mentioned entities

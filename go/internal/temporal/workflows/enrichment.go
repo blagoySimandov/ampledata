@@ -260,7 +260,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	output.ExtractedData = extractOutput.ExtractedData
 	output.Confidence = extractOutput.Confidence
 	output.Sources = allSources
-	output.Success = true
+	output.Success = len(extractOutput.ExtractedData) > 0
 
 	var feedbackOutput activities.FeedbackAnalysisOutput
 	workflow.ExecuteActivity(ctx, "AnalyzeFeedback", activities.FeedbackAnalysisInput{
@@ -338,6 +338,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		output.Sources = mergeSources(output.Sources, retryOutput.Sources)
 
 		output.IterationCount = retryOutput.IterationCount
+		output.Success = len(output.ExtractedData) > 0
 
 		if input.RetryCount == 0 {
 			var reportErr error
@@ -352,6 +353,8 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 
 		return output, nil
 	}
+
+	output.Success = len(output.ExtractedData) > 0
 
 	workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 		JobID:  input.JobID,
