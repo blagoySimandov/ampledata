@@ -16,11 +16,12 @@ import (
 )
 
 type CrawlDecision struct {
-	URLsToCrawl    []string               `json:"urls_to_crawl"`
-	ExtractedData  map[string]interface{} `json:"extracted_data"`
-	Reasoning      string                 `json:"reasoning"`
-	SourceURLs     []string               `json:"source_urls"`
-	MissingColumns []string               `json:"-"`
+	URLsToCrawl    []string                        `json:"urls_to_crawl"`
+	ExtractedData  map[string]interface{}          `json:"extracted_data"`
+	Confidence     map[string]*models.FieldConfidenceInfo `json:"extracted_confidence"`
+	Reasoning      string                          `json:"reasoning"`
+	SourceURLs     []string                        `json:"source_urls"`
+	MissingColumns []string                        `json:"-"`
 }
 
 type DecisionMaker interface {
@@ -219,10 +220,33 @@ Example 3 - Mixed scenario:
 - Snippets show employee count but not picture URL
 - Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "source_urls": ["url_of_snippet_with_employee_count"], "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
 
+## Confidence Scoring (for extracted_confidence)
+
+Assign a confidence score to every field you extract into extracted_data:
+
+- 1.0: Explicitly stated, exact unit/format match, target entity unambiguous
+- 0.8-0.9: Clear statement, minor interpretation needed, correct unit/format
+- 0.6-0.7: Partial information or mild ambiguity, but unit/format matches description
+- 0.4-0.5: Significant uncertainty, approximate value, or entity unclear
+- <0.4: Wrong unit/format, likely wrong entity, or heavy inference required
+
+⚠️  CRITICAL UNIT/FORMAT RULE: If the column description specifies a unit or currency
+(e.g. "in USD", "in meters", "ISO date format") and the only available data is in a
+DIFFERENT unit (e.g. INR when USD is required), you MUST:
+1. Assign confidence ≤ 0.4 to that field
+2. Explain the mismatch clearly in the reason (e.g. "Found INR price, description requires USD")
+3. Consider marking the column as missing rather than extracting the wrong unit
+
 ## Response Format (JSON only, no markdown)
 {
     "urls_to_crawl": ["url1", "url2"] or [],
     "extracted_data": {"column_name": value_with_correct_type} or null,
+    "extracted_confidence": {
+        "column_name": {
+            "score": 0.85,
+            "reason": "One-sentence explanation of confidence level"
+        }
+    },
     "source_urls": ["url_whose_snippet_contained_extracted_data"] or [],
     "reasoning": "Explanation of what was extracted, what needs crawling, and any entity disambiguation performed"
 }`, entityContext, entityContext, entity, columnsText, organicResults, peopleAlsoAsk, entityContext, maxURLs, entity, entityContext, entityContext, entityContext)
@@ -424,10 +448,33 @@ Example 3 - Mixed scenario:
 - Snippets show employee count but not picture URL
 - Response: {"urls_to_crawl": ["url1", "url2"], "extracted_data": {"employee_count": 228000}, "source_urls": ["url_of_snippet_with_employee_count"], "reasoning": "Extracted employee count, selecting URLs to find founder picture"}
 
+## Confidence Scoring (for extracted_confidence)
+
+Assign a confidence score to every field you extract into extracted_data:
+
+- 1.0: Explicitly stated, exact unit/format match, target entity unambiguous
+- 0.8-0.9: Clear statement, minor interpretation needed, correct unit/format
+- 0.6-0.7: Partial information or mild ambiguity, but unit/format matches description
+- 0.4-0.5: Significant uncertainty, approximate value, or entity unclear
+- <0.4: Wrong unit/format, likely wrong entity, or heavy inference required
+
+⚠️  CRITICAL UNIT/FORMAT RULE: If the column description specifies a unit or currency
+(e.g. "in USD", "in meters", "ISO date format") and the only available data is in a
+DIFFERENT unit (e.g. INR when USD is required), you MUST:
+1. Assign confidence ≤ 0.4 to that field
+2. Explain the mismatch clearly in the reason (e.g. "Found INR price, description requires USD")
+3. Consider marking the column as missing rather than extracting the wrong unit
+
 ## Response Format (JSON only, no markdown)
 {
     "urls_to_crawl": ["url1", "url2"] or [],
     "extracted_data": {"column_name": value_with_correct_type} or null,
+    "extracted_confidence": {
+        "column_name": {
+            "score": 0.85,
+            "reason": "One-sentence explanation of confidence level"
+        }
+    },
     "source_urls": ["url_whose_snippet_contained_extracted_data"] or [],
     "reasoning": "Explanation of what was extracted, what needs crawling, and any entity disambiguation performed"
 }`, entityContext, entityContext, entity, columnsText, organicResults, peopleAlsoAsk, entityContext, maxURLs, entity, entityContext, entityContext, entityContext)

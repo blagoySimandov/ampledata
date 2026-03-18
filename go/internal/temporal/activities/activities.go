@@ -240,6 +240,7 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 	decision := &models.Decision{
 		URLsToCrawl:    crawlDecision.URLsToCrawl,
 		ExtractedData:  crawlDecision.ExtractedData,
+		Confidence:     crawlDecision.Confidence,
 		Reasoning:      crawlDecision.Reasoning,
 		SourceURLs:     crawlDecision.SourceURLs,
 		MissingColumns: crawlDecision.MissingColumns,
@@ -345,9 +346,15 @@ func mergeDecisionData(extractedData map[string]interface{}, confidence map[stri
 		if _, exists := extractedData[k]; !exists {
 			extractedData[k] = v
 			if confidence[k] == nil {
+				if decision.Confidence != nil {
+					if conf, ok := decision.Confidence[k]; ok && conf != nil {
+						confidence[k] = conf
+						continue
+					}
+				}
 				confidence[k] = &models.FieldConfidenceInfo{
-					Score:  0.8,
-					Reason: "Extracted from SERP results",
+					Score:  0.6,
+					Reason: "Extracted from SERP results (no per-field confidence provided by LLM)",
 				}
 			}
 		}
@@ -437,7 +444,7 @@ func (a *Activities) AnalyzeFeedback(ctx context.Context, input FeedbackAnalysis
 		}
 	}
 
-	confidenceThreshold := 0.6
+	confidenceThreshold := 0.75
 	var totalConfidence float64
 	var confidenceCount int
 
