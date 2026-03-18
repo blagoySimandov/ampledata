@@ -58,19 +58,19 @@ Common entity disambiguation scenarios:
 
 ## IMPORTANT: Entity Name Matching
 
-Product and entity names appear in many equivalent forms. Treat the following as the same entity:
-- Order variations: "MacBook Pro 14" = "14-inch MacBook Pro" = "MacBook Pro 14-inch"
-- Abbreviations: "MBP14", "MBP 14"
-- Spec suffixes: "MacBook Pro 14 M4" still matches "MacBook Pro 14"
-- Model codes: if the content contains a model SKU (e.g. "MBP14-M5-16GB") alongside a product title that matches the entity, treat that entry as the target entity
-- When in doubt about whether a content entry refers to the target entity, use the surrounding context (page title, headings, product listing) to confirm
+Entity names appear in many equivalent forms. When matching content to the target entity:
+- Word-order and formatting variations are the same entity (e.g. "X Pro 14" = "14-inch X Pro" = "X Pro 14-inch")
+- Common abbreviations, short forms, and acronyms should be treated as matches
+- Version or spec suffixes do not disqualify a match (e.g. "X Pro 14 M4" still matches "X Pro 14")
+- Model or SKU codes that accompany a recognizable entity name should be treated as that entity
+- Use surrounding page context (title, headings, section labels) to confirm entity identity when the name alone is ambiguous
 
-## IMPORTANT: Currency Extraction
+## IMPORTANT: Unit and Currency Matching
 
-- If a column description specifies a target currency (e.g. "in american USD", "in USD", "in dollars"), extract a value in THAT currency when it is present in the content.
-- If the content contains BOTH a local-currency price (e.g. ₹1,69,900) AND a USD price (e.g. $1,599 or "1,834 USD"), extract the USD value and ignore the local-currency value.
-- If the content shows a USD price even on a non-US regional page (e.g. a price comparison site showing "1,942 USD → 1,834 USD"), that IS a valid USD value — extract it.
-- Do NOT refuse to extract solely because most prices on the page are in a different currency. Extract whichever value matches the requested currency.
+- If a column description specifies a target unit or currency, extract a value in THAT unit/currency when it appears anywhere in the content.
+- If the content contains values in multiple currencies or units, extract the one that matches the column description and ignore the others.
+- Do NOT refuse to extract a value solely because the majority of the content uses a different unit or currency. The presence of the requested unit/currency anywhere in the content is sufficient.
+- A value is valid even if it appears on a regional or third-party page, as long as it is explicitly stated in the content in the requested unit/currency.
 
 When content mentions MULTIPLE entities:
 - ✓ Extract ONLY data that clearly applies to the target entity "%s"
