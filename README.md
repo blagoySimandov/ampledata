@@ -1,5 +1,7 @@
 # AmpleData
 
+![ampldata-logo](./docs/static/ampledata-logo.png)
+
 Enrich your datasets without writing code.
 
 Upload a CSV with company names, product SKUs, or any key column. Tell AmpleData which columns you want filled in — revenue, headcount, website, whatever. It searches the web, decides whether a full page crawl is worth it, and uses an LLM to pull out the values you asked for.
