@@ -1,0 +1,202 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "Decision maker — v1 vs v2 on Gemini 2.5 Flash"
+
+prompts:
+  - id: file://prompts/decision-maker-v1.txt
+    label: v1-verbose
+  - id: file://../internal/prompts/decision-maker.txt
+    label: v2-production
+
+providers:
+  - id: google:gemini-2.5-flash
+
+defaultTest:
+  assert:
+    - type: is-json
+      label: "valid JSON"
+    - type: javascript
+      label: "urls_to_crawl is an array"
+      value: |
+        const d = JSON.parse(output);
+        return Array.isArray(d.urls_to_crawl);
+    - type: javascript
+      label: "no extra top-level keys"
+      value: |
+        const d = JSON.parse(output);
+        const allowed = new Set(['urls_to_crawl','extracted_data','extracted_confidence','source_urls','reasoning']);
+        return Object.keys(d).every(k => allowed.has(k));
+
+tests:
+  - description: "Data clearly in snippet — should extract with correct type"
+    vars:
+      entity_context: '"Stripe"'
+      entity: "Stripe"
+      columns: "- employee_count [type: number]\n- founded_year [type: number]\n- headquarters [type: string]"
+      search_results: |
+        Position 1: Stripe - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Stripe_(company)
+        Snippet: Stripe, Inc. is an Irish-American financial services company. It was founded in 2010 by brothers Patrick and John Collison. The company is headquartered in South San Francisco, California and has approximately 8,000 employees.
+        ---
+        Position 2: Stripe - Crunchbase
+        URL: https://www.crunchbase.com/organization/stripe
+        Snippet: Stripe was founded in 2010. It is headquartered in San Francisco, CA.
+        ---
+      people_also_ask: ""
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "extracts founded_year as number 2010"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.founded_year === 2010;
+      - type: javascript
+        label: "employee_count is a number not a string"
+        value: |
+          const d = JSON.parse(output);
+          const ec = d.extracted_data?.employee_count;
+          return ec === undefined || typeof ec === 'number';
+      - type: javascript
+        label: "confidence scores are 0-1"
+        value: |
+          const d = JSON.parse(output);
+          const conf = d.extracted_confidence || {};
+          return Object.values(conf).every(c => c.score >= 0 && c.score <= 1);
+      - type: javascript
+        label: "source_urls populated for extracted data"
+        value: |
+          const d = JSON.parse(output);
+          if (d.extracted_data && Object.keys(d.extracted_data).length > 0) {
+            return Array.isArray(d.source_urls) && d.source_urls.length > 0;
+          }
+          return true;
+
+  - description: "Data missing from snippets — must select URLs to crawl"
+    vars:
+      entity_context: '"Anthropic"'
+      entity: "Anthropic"
+      columns: "- logo_url [type: string]\n- ceo_picture_url [type: string]"
+      search_results: |
+        Position 1: Anthropic - Official Website
+        URL: https://www.anthropic.com
+        Snippet: Anthropic is an AI safety company working to build reliable, interpretable, and steerable AI systems.
+        ---
+        Position 2: Anthropic CEO Dario Amodei - Getty Images
+        URL: https://www.gettyimages.com/photos/dario-amodei
+        Snippet: Browse 245 Dario Amodei photos and images available.
+        ---
+        Position 3: Anthropic Press Kit
+        URL: https://www.anthropic.com/press
+        Snippet: Download Anthropic logos, brand assets and photos of our leadership team.
+        ---
+      people_also_ask: ""
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "urls_to_crawl is not empty when data is missing"
+        value: |
+          const d = JSON.parse(output);
+          return d.urls_to_crawl.length > 0;
+      - type: javascript
+        label: "anthropic.com or press page selected"
+        value: |
+          const d = JSON.parse(output);
+          return d.urls_to_crawl.some(u => u.includes('anthropic.com'));
+
+  - description: "Entity disambiguation — person vs company"
+    vars:
+      entity_context: '"Elon Musk"'
+      entity: "Elon Musk"
+      columns: "- net_worth_usd [type: number]\n- birth_year [type: number]"
+      search_results: |
+        Position 1: Elon Musk - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Elon_Musk
+        Snippet: Elon Musk (born June 28, 1971) is a business magnate and investor. As of 2025, his estimated net worth is $200 billion.
+        ---
+        Position 2: Tesla Q3 2025 Earnings
+        URL: https://ir.tesla.com/quarterly-earnings
+        Snippet: Tesla reported revenue of $25.18 billion in Q3 2025, up 8% year over year.
+        ---
+        Position 3: SpaceX Valuation
+        URL: https://www.wsj.com/spacex-valuation
+        Snippet: SpaceX was valued at $350 billion in its latest funding round.
+        ---
+      people_also_ask: "Q: How much is Elon Musk worth? A: Approximately $200 billion as of 2025."
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "birth_year is 1971 as a number"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.birth_year === 1971;
+      - type: javascript
+        label: "does not extract Tesla revenue as Elon's net worth"
+        value: |
+          const d = JSON.parse(output);
+          const nw = d.extracted_data?.net_worth_usd;
+          return nw !== 25180000000 && nw !== 25000000000;
+      - type: llm-rubric
+        label: "entity disambiguation quality"
+        value: "The extracted data is about Elon Musk the person, not Tesla or SpaceX. Tesla's revenue ($25B) is not confused with Elon's net worth."
+
+  - description: "Mixed — some data in snippets, some needs crawling"
+    vars:
+      entity_context: '"OpenAI"'
+      entity: "OpenAI"
+      columns: "- employee_count [type: number]\n- ceo [type: string]\n- logo_url [type: string]"
+      search_results: |
+        Position 1: OpenAI - Wikipedia
+        URL: https://en.wikipedia.org/wiki/OpenAI
+        Snippet: OpenAI is an American artificial intelligence company. As of 2024, OpenAI has approximately 1,800 employees. The company is led by CEO Sam Altman.
+        ---
+        Position 2: OpenAI Brand Assets
+        URL: https://openai.com/brand
+        Snippet: Download OpenAI's official logos, icons, and brand guidelines.
+        ---
+      people_also_ask: ""
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "extracts employee_count and ceo from snippets"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.ceo !== undefined && d.extracted_data?.employee_count !== undefined;
+      - type: javascript
+        label: "ceo is a string"
+        value: |
+          const d = JSON.parse(output);
+          return typeof d.extracted_data?.ceo === 'string';
+      - type: javascript
+        label: "selects openai.com/brand for logo_url"
+        value: |
+          const d = JSON.parse(output);
+          return d.urls_to_crawl.some(u => u.includes('openai.com'));
+
+  - description: "Approximate values — must not be converted"
+    vars:
+      entity_context: '"Notion"'
+      entity: "Notion"
+      columns: "- user_count [type: number]\n- founded_year [type: number]"
+      search_results: |
+        Position 1: Notion - About
+        URL: https://www.notion.so/about
+        Snippet: Notion was founded in 2013 and now serves 30 million+ users worldwide.
+        ---
+      people_also_ask: ""
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "founded_year extracted as 2013"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.founded_year === 2013;
+      - type: javascript
+        label: "user_count not fabricated from '30 million+'"
+        value: |
+          const d = JSON.parse(output);
+          const uc = d.extracted_data?.user_count;
+          // Either omitted (acceptable) or a round/approximate number — not 30000001
+          if (uc === undefined) return true;
+          return uc === 30000000 || uc > 29000000;
+      - type: llm-rubric
+        label: "handles approximate values correctly"
+        value: "The model does not fabricate a precise number from '30 million+'. It either omits user_count or represents it as approximately 30000000, and explains the approximation in confidence reasoning."

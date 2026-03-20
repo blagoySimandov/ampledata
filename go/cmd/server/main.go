@@ -60,21 +60,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create AI client: %v", err)
 	}
-	patternGenerator, err := services.NewPatternGenerator(aiClient)
+	promptService := services.NewPromptService()
+	patternGenerator, err := services.NewPatternGenerator(aiClient, promptService)
 	if err != nil {
 		log.Fatalf("Failed to create Gemini pattern generator: %v", err)
 	}
 	webSearcher := services.NewSerperClient(cfg.SerperAPIKey)
-	decisionMaker, err := services.NewGeminiDecisionMaker(cfg.GeminiAPIKey)
+	decisionMaker, err := services.NewGeminiDecisionMaker(promptService)
 	if err != nil {
 		log.Fatalf("Failed to create Gemini decision maker: %v", err)
 	}
 	crawler := services.NewCrawl4aiClient(cfg.Crawl4aiURL)
-	extractor, err := services.NewAIContentExtractor(aiClient)
+	extractor, err := services.NewAIContentExtractor(aiClient, promptService)
 	if err != nil {
 		log.Fatalf("Failed to create Gemini content extractor: %v", err)
 	}
-	keySelector, err := services.NewGeminiKeySelector(cfg.GeminiAPIKey)
+	keySelector, err := services.NewGeminiKeySelector(promptService)
 	if err != nil {
 		log.Fatalf("Failed to create Gemini key selector: %v", err)
 	}
