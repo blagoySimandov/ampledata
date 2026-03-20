@@ -8,9 +8,8 @@ import (
 type Config struct {
 	DatabaseURL       string
 	ServerAddr        string
-	SerperAPIKey      string
-	GroqAPIKey        string
-	Crawl4aiURL       string
+	SerperAPIKey string
+	Crawl4aiURL  string
 	GeminiAPIKey      string
 	WorkOSAPIKey      string
 	WorkOSClientID    string
@@ -63,9 +62,8 @@ const (
 var cfg Config = Config{
 	DatabaseURL:       getEnv("DATABASE_URL_ENRICH", "postgres://enrichment:enrichment@localhost:5432/enrichment?sslmode=disable"),
 	ServerAddr:        getEnv("SERVER_ADDR", ":8080"),
-	SerperAPIKey:      getEnv("SERPER_API_KEY", ""),
-	GroqAPIKey:        getEnv("GROQ_API_KEY", ""),
-	GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
+	SerperAPIKey: getEnv("SERPER_API_KEY", ""),
+	GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 	WorkOSAPIKey:      getEnv("WORKOS_API_KEY", ""),
 	WorkOSClientID:    getEnv("WORKOS_CLIENT_ID", ""),
 	Crawl4aiURL:       getEnv("CRAWL4AI_URL", "http://localhost:8000"),

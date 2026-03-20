@@ -1,52 +1,8 @@
-package services
-
-import (
-	"fmt"
-	"strings"
-
-	"github.com/blagoySimandov/ampledata/go/internal/models"
-)
-
-type IExtractionPromptBuilder interface {
-	Build(content string, columnsMetadata []*models.ColumnMetadata, entity string, keyColumnDescription string) string
-}
-
-type ExtractionPromptBuilder struct{}
-
-func NewExtractionPromptBuilder() *ExtractionPromptBuilder {
-	return &ExtractionPromptBuilder{}
-}
-
-func formatEntityContext(entity, keyColumnDescription string) string {
-	if keyColumnDescription == "" {
-		return fmt.Sprintf(`"%s"`, entity)
-	}
-	return fmt.Sprintf(`"%s" (context: %s)`, entity, keyColumnDescription)
-}
-
-func (e *ExtractionPromptBuilder) Build(content string, columnsMetadata []*models.ColumnMetadata, entity string, keyColumnDescription string) string {
-	var columnsInfo []string
-	for _, col := range columnsMetadata {
-		desc := ""
-		if col.Description != nil {
-			desc = fmt.Sprintf(" (%s)", *col.Description)
-		}
-		columnsInfo = append(columnsInfo, fmt.Sprintf("- %s [type: %s]%s", col.Name, col.Type, desc))
-	}
-	columnsText := strings.Join(columnsInfo, "\n")
-
-	truncatedContent := content
-	if len(content) > 8000 {
-		truncatedContent = content[:8000]
-	}
-
-	entityContext := formatEntityContext(entity, keyColumnDescription)
-
-	return fmt.Sprintf(`You are a data extraction specialist. Extract the following fields about the entity %s from the provided website content.
+You are a data extraction specialist. Extract the following fields about the entity {{entity_context}} from the provided website content.
 
 ## CRITICAL: Entity Extraction Rules
 
-You are extracting data about the TARGET ENTITY: %s
+You are extracting data about the TARGET ENTITY: {{entity_context}}
 
 ALL extracted fields must be about THIS SPECIFIC ENTITY - not about related or mentioned entities.
 
@@ -57,15 +13,15 @@ Common entity disambiguation scenarios:
 - If extracting about a location: data should be about THIS LOCATION, not nearby places or regions
 
 When content mentions MULTIPLE entities:
-- ✓ Extract ONLY data that clearly applies to the target entity "%s"
+- ✓ Extract ONLY data that clearly applies to the target entity "{{entity}}"
 - ✗ Do NOT extract data about related/mentioned entities
 - ✗ Do NOT mix attributes from different entities
 
 ## Fields to Extract (ONLY extract these fields)
-%s
+{{columns}}
 
 ## Website Content
-%s
+{{content}}
 
 ## Your Task
 
@@ -86,7 +42,7 @@ If a field cannot be found in the content, omit it from the response.
 ## Entity Consistency Validation
 
 Before finalizing your response, verify:
-1. ALL extracted data refers to the TARGET ENTITY (%s), not to:
+1. ALL extracted data refers to the TARGET ENTITY ({{entity_context}}), not to:
    - Related or associated entities mentioned in the content
    - Similar or competing entities
    - Parent/subsidiary entities (unless explicitly requested)
@@ -118,7 +74,7 @@ Before finalizing your response, verify:
 Base your confidence on BOTH information availability AND entity certainty:
 
 - 1.0: Exact match, explicitly stated, AND clearly about the target entity
-  * The information is unambiguous and directly attributed to "%s"
+  * The information is unambiguous and directly attributed to "{{entity}}"
 
 - 0.8-0.9: Clear statement, minor interpretation needed, target entity is clear
   * Strong attribution to the target entity with minimal ambiguity
@@ -136,7 +92,6 @@ Base your confidence on BOTH information availability AND entity certainty:
   * Heavy inference required
 
 ⚠️  ALWAYS reduce confidence by at least 0.2 when:
-- Information is about a related entity instead of the target entity "%s"
+- Information is about a related entity instead of the target entity "{{entity}}"
 - Multiple entities are mentioned and target is unclear
-- Source is indirect (third-party descriptions, not primary source)`, entityContext, entityContext, entity, columnsText, truncatedContent, entityContext, entity, entity)
-}
+- Source is indirect (third-party descriptions, not primary source)

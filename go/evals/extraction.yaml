@@ -1,0 +1,166 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "Extraction prompt — v1 vs v2 on Gemini 2.5 Flash"
+
+prompts:
+  - id: file://prompts/extraction-v1.txt
+    label: v1-verbose
+  - id: file://../internal/prompts/extraction.txt
+    label: v2-production
+
+providers:
+  - id: google:gemini-2.5-flash
+    config:
+      apiKey: env:GEMINI_API_KEY
+
+defaultTest:
+  assert:
+    - type: is-json
+      label: "valid JSON"
+    - type: javascript
+      label: "has required keys"
+      value: |
+        const d = JSON.parse(output);
+        return 'extracted_data' in d && 'confidence' in d && 'reasoning' in d;
+
+tests:
+  - description: "Company page — extract typed fields correctly"
+    vars:
+      entity_context: '"Linear" (context: project management software company)'
+      entity: "Linear"
+      columns: |
+        - employee_count [type: number]
+        - founded_year [type: number]
+        - headquarters [type: string]
+        - is_public [type: boolean]
+      content: |
+        Linear – The Issue Tracker Built for High-Performance Teams
+
+        About Linear
+        Linear was founded in 2019 by Karri Saarinen, Tuomas Artman, and Jori Lallo. The company is headquartered in San Francisco, California.
+
+        Linear is a privately held company with approximately 60 employees as of 2024.
+
+        Linear's software is used by over 10,000 companies worldwide including Vercel, Raycast, and Loom.
+    assert:
+      - type: javascript
+        label: "founded_year is number 2019"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.founded_year === 2019;
+      - type: javascript
+        label: "employee_count is a number"
+        value: |
+          const d = JSON.parse(output);
+          const ec = d.extracted_data?.employee_count;
+          return ec === undefined || typeof ec === 'number';
+      - type: javascript
+        label: "is_public is boolean false"
+        value: |
+          const d = JSON.parse(output);
+          const ip = d.extracted_data?.is_public;
+          return ip === undefined || ip === false;
+      - type: javascript
+        label: "all confidence scores in range"
+        value: |
+          const d = JSON.parse(output);
+          return Object.values(d.confidence || {}).every(c => c.score >= 0 && c.score <= 1 && typeof c.reason === 'string');
+
+  - description: "Person page — do not extract company data as person data"
+    vars:
+      entity_context: '"Patrick Collison"'
+      entity: "Patrick Collison"
+      columns: |
+        - net_worth_usd [type: number]
+        - birth_year [type: number]
+        - nationality [type: string]
+      content: |
+        Patrick Collison - Wikipedia
+
+        Patrick Collison (born September 9, 1988) is an Irish entrepreneur and the co-founder and CEO of Stripe. He is a citizen of Ireland and the United States.
+
+        Stripe, the payments company he co-founded with his brother John, was valued at $65 billion as of 2023 and processes hundreds of billions of dollars annually. Patrick's estimated net worth is $9.5 billion.
+
+        John Collison, his brother and co-founder, was born in 1990 and also serves as president of Stripe.
+    assert:
+      - type: javascript
+        label: "birth_year is 1988, not John's 1990"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.birth_year === 1988;
+      - type: javascript
+        label: "net_worth is Patrick's (~9.5B), not Stripe's valuation (65B)"
+        value: |
+          const d = JSON.parse(output);
+          const nw = d.extracted_data?.net_worth_usd;
+          if (nw === undefined) return true;
+          return nw < 20000000000;
+      - type: javascript
+        label: "nationality is a string"
+        value: |
+          const d = JSON.parse(output);
+          const nat = d.extracted_data?.nationality;
+          return nat === undefined || typeof nat === 'string';
+      - type: llm-rubric
+        label: "entity disambiguation"
+        value: "Data extracted is about Patrick Collison specifically. Stripe's $65B valuation is not confused with Patrick's net worth. John Collison's birth year (1990) is not used instead of Patrick's (1988)."
+
+  - description: "Missing fields — must omit not hallucinate"
+    vars:
+      entity_context: '"Figma"'
+      entity: "Figma"
+      columns: |
+        - employee_count [type: number]
+        - annual_revenue_usd [type: number]
+        - ipo_date [type: date]
+      content: |
+        Figma is a collaborative interface design tool. Figma was acquired by Adobe in 2022 for $20 billion, but the deal was later terminated in 2023.
+
+        The company was founded by Dylan Field and Evan Wallace. Figma has raised over $333 million in venture funding and has offices in San Francisco.
+    assert:
+      - type: javascript
+        label: "ipo_date is omitted since Figma has not IPO'd"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.ipo_date === undefined || d.extracted_data?.ipo_date === null;
+      - type: javascript
+        label: "does not hallucinate annual_revenue from funding amount"
+        value: |
+          const d = JSON.parse(output);
+          const rev = d.extracted_data?.annual_revenue_usd;
+          // $333M is funding, not revenue — should not appear as annual revenue
+          return rev === undefined || (rev !== 333000000 && rev !== 20000000000);
+      - type: llm-rubric
+        label: "hallucination prevention"
+        value: "The model does not invent values for fields not stated in the content. ipo_date is absent since Figma is not public. Annual revenue is not fabricated from the $333M funding figure or $20B acquisition price."
+
+  - description: "Type coercion — correct types from natural language"
+    vars:
+      entity_context: '"Vercel"'
+      entity: "Vercel"
+      columns: |
+        - founded_year [type: number]
+        - is_open_source [type: boolean]
+        - latest_funding_date [type: date]
+      content: |
+        Vercel was founded in 2015 by Guillermo Rauch. The company's core product, Next.js, is open source and available on GitHub.
+
+        Vercel closed a $150 million Series D round in May 2022, valuing the company at $2.5 billion.
+    assert:
+      - type: javascript
+        label: "founded_year is number 2015 not string"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.founded_year === 2015;
+      - type: javascript
+        label: "is_open_source is boolean true not string"
+        value: |
+          const d = JSON.parse(output);
+          const ios = d.extracted_data?.is_open_source;
+          return ios === undefined || ios === true;
+      - type: javascript
+        label: "latest_funding_date is ISO date string"
+        value: |
+          const d = JSON.parse(output);
+          const fd = d.extracted_data?.latest_funding_date;
+          if (fd === undefined) return true;
+          return /^\d{4}-\d{2}-\d{2}$/.test(fd);

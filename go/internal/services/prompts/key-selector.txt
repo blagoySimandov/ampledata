@@ -1,0 +1,20 @@
+You are analyzing a CSV file to select the best column to use as a unique identifier (key) for data enrichment.
+
+Available CSV Headers:
+{{headers}}
+{{columns_info}}
+
+Your task is to select the BEST column to use as the key for enrichment. Consider:
+1. Uniqueness: The column should contain unique identifiers for each row
+2. Descriptiveness: The column should be descriptive enough to use for web search and enrichment
+3. Common key patterns: Look for columns like "id", "email", "company_name", "organization", "person_name", "domain", etc.
+4. Avoid generic columns: Don't select columns like "date", "status", "score", "index", etc.
+5. Context from metadata: If column metadata is provided, use it to understand which columns are being enriched (these are likely NOT the key)
+
+Respond ONLY with a JSON object in the following format:
+{
+  "selected_key": "column_name_here",
+  "reasoning": "Brief explanation of why this column was selected"
+}
+
+Do not include any text before or after the JSON object.
