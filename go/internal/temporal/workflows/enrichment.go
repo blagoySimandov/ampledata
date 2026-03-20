@@ -26,13 +26,14 @@ type EnrichmentWorkflowInput struct {
 }
 
 type EnrichmentWorkflowOutput struct {
-	RowKey         string
-	ExtractedData  map[string]interface{}
-	Confidence     map[string]*models.FieldConfidenceInfo
-	Sources        []string
-	Success        bool
-	Error          string
-	IterationCount int
+	RowKey            string
+	ExtractedData     map[string]interface{}
+	Confidence        map[string]*models.FieldConfidenceInfo
+	Sources           []string
+	ExtractionHistory []*models.ExtractionHistoryEntry
+	Success           bool
+	Error             string
+	IterationCount    int
 }
 
 func mergeSources(serpSources, crawlSources []string) []string {
@@ -250,6 +251,16 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		enrichedData.Sources = allSources
 	}
 
+	// Always record this attempt in the extraction history, regardless of confidence
+	historyEntry := &models.ExtractionHistoryEntry{
+		AttemptNumber: input.RetryCount + 1,
+		ExtractedData: extractOutput.ExtractedData,
+		Confidence:    extractOutput.Confidence,
+		Sources:       allSources,
+		Reasoning:     extractOutput.Reasoning,
+	}
+	enrichedData.ExtractionHistory = []*models.ExtractionHistoryEntry{historyEntry}
+
 	workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
 		JobID:  input.JobID,
 		RowKey: input.RowKey,
@@ -260,6 +271,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	output.ExtractedData = extractOutput.ExtractedData
 	output.Confidence = extractOutput.Confidence
 	output.Sources = allSources
+	output.ExtractionHistory = []*models.ExtractionHistoryEntry{historyEntry}
 	output.Success = true
 
 	var feedbackOutput activities.FeedbackAnalysisOutput
@@ -336,6 +348,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		// This shouldn't usually happen since the feedback loop generates different query
 		// patterns specifically to find better sources for the missing/low-confidence columns.
 		output.Sources = mergeSources(output.Sources, retryOutput.Sources)
+		output.ExtractionHistory = append(output.ExtractionHistory, retryOutput.ExtractionHistory...)
 
 		output.IterationCount = retryOutput.IterationCount
 
