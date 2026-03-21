@@ -4,25 +4,32 @@ description: "Decision maker — v1 vs v2 on Gemini 2.5 Flash"
 prompts:
   - id: file://prompts/decision-maker-v1.txt
     label: v1-verbose
-  - id: file://../internal/prompts/decision-maker.txt
+  - id: file://../internal/services/prompts/decision-maker.txt
     label: v2-production
 
 providers:
   - id: google:gemini-2.5-flash
 
 defaultTest:
+  options:
+    provider: openai:gpt-5.4
+  vars:
+    current_date: "2026-03-20"
   assert:
-    - type: is-json
-      label: "valid JSON"
+    - type: javascript
+      label: "valid JSON (with or without markdown fences)"
+      value: |
+        const stripped = output.replace(/^```(?:json)?\s*/,'').replace(/```\s*$/,'');
+        try { JSON.parse(stripped); return true; } catch { return false; }
     - type: javascript
       label: "urls_to_crawl is an array"
       value: |
-        const d = JSON.parse(output);
+        const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
         return Array.isArray(d.urls_to_crawl);
     - type: javascript
       label: "no extra top-level keys"
       value: |
-        const d = JSON.parse(output);
+        const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
         const allowed = new Set(['urls_to_crawl','extracted_data','extracted_confidence','source_urls','reasoning']);
         return Object.keys(d).every(k => allowed.has(k));
 
@@ -33,38 +40,73 @@ tests:
       entity: "Stripe"
       columns: "- employee_count [type: number]\n- founded_year [type: number]\n- headquarters [type: string]"
       search_results: |
-        Position 1: Stripe - Wikipedia
-        URL: https://en.wikipedia.org/wiki/Stripe_(company)
-        Snippet: Stripe, Inc. is an Irish-American financial services company. It was founded in 2010 by brothers Patrick and John Collison. The company is headquartered in South San Francisco, California and has approximately 8,000 employees.
+        Position 1: Stripe, Inc.
+        URL: https://en.wikipedia.org/wiki/Stripe,_Inc.
+        Snippet: History · Irish entrepreneur brothers John and Patrick Collison founded Stripe in Palo Alto, California, in 2010, and serve as the company's president and CEO, ...
         ---
-        Position 2: Stripe - Crunchbase
+        Position 2: Stripe 2026 Company Profile: Valuation, Funding & Investors
+        URL: https://pitchbook.com/profiles/company/54782-29
+        Snippet: Stripe FAQs. When was Stripe founded? Stripe was founded in 2010. Where is Stripe headquartered?
+        ---
+        Position 3: Stripe - Crunchbase Company Profile & Funding
         URL: https://www.crunchbase.com/organization/stripe
-        Snippet: Stripe was founded in 2010. It is headquartered in San Francisco, CA.
+        Snippet: Where is Stripe's headquarters? Stripe is located in South San Francisco, California, United States. Who invested in Stripe? Stripe has 66 investors ...
+        ---
+        Position 4: Stripe - Overview, News & Similar companies
+        URL: https://www.zoominfo.com/c/susser-holdings-corp/352810353
+        Snippet: Stripe, founded in 2010, is a pivotal technology company building essential economic infrastructure for the internet.
+        ---
+        Position 5: Stripe | Company Overview & News
+        URL: https://www.forbes.com/companies/stripe/
+        Date: Feb 19, 2026
+        Snippet: Founded: 2010 ; Headquarters: San Francisco, California ; Country/Territory: United States ; CEO: Patrick Collison ; Employees: 8,000 ...
+        ---
+        Position 6: Stripe
+        URL: https://www.linkedin.com/company/stripe
+        Date: Mar 27, 2025
+        Snippet: Headquartered in San Francisco and Dublin, the company aims to increase the GDP of the internet.
+        ---
+        Position 7: What is Brief History of Stripe Company?
+        URL: https://matrixbcg.com/blogs/brief-history/stripe
+        Date: Mar 11, 2026
+        Snippet: Founded by Patrick and John Collison in 2010, it aimed to increase the GDP of the internet by embedding financial infrastructure into software.
+        ---
+        Position 8: Stripe, Inc. Company Profile | South San Francisco, California
+        URL: https://www.dnb.com/business-directory/company-profiles.stripe_inc.30c5cd366040d862afbbb8732644b4f3.html
+        Snippet: Stripe, Inc. has employees. Who is Stripe, Inc.'s key principal? Stripe, Inc.'s key principal is Patrick Collison. What year was Stripe, Inc. started?
+        ---
+        Position 9: Stripe | Company Profile - Vault
+        URL: https://vault.com/company-profiles/financial-technology/stripe
+        Snippet: 5,001-10,000 Employees. About the Company. Stripe was founded by brothers John and Patrick Collison in 2009.
+        ---
+        Position 10: Stripe Headquarters - Office Location & Address
+        URL: https://salestools.io/en/report/stripe-headquarters
+        Snippet: Stripe headquarters is located at 510 Townsend St, San Francisco, CA 94103. Founded in 2010 with 8000+ employees.
         ---
       people_also_ask: ""
       max_urls: "3"
     assert:
       - type: javascript
-        label: "extracts founded_year as number 2010"
+        label: "founded_year is a number"
         value: |
-          const d = JSON.parse(output);
-          return d.extracted_data?.founded_year === 2010;
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          return typeof d.extracted_data?.founded_year === 'number';
       - type: javascript
         label: "employee_count is a number not a string"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           const ec = d.extracted_data?.employee_count;
           return ec === undefined || typeof ec === 'number';
       - type: javascript
         label: "confidence scores are 0-1"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           const conf = d.extracted_confidence || {};
           return Object.values(conf).every(c => c.score >= 0 && c.score <= 1);
       - type: javascript
         label: "source_urls populated for extracted data"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           if (d.extracted_data && Object.keys(d.extracted_data).length > 0) {
             return Array.isArray(d.source_urls) && d.source_urls.length > 0;
           }
@@ -76,17 +118,48 @@ tests:
       entity: "Anthropic"
       columns: "- logo_url [type: string]\n- ceo_picture_url [type: string]"
       search_results: |
-        Position 1: Anthropic - Official Website
-        URL: https://www.anthropic.com
-        Snippet: Anthropic is an AI safety company working to build reliable, interpretable, and steerable AI systems.
+        Position 1: Home \ Anthropic
+        URL: https://www.anthropic.com/
+        Snippet: Anthropic is an AI safety and research company that's working to build reliable, interpretable, and steerable AI systems.
         ---
-        Position 2: Anthropic CEO Dario Amodei - Getty Images
-        URL: https://www.gettyimages.com/photos/dario-amodei
-        Snippet: Browse 245 Dario Amodei photos and images available.
+        Position 2: The Making Of Anthropic CEO Dario Amodei
+        URL: https://kantrowitz.medium.com/the-making-of-anthropic-ceo-dario-amodei-449777529dd6
+        Date: Jul 29, 2025
+        Snippet: Dario Amodei doesn't hesitate when I ask what's gotten into him. The Anthropic CEO has spent 2025 at war, feuding with industry counterparts ...
         ---
-        Position 3: Anthropic Press Kit
-        URL: https://www.anthropic.com/press
-        Snippet: Download Anthropic logos, brand assets and photos of our leadership team.
+        Position 3: Anthropic Ai Company Logo And Office
+        URL: https://www.instagram.com/popular/anthropic-ai-company-logo-and-office/
+        Date: Feb 26, 2026
+        Snippet: Anthropic CEO Dario Amodei predicts that AI models will be able to do the work of a PhD researcher within 18 months.
+        ---
+        Position 4: Inspiration behind Anthropic's logo
+        URL: https://www.reddit.com/r/Anthropic/comments/1qzop13/inspiration_behind_anthropics_logo/
+        Date: Feb 8, 2026
+        Snippet: Just a fun observation. While researching proto-cuneiform for a logo design, I came across the symbol in the image.
+        ---
+        Position 5: Dario Amodei
+        URL: https://en.wikipedia.org/wiki/Dario_Amodei
+        Snippet: Dario Amodei (born 1983) is an American artificial intelligence (AI) researcher and entrepreneur. In 2021, he and his sister Daniela Amodei co-founded Anthropic ...
+        ---
+        Position 6: Company \ Anthropic
+        URL: https://www.anthropic.com/company
+        Snippet: Making AI systems you can rely on. Anthropic is an AI safety and research company. We build reliable, interpretable, and steerable AI systems.
+        ---
+        Position 7: Anthropic Logo On Smartphone Screen Claude Stock
+        URL: https://www.shutterstock.com/image-photo/anthropic-logo-on-smartphone-screen-claude-2635155591
+        Snippet: Anthropic logo on smartphone screen.
+        ---
+        Position 8: 659 Anthropic Photos & High Res Pictures
+        URL: https://www.gettyimages.com/photos/anthropic
+        Snippet: The Anthropic AI logo is displayed on a mobile phone screen in this photo illustration in Brussels, Belgium, on February 24, 2026.
+        ---
+        Position 9: Anthropic Claude Ai Branding Logo
+        URL: https://www.instagram.com/popular/anthropic-claude-ai-branding-logo/
+        Snippet: Watch short videos about anthropic claude ai branding logo from people around the world.
+        ---
+        Position 10: Anthropic
+        URL: https://www.linkedin.com/company/anthropicresearch
+        Snippet: Anthropic is an AI safety and research company working to build reliable, interpretable, and steerable AI systems.
         ---
       people_also_ask: ""
       max_urls: "3"
@@ -94,12 +167,12 @@ tests:
       - type: javascript
         label: "urls_to_crawl is not empty when data is missing"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           return d.urls_to_crawl.length > 0;
       - type: javascript
-        label: "anthropic.com or press page selected"
+        label: "anthropic.com selected for crawling"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           return d.urls_to_crawl.some(u => u.includes('anthropic.com'));
 
   - description: "Entity disambiguation — person vs company"
@@ -108,35 +181,68 @@ tests:
       entity: "Elon Musk"
       columns: "- net_worth_usd [type: number]\n- birth_year [type: number]"
       search_results: |
-        Position 1: Elon Musk - Wikipedia
-        URL: https://en.wikipedia.org/wiki/Elon_Musk
-        Snippet: Elon Musk (born June 28, 1971) is a business magnate and investor. As of 2025, his estimated net worth is $200 billion.
+        Position 1: Elon Musk - Forbes
+        URL: https://www.forbes.com/profile/elon-musk/
+        Date: Mar 10, 2026
+        Snippet: Richest In Tech (2017) ; Age: 54 ; Source of Wealth: Tesla, SpaceX, Self Made ; Residence: Austin, Texas.
         ---
-        Position 2: Tesla Q3 2025 Earnings
-        URL: https://ir.tesla.com/quarterly-earnings
-        Snippet: Tesla reported revenue of $25.18 billion in Q3 2025, up 8% year over year.
+        Position 2: Elon Musk's wealth and milestones timeline - Facebook
+        URL: https://www.facebook.com/groups/1090131518247378/posts/1926050801322108/
+        Date: Feb 11, 2026
+        Snippet: ELON MUSK: 54 YEARS TO $852 BILLION Timeline of Wealth & Milestones --- CHILDHOOD & EARLY YEARS Age 0 (1971) — Born in South Africa.
         ---
-        Position 3: SpaceX Valuation
-        URL: https://www.wsj.com/spacex-valuation
-        Snippet: SpaceX was valued at $350 billion in its latest funding round.
+        Position 3: Wealth of Elon Musk - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Wealth_of_Elon_Musk
+        Snippet: At the start of 2020, Musk had a net worth of $27 billion. By the end of the year his net worth had increased by $150 billion, mostly driven by his ...
         ---
-      people_also_ask: "Q: How much is Elon Musk worth? A: Approximately $200 billion as of 2025."
+        Position 4: Elon Musk's Net Worth Over the Years
+        URL: https://www.threads.com/@niccovibes/post/DCRf9MCND-4
+        Date: Nov 12, 2024
+        Snippet: 1971 — $0 ; 1995 — $28k (Zip2 Startup) ; 1999 — $22M (PayPal Sale) ; 2002 — $180M ; 2008 — $800M.
+        ---
+        Position 5: Elon Musk biography, children, net worth and quotes - Toolshero
+        URL: https://www.toolshero.com/toolsheroes/elon-musk/
+        Snippet: Elon Reeve Musk was born on June 28, 1971, in Pretoria, South Africa. He is the son of a Canadian model (Maye Musk) and a South African electromechanical engineer.
+        ---
+        Position 6: What is Elon Musk's net worth? A timeline of the billionaire's wealth
+        URL: https://www.indy100.com/news/elon-musk-wealth-timeline-trillionaire-2674851406
+        Date: Jan 6, 2026
+        Snippet: On 15 December, Musk reached an estimated net worth of $677 billion — a surge largely driven by an increase in the valuation of his space company.
+        ---
+        Position 7: Who is Elon Musk and what is his net worth? - BBC
+        URL: https://www.bbc.com/news/articles/c0r1975ded7o
+        Date: Feb 3, 2026
+        Snippet: In October 2025, he became the first person to achieve a net worth of more than half a trillion dollars, according to Forbes.
+        ---
+        Position 8: Elon Musk - Age, Bio, Family | Famous Birthdays
+        URL: https://www.famousbirthdays.com/people/elon-musk.html
+        Snippet: Birth Sign Cancer. Birthplace Pretoria, South Africa. Age 54. In January 2021, he was the richest person in the world with a net worth of $188 billion.
+        ---
+        Position 9: Elon Musk | SpaceX, Tesla, Twitter, X, Trump, DOGE, & Facts
+        URL: https://www.britannica.com/money/Elon-Musk
+        Snippet: Elon Musk (born June 28, 1971, Pretoria, South Africa) is a South African-born entrepreneur. Musk is the world's richest person, with a net worth of $393 billion, as of 2025.
+        ---
+      people_also_ask: "Q: What did Elon Musk sell when he was 12 years old? A: Blastar was a game written by Elon Musk in 1984 (at the age of 12). The source code was published in a magazine and he received $500 for it."
       max_urls: "3"
     assert:
       - type: javascript
         label: "birth_year is 1971 as a number"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           return d.extracted_data?.birth_year === 1971;
       - type: javascript
-        label: "does not extract Tesla revenue as Elon's net worth"
+        label: "does not confuse company revenue with personal net worth"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           const nw = d.extracted_data?.net_worth_usd;
           return nw !== 25180000000 && nw !== 25000000000;
       - type: llm-rubric
         label: "entity disambiguation quality"
-        value: "The extracted data is about Elon Musk the person, not Tesla or SpaceX. Tesla's revenue ($25B) is not confused with Elon's net worth."
+        value: |
+          The extracted data is about Elon Musk the person. Evaluate three things:
+          1. Correctness: net_worth_usd either reflects his personal fortune (~$852B as of Feb 2026 per Forbes) or is omitted in favour of crawling — not a company revenue figure.
+          2. URL quality: if urls_to_crawl is populated, it should prefer authoritative sources (forbes.com profile, en.wikipedia.org/wiki/Wealth_of_Elon_Musk) over SEO aggregators or social media posts.
+          3. Confidence calibration: if net_worth_usd is extracted from a snippet that is more than 6 months old relative to today (2026-03-20), the confidence score should be ≤0.7 to reflect staleness.
 
   - description: "Mixed — some data in snippets, some needs crawling"
     vars:
@@ -144,59 +250,140 @@ tests:
       entity: "OpenAI"
       columns: "- employee_count [type: number]\n- ceo [type: string]\n- logo_url [type: string]"
       search_results: |
-        Position 1: OpenAI - Wikipedia
-        URL: https://en.wikipedia.org/wiki/OpenAI
-        Snippet: OpenAI is an American artificial intelligence company. As of 2024, OpenAI has approximately 1,800 employees. The company is led by CEO Sam Altman.
+        Position 1: OpenAI staffers reportedly 'taken aback' by 'ominous' logo rebranding
+        URL: https://www.yahoo.com/news/openai-staffers-reportedly-taken-aback-by-ominous-logo-rebranding-160017936.html
+        Date: Sep 21, 2024
+        Snippet: OpenAI is changing its logo to a large black "O," Fortune says, and the company's own staff members reportedly find it ominous.
         ---
-        Position 2: OpenAI Brand Assets
-        URL: https://openai.com/brand
-        Snippet: Download OpenAI's official logos, icons, and brand guidelines.
+        Position 2: OpenAI Is Testing a New Logo. Its Employees Hate It - Inc. Magazine
+        URL: https://www.inc.com/kit-eaton/openai-is-testing-a-new-logo-its-employees-hate-it.html
+        Date: Sep 23, 2024
+        Snippet: In a planned rebrand, OpenAI considers using a big O to symbolize the future of AI tech.
         ---
-      people_also_ask: ""
+        Position 3: OpenAI's 'Ominous' New Logo Leaves Staffers Reportedly Stunned
+        URL: https://medium.com/design-bootcamp/openais-ominous-new-logo-leaves-staffers-reportedly-stunned-75f2162642c2
+        Snippet: It will be replaced by a large black "O" or a simple ring, a design that many employees reportedly found uninspiring, even foreboding.
+        ---
+        Position 4: OpenAI's newest creation is raising shock, alarm, and horror among staffers
+        URL: https://fortune.com/2024/09/20/openai-staffers-unhappy-new-logo-design-ominous/
+        Date: Sep 20, 2024
+        Snippet: The new logo presented was a simple, large black "O," easily interpreted as a ring or a zero, as one of the sources described it.
+        ---
+        Position 5: OpenAI Staff Upset by Company's Horrendous New Logo - Futurism
+        URL: https://futurism.com/the-byte/openai-staff-upset-new-logo
+        Date: Sep 23, 2024
+        Snippet: The new logo is a dramatic departure from OpenAI's iconic floral symbol, which is meant to evoke precision, potential and optimism.
+        ---
+        Position 6: Design Guidelines - OpenAI
+        URL: https://openai.com/brand/
+        Snippet: Ensure each logo is displayed at an appropriate size, uses its approved color format, and is not distorted or altered in any way. All co-branded materials must ...
+        ---
+        Position 7: OpenAI staff 'taken aback' by new 'ominous' logo rebranding
+        URL: https://www.storyboard18.com/digital/openai-staff-taken-aback-by-new-ominous-logo-rebranding-42896.htm
+        Date: Sep 23, 2024
+        Snippet: Reported internal reactions reveal unease over OpenAI's new logo, described as a stark departure from its previous design.
+        ---
+        Position 8: Why concerns about OpenAI's new logo are about more than design
+        URL: https://www.fastcompany.com/91200958/concerns-openai-new-circle-logo-more-than-design
+        Date: Oct 2, 2024
+        Snippet: OpenAI employees were reportedly "taken aback" by the company's plans to introduce the black circle or letter "O" as its new logo.
+        ---
+        Position 9: The Evolution of OpenAI's Logo - LinkedIn
+        URL: https://www.linkedin.com/pulse/evolution-openais-logo-siraj-ahmad-4wvzc
+        Snippet: The OpenAI in-house team under leadership from Veit Moeller and Shannon Jager designed a modified brand identity after OpenAI CEO Sam Altman ...
+        ---
+        Position 10: OpenAI unveils its first ever rebrand | Wallpaper*
+        URL: https://www.wallpaper.com/tech/openai-has-undergone-its-first-ever-rebrand-giving-fresh-life-to-chatgpt-interactions
+        Date: Feb 4, 2025
+        Snippet: A new typeface, word mark, symbol and palette underpin all the ways in which OpenAI's technology interacts with the real world.
+        ---
+      people_also_ask: "Q: Who owns the other 51% of OpenAI? A: The OpenAI Foundation holds a 26% stake in the PBC, while Microsoft holds a 27% stake and the remaining 47% is owned by employees and other investors."
       max_urls: "3"
     assert:
       - type: javascript
-        label: "extracts employee_count and ceo from snippets"
-        value: |
-          const d = JSON.parse(output);
-          return d.extracted_data?.ceo !== undefined && d.extracted_data?.employee_count !== undefined;
-      - type: javascript
         label: "ceo is a string"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           return typeof d.extracted_data?.ceo === 'string';
       - type: javascript
-        label: "selects openai.com/brand for logo_url"
+        label: "selects openai.com for logo_url crawl"
         value: |
-          const d = JSON.parse(output);
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
           return d.urls_to_crawl.some(u => u.includes('openai.com'));
 
-  - description: "Approximate values — must not be converted"
+  - description: "Approximate values — must not be fabricated"
     vars:
       entity_context: '"Notion"'
       entity: "Notion"
       columns: "- user_count [type: number]\n- founded_year [type: number]"
       search_results: |
-        Position 1: Notion - About
-        URL: https://www.notion.so/about
-        Snippet: Notion was founded in 2013 and now serves 30 million+ users worldwide.
+        Position 1: 100 Million of You - Notion
+        URL: https://www.notion.com/blog/100-million-of-you
+        Date: Sep 3, 2024
+        Snippet: Last month, Notion passed 100M users! I found the photo I took after we reached 1,000 users. And I still recall the day when we passed 1M in ...
         ---
-      people_also_ask: ""
+        Position 2: How Notion Grew to 20 Million Users with 95% Organic Growth
+        URL: https://medium.com/@ehoneahobed/how-notion-grew-to-20-million-users-with-95-organic-growth-and-why-their-boldest-move-almost-7b0031de15d1
+        Date: Aug 4, 2025
+        Snippet: How Notion Grew to 20 Million Users with 95% Organic Growth (And Why Their Boldest Move Almost Seemed Like Business Suicide).
+        ---
+        Position 3: Notion Statistics 2026: Company Information | Productivity Apps
+        URL: https://toolfinder.com/lists/notion-in-statistics
+        Date: Mar 12, 2026
+        Snippet: Notion has over 35M users worldwide and growing and much more statistics behind productivity software's biggest releases. Here's the numbers.
+        ---
+        Position 4: Inside Notion's 1M to 100M Users Viral Growth Blueprint - YouTube
+        URL: https://www.youtube.com/watch?v=gp7mbHwKtIA
+        Date: Aug 13, 2025
+        Snippet: While 99% of SaaS companies burn millions on ads, Notion cracked the code to 240% growth with almost zero paid acquisition.
+        ---
+        Position 5: 10 Notion Statistics (2025): Revenue, Valuation, Users, Investors
+        URL: https://taptwicedigital.com/stats/notion
+        Date: May 17, 2025
+        Snippet: Today, Notion has over 100 million users worldwide, including individuals, startups, and Fortune 500 companies.
+        ---
+        Position 6: Notion at 100M Users: Why Viral Products Don't Automatically Become Enterprise Systems
+        URL: https://www.reddit.com/r/SaaS/comments/1pav9cs/notion_at_100m_users_why_viral_products_dont/
+        Date: Nov 30, 2025
+        Snippet: Notion at 100M Users: Why Viral Products Don't Automatically Become Enterprise Systems. B2B SaaS (Enterprise).
+        ---
+        Position 7: Inside Notion 100 million users - YouTube
+        URL: https://www.youtube.com/watch?v=gz9IoQ_7DQg
+        Date: Jun 24, 2024
+        Snippet: Behind the scenes of @Notion one of the fastest growing productivity app, I interview the COO and cofounder Akshay Kothari, I tour the whole ...
+        ---
+        Position 8: Notion User Thresholds: Databases, Activation, and Storage - LinkedIn
+        URL: https://www.linkedin.com/posts/mark-ryan-20717636_notion-has-100-million-users-but-most-of-activity-7421935044560244736-DdEO
+        Date: Jan 27, 2026
+        Snippet: Notion has 100 million users, but most of them never make it past using it as a notes app. The ones that stick around and pay? They all ...
+        ---
+        Position 9: Notion has 100 Million Users as of 2026 + More Statistics
+        URL: https://super.so/blog/notion-stats
+        Snippet: Notion has revolutionized the way people organize their lives and businesses, crossing the 100 million users milestone as of 2024.
+        ---
+        Position 10: Notion Statistics: Growth, Revenue & More (2024) - Simple.ink
+        URL: https://www.simple.ink/blog/notion-stats
+        Date: Dec 2, 2024
+        Snippet: At the moment, Notion has over 30 million users, out of which 4 million are subscribed (paid) users. notion has 30 million users in 2022.
+        ---
+        Position 11: Notion (productivity software) - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Notion_(software)
+        Snippet: Notion is a productivity and note-taking web application developed by Notion Labs Inc. The app was launched in 2016 by Ivan Zhao and Simon Last.
+        ---
+      people_also_ask: |
+        Q: Why are people leaving Notion? A: The biggest reason why people seem to be leaving Notion for other tools is how complex it can be to navigate.
+        Q: How does Notion handle 200 billion notes without crashing? A: Instead of one massive database, Notion divided its data across 32 separate database instances, each hosting 15 shards — a total of 480 logical shards.
       max_urls: "3"
     assert:
       - type: javascript
-        label: "founded_year extracted as 2013"
+        label: "founded_year is 2016 from Wikipedia"
         value: |
-          const d = JSON.parse(output);
-          return d.extracted_data?.founded_year === 2013;
-      - type: javascript
-        label: "user_count not fabricated from '30 million+'"
-        value: |
-          const d = JSON.parse(output);
-          const uc = d.extracted_data?.user_count;
-          // Either omitted (acceptable) or a round/approximate number — not 30000001
-          if (uc === undefined) return true;
-          return uc === 30000000 || uc > 29000000;
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          return d.extracted_data?.founded_year === 2016;
       - type: llm-rubric
-        label: "handles approximate values correctly"
-        value: "The model does not fabricate a precise number from '30 million+'. It either omits user_count or represents it as approximately 30000000, and explains the approximation in confidence reasoning."
+        label: "handles conflicting user count data correctly"
+        value: |
+          The snippets contain conflicting user counts across different dates (20M in 2022, 100M in 2024, 35M in Mar 2026). Evaluate three things:
+          1. Recency: the model should prefer the most recently dated snippet (Mar 12, 2026 from toolfinder.com) or acknowledge the conflict and defer to crawling — not blindly pick an older figure.
+          2. URL quality: if urls_to_crawl is populated for user_count, it should prefer notion.com or wikipedia.org over YouTube videos, Reddit posts, or SEO aggregator blogs.
+          3. Confidence calibration: if a figure older than 6 months relative to today (2026-03-20) is used, the confidence score for user_count should be ≤0.7. A figure from a secondary/aggregator source should score no higher than 0.8 even if recent.
