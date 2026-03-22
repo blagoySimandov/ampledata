@@ -4,7 +4,7 @@ PROMPTS := decision-maker extraction
 
 # Current versions
 decision-maker_VERSION := v2-clear
-extraction_VERSION := v1
+extraction_VERSION := v2-clear
 
 define PROMPT_RULES
 promote-$(1):
