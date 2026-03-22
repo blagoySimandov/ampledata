@@ -2,17 +2,22 @@
 description: "Extraction prompt — v1 vs v2 on Gemini 2.5 Flash"
 
 prompts:
-  - id: file://prompts/extraction-v1.txt
+  - id: file://prompts/extraction-v2-clear.txt
+    label: v2-clear
+  - id: file://../internal/services/prompts/extraction.txt
     label: v1-verbose
-  - id: file://../internal/prompts/extraction.txt
-    label: v2-production
 
 providers:
   - id: google:gemini-2.5-flash
-    config:
-      apiKey: env:GEMINI_API_KEY
 
 defaultTest:
+  vars:
+    current_date: "2026-03-22"
+  options:
+    provider:
+      id: openai:gpt-5.4
+    transform: |
+      return output.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
   assert:
     - type: is-json
       label: "valid JSON"
@@ -21,8 +26,27 @@ defaultTest:
       value: |
         const d = JSON.parse(output);
         return 'extracted_data' in d && 'confidence' in d && 'reasoning' in d;
+    - type: javascript
+      label: "extracted_data is a plain object"
+      value: |
+        const d = JSON.parse(output);
+        return typeof d.extracted_data === 'object' && d.extracted_data !== null && !Array.isArray(d.extracted_data);
+    - type: javascript
+      label: "confidence is keyed by column name with score+reason"
+      value: |
+        const d = JSON.parse(output);
+        const conf = d.confidence;
+        if (typeof conf !== 'object' || conf === null || Array.isArray(conf)) return false;
+        return Object.values(conf).every(c =>
+          typeof c === 'object' && c !== null &&
+          typeof c.score === 'number' && c.score >= 0 && c.score <= 1 &&
+          typeof c.reason === 'string'
+        );
 
 tests:
+  # ──────────────────────────────────────────────
+  # 1. Happy path — extract typed fields correctly
+  # ──────────────────────────────────────────────
   - description: "Company page — extract typed fields correctly"
     vars:
       entity_context: '"Linear" (context: project management software company)'
@@ -48,23 +72,26 @@ tests:
           const d = JSON.parse(output);
           return d.extracted_data?.founded_year === 2019;
       - type: javascript
-        label: "employee_count is a number"
+        label: "employee_count is present and is a number"
         value: |
           const d = JSON.parse(output);
           const ec = d.extracted_data?.employee_count;
-          return ec === undefined || typeof ec === 'number';
+          return typeof ec === 'number' && ec > 0;
+      - type: javascript
+        label: "headquarters is present and mentions San Francisco"
+        value: |
+          const d = JSON.parse(output);
+          const hq = d.extracted_data?.headquarters;
+          return typeof hq === 'string' && hq.toLowerCase().includes('san francisco');
       - type: javascript
         label: "is_public is boolean false"
         value: |
           const d = JSON.parse(output);
-          const ip = d.extracted_data?.is_public;
-          return ip === undefined || ip === false;
-      - type: javascript
-        label: "all confidence scores in range"
-        value: |
-          const d = JSON.parse(output);
-          return Object.values(d.confidence || {}).every(c => c.score >= 0 && c.score <= 1 && typeof c.reason === 'string');
+          return d.extracted_data?.is_public === false;
 
+  # ──────────────────────────────────────────────
+  # 2. Entity disambiguation — person vs sibling vs company
+  # ──────────────────────────────────────────────
   - description: "Person page — do not extract company data as person data"
     vars:
       entity_context: '"Patrick Collison"'
@@ -92,18 +119,20 @@ tests:
         value: |
           const d = JSON.parse(output);
           const nw = d.extracted_data?.net_worth_usd;
-          if (nw === undefined) return true;
-          return nw < 20000000000;
+          return typeof nw === 'number' && nw >= 9000000000 && nw <= 10000000000;
       - type: javascript
-        label: "nationality is a string"
+        label: "nationality is a non-empty string"
         value: |
           const d = JSON.parse(output);
           const nat = d.extracted_data?.nationality;
-          return nat === undefined || typeof nat === 'string';
+          return typeof nat === 'string' && nat.length > 0;
       - type: llm-rubric
         label: "entity disambiguation"
         value: "Data extracted is about Patrick Collison specifically. Stripe's $65B valuation is not confused with Patrick's net worth. John Collison's birth year (1990) is not used instead of Patrick's (1988)."
 
+  # ──────────────────────────────────────────────
+  # 3. Missing fields — must omit, not hallucinate
+  # ──────────────────────────────────────────────
   - description: "Missing fields — must omit not hallucinate"
     vars:
       entity_context: '"Figma"'
@@ -118,21 +147,33 @@ tests:
         The company was founded by Dylan Field and Evan Wallace. Figma has raised over $333 million in venture funding and has offices in San Francisco.
     assert:
       - type: javascript
-        label: "ipo_date is omitted since Figma has not IPO'd"
+        label: "ipo_date is null/omitted since Figma has not IPO'd"
         value: |
           const d = JSON.parse(output);
           return d.extracted_data?.ipo_date === undefined || d.extracted_data?.ipo_date === null;
       - type: javascript
-        label: "does not hallucinate annual_revenue from funding amount"
+        label: "does not hallucinate annual_revenue from funding or acquisition"
         value: |
           const d = JSON.parse(output);
           const rev = d.extracted_data?.annual_revenue_usd;
-          // $333M is funding, not revenue — should not appear as annual revenue
-          return rev === undefined || (rev !== 333000000 && rev !== 20000000000);
-      - type: llm-rubric
-        label: "hallucination prevention"
-        value: "The model does not invent values for fields not stated in the content. ipo_date is absent since Figma is not public. Annual revenue is not fabricated from the $333M funding figure or $20B acquisition price."
+          return rev === undefined || rev === null || (rev !== 333000000 && rev !== 20000000000);
+      - type: javascript
+        label: "employee_count is null/omitted (not stated in content)"
+        value: |
+          const d = JSON.parse(output);
+          const ec = d.extracted_data?.employee_count;
+          return ec === undefined || ec === null;
+      - type: javascript
+        label: "confidence for missing fields has low scores"
+        value: |
+          const d = JSON.parse(output);
+          const conf = d.confidence || {};
+          const missingFields = ['annual_revenue_usd', 'ipo_date', 'employee_count'];
+          return missingFields.every(f => !conf[f] || conf[f].score <= 0.3);
 
+  # ──────────────────────────────────────────────
+  # 4. Type coercion — correct types from natural language
+  # ──────────────────────────────────────────────
   - description: "Type coercion — correct types from natural language"
     vars:
       entity_context: '"Vercel"'
@@ -152,15 +193,316 @@ tests:
           const d = JSON.parse(output);
           return d.extracted_data?.founded_year === 2015;
       - type: javascript
-        label: "is_open_source is boolean true not string"
+        label: "is_open_source is boolean or null (product vs company ambiguity)"
         value: |
           const d = JSON.parse(output);
           const ios = d.extracted_data?.is_open_source;
-          return ios === undefined || ios === true;
+          return ios === true || ios === null || ios === undefined;
+      - type: javascript
+        label: "if is_open_source is true, confidence is lower (indirect evidence)"
+        value: |
+          const d = JSON.parse(output);
+          const ios = d.extracted_data?.is_open_source;
+          if (ios !== true) return true;
+          const conf = d.confidence?.is_open_source;
+          return conf && conf.score < 0.9;
       - type: javascript
         label: "latest_funding_date is ISO date string"
         value: |
           const d = JSON.parse(output);
           const fd = d.extracted_data?.latest_funding_date;
-          if (fd === undefined) return true;
-          return /^\d{4}-\d{2}-\d{2}$/.test(fd);
+          if (fd === undefined || fd === null) return true;
+          return /^\d{4}-\d{2}(-\d{2})?$/.test(fd);
+
+  # ──────────────────────────────────────────────
+  # 5. Garbage content — 404 page, should return all nulls
+  # ──────────────────────────────────────────────
+  - description: "Garbage content — 404 page returns all nulls"
+    vars:
+      entity_context: '"Acme Corp"'
+      entity: "Acme Corp"
+      columns: |
+        - employee_count [type: number]
+        - founded_year [type: number]
+        - headquarters [type: string]
+      content: |
+        404 Not Found
+
+        The page you are looking for does not exist. Please check the URL or return to the homepage.
+
+        © 2024 Example.com | Privacy Policy | Terms of Service
+    assert:
+      - type: javascript
+        label: "all extracted fields are null or omitted"
+        value: |
+          const d = JSON.parse(output);
+          const ed = d.extracted_data || {};
+          return Object.values(ed).every(v => v === null || v === undefined);
+      - type: javascript
+        label: "all confidence scores are zero or very low"
+        value: |
+          const d = JSON.parse(output);
+          const conf = d.confidence || {};
+          return Object.values(conf).every(c => c.score <= 0.1);
+
+  # ──────────────────────────────────────────────
+  # 6. Irrelevant content — page about wrong entity
+  # ──────────────────────────────────────────────
+  - description: "Irrelevant content — page about completely different entity"
+    vars:
+      entity_context: '"Notion" (context: productivity software company)'
+      entity: "Notion"
+      columns: |
+        - founded_year [type: number]
+        - ceo [type: string]
+        - headquarters [type: string]
+      content: |
+        Slack Technologies - Company Profile
+
+        Slack was founded in 2013 by Stewart Butterfield. The company is headquartered in San Francisco, California. Slack was acquired by Salesforce in 2021 for $27.7 billion. Stewart Butterfield served as CEO until 2023.
+    assert:
+      - type: javascript
+        label: "does not extract Slack data as Notion data"
+        value: |
+          const d = JSON.parse(output);
+          const ed = d.extracted_data || {};
+          return (ed.founded_year === null || ed.founded_year === undefined) &&
+                 (ed.ceo === null || ed.ceo === undefined) &&
+                 (ed.headquarters === null || ed.headquarters === undefined);
+      - type: javascript
+        label: "all confidence scores are very low"
+        value: |
+          const d = JSON.parse(output);
+          return Object.values(d.confidence || {}).every(c => c.score <= 0.1);
+
+  # ──────────────────────────────────────────────
+  # 7. Conflicting data — two values for same field
+  # ──────────────────────────────────────────────
+  - description: "Conflicting data — contradictory values in source"
+    vars:
+      entity_context: '"Raycast" (context: productivity launcher app)'
+      entity: "Raycast"
+      columns: |
+        - founded_year [type: number]
+        - employee_count [type: number]
+      content: |
+        Raycast – Your Shortcut to Everything
+
+        Raycast was founded in 2020 by Thomas Paul Mann and Petr Nikolaev. The Berlin-based startup has grown rapidly since its launch.
+
+        According to Crunchbase, Raycast was established in 2019 and now has around 45 employees. Other sources report the team has grown to approximately 70 people as of late 2024.
+    assert:
+      - type: javascript
+        label: "founded_year is one of the stated values (2019 or 2020)"
+        value: |
+          const d = JSON.parse(output);
+          const fy = d.extracted_data?.founded_year;
+          return fy === 2019 || fy === 2020;
+      - type: javascript
+        label: "employee_count is one of the stated ranges (45 or 70)"
+        value: |
+          const d = JSON.parse(output);
+          const ec = d.extracted_data?.employee_count;
+          return ec === null || ec === undefined || (typeof ec === 'number' && ec >= 40 && ec <= 80);
+      - type: javascript
+        label: "confidence reflects ambiguity (not 1.0)"
+        value: |
+          const d = JSON.parse(output);
+          const conf = d.confidence || {};
+          const fyConf = conf.founded_year?.score;
+          const ecConf = conf.employee_count?.score;
+          return (fyConf === undefined || fyConf < 0.9) && (ecConf === undefined || ecConf < 0.9);
+
+  # ──────────────────────────────────────────────
+  # 8. Large numbers — don't mangle big values
+  # ──────────────────────────────────────────────
+  - description: "Large numbers — correct numeric parsing from natural language"
+    vars:
+      entity_context: '"Stripe" (context: fintech payments company)'
+      entity: "Stripe"
+      columns: |
+        - valuation_usd [type: number]
+        - annual_processing_volume_usd [type: number]
+        - employee_count [type: number]
+      content: |
+        Stripe is a financial infrastructure platform for the internet. As of 2023, Stripe is valued at $65 billion. The company processes over $1 trillion in total payment volume annually.
+
+        Stripe employs approximately 8,000 people across its offices in San Francisco, Dublin, Singapore, and other locations.
+    assert:
+      - type: javascript
+        label: "valuation is ~65 billion (not 65 million or 65 thousand)"
+        value: |
+          const d = JSON.parse(output);
+          const v = d.extracted_data?.valuation_usd;
+          return typeof v === 'number' && v >= 60000000000 && v <= 70000000000;
+      - type: javascript
+        label: "processing volume is ~1 trillion"
+        value: |
+          const d = JSON.parse(output);
+          const pv = d.extracted_data?.annual_processing_volume_usd;
+          return pv === null || pv === undefined || (typeof pv === 'number' && pv >= 900000000000 && pv <= 1100000000000);
+      - type: javascript
+        label: "employee_count is ~8000"
+        value: |
+          const d = JSON.parse(output);
+          const ec = d.extracted_data?.employee_count;
+          return typeof ec === 'number' && ec >= 7500 && ec <= 8500;
+
+  # ──────────────────────────────────────────────
+  # 9. Cookie banner / boilerplate-heavy page
+  # ──────────────────────────────────────────────
+  - description: "Noisy content — extract signal from boilerplate-heavy page"
+    vars:
+      entity_context: '"Retool" (context: internal tools platform)'
+      entity: "Retool"
+      columns: |
+        - founded_year [type: number]
+        - headquarters [type: string]
+        - ceo [type: string]
+      content: |
+        We use cookies to improve your experience. By continuing to browse, you agree to our cookie policy. Accept All | Manage Preferences
+
+        Navigation: Products | Solutions | Customers | Pricing | Docs | Blog | Login | Sign Up
+
+        Retool — Build Internal Tools, Remarkably Fast
+
+        Retool was founded in 2017 by David Hsu. The company is based in San Francisco.
+
+        Trusted by 30,000+ teams including Amazon, NBC, DoorDash, and Brex.
+
+        Footer: © 2024 Retool, Inc. | Privacy Policy | Terms of Service | Security | Status | Careers
+        San Francisco, CA | New York, NY | London, UK
+        Twitter | LinkedIn | GitHub | YouTube
+    assert:
+      - type: javascript
+        label: "founded_year is 2017"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.founded_year === 2017;
+      - type: javascript
+        label: "headquarters mentions San Francisco"
+        value: |
+          const d = JSON.parse(output);
+          const hq = d.extracted_data?.headquarters;
+          return typeof hq === 'string' && hq.toLowerCase().includes('san francisco');
+      - type: javascript
+        label: "ceo is David Hsu with low confidence or omitted"
+        value: |
+          const d = JSON.parse(output);
+          const ceo = d.extracted_data?.ceo;
+          if (ceo === null || ceo === undefined) return true;
+          const conf = d.confidence?.ceo;
+          return ceo.includes('David Hsu') && conf && conf.score <= 0.6;
+
+  # ──────────────────────────────────────────────
+  # 10. Multi-entity page — extract only target entity
+  # ──────────────────────────────────────────────
+  - description: "Multi-entity page — comparison article, extract only target"
+    vars:
+      entity_context: '"Supabase" (context: open-source Firebase alternative)'
+      entity: "Supabase"
+      columns: |
+        - founded_year [type: number]
+        - is_open_source [type: boolean]
+        - headquarters [type: string]
+      content: |
+        Firebase vs Supabase: Which Backend Should You Choose in 2024?
+
+        Firebase was founded in 2011 by Andrew Lee and James Tamplin. It was acquired by Google in 2014 and is headquartered in Mountain View, California. Firebase is a proprietary, closed-source platform.
+
+        Supabase was founded in 2020 by Paul Copplestone and Ant Wilson. The company is headquartered in Singapore. Supabase is fully open source and is often described as the open-source Firebase alternative.
+
+        Both platforms offer real-time databases, authentication, and edge functions.
+    assert:
+      - type: javascript
+        label: "founded_year is 2020 (Supabase), not 2011 (Firebase)"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.founded_year === 2020;
+      - type: javascript
+        label: "headquarters is Singapore, not Mountain View"
+        value: |
+          const d = JSON.parse(output);
+          const hq = d.extracted_data?.headquarters;
+          return typeof hq === 'string' && hq.toLowerCase().includes('singapore');
+      - type: javascript
+        label: "is_open_source is true (Supabase), not false (Firebase)"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.is_open_source === true;
+
+  # ──────────────────────────────────────────────
+  # 11. Minimal content — single sentence with partial info
+  # ──────────────────────────────────────────────
+  - description: "Minimal content — single sentence, partial extraction"
+    vars:
+      entity_context: '"Deno" (context: JavaScript runtime)'
+      entity: "Deno"
+      columns: |
+        - founded_year [type: number]
+        - creator [type: string]
+        - employee_count [type: number]
+        - headquarters [type: string]
+      content: |
+        Deno is a modern JavaScript runtime created by Ryan Dahl, the original creator of Node.js.
+    assert:
+      - type: javascript
+        label: "creator is Ryan Dahl"
+        value: |
+          const d = JSON.parse(output);
+          const c = d.extracted_data?.creator;
+          return typeof c === 'string' && c.includes('Ryan Dahl');
+      - type: javascript
+        label: "fields not in content are null/omitted"
+        value: |
+          const d = JSON.parse(output);
+          const ed = d.extracted_data || {};
+          return (ed.employee_count === null || ed.employee_count === undefined) &&
+                 (ed.headquarters === null || ed.headquarters === undefined) &&
+                 (ed.founded_year === null || ed.founded_year === undefined);
+      - type: javascript
+        label: "creator confidence is high, others are low"
+        value: |
+          const d = JSON.parse(output);
+          const conf = d.confidence || {};
+          const creatorHigh = conf.creator?.score >= 0.8;
+          const othersLow = ['employee_count', 'headquarters', 'founded_year'].every(
+            f => !conf[f] || conf[f].score <= 0.2
+          );
+          return creatorHigh && othersLow;
+
+  # ──────────────────────────────────────────────
+  # 12. Date edge cases — partial and ambiguous dates
+  # ──────────────────────────────────────────────
+  - description: "Date edge cases — various date formats in source"
+    vars:
+      entity_context: '"Temporal.io" (context: workflow orchestration platform)'
+      entity: "Temporal.io"
+      columns: |
+        - founded_date [type: date]
+        - last_funding_date [type: date]
+        - ipo_date [type: date]
+      content: |
+        Temporal was founded in 2019. The company raised a $75 million Series B in February 2023.
+
+        Temporal has not gone public and remains privately held.
+    assert:
+      - type: javascript
+        label: "founded_date handles year-only input gracefully"
+        value: |
+          const d = JSON.parse(output);
+          const fd = d.extracted_data?.founded_date;
+          if (fd === null || fd === undefined) return true;
+          return typeof fd === 'string' && fd.startsWith('2019');
+      - type: javascript
+        label: "last_funding_date is Feb 2023"
+        value: |
+          const d = JSON.parse(output);
+          const lfd = d.extracted_data?.last_funding_date;
+          if (lfd === null || lfd === undefined) return true;
+          return typeof lfd === 'string' && lfd.startsWith('2023-02');
+      - type: javascript
+        label: "ipo_date is null/omitted"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.ipo_date === null || d.extracted_data?.ipo_date === undefined;
