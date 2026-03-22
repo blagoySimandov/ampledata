@@ -54,6 +54,34 @@ func mergeSources(serpSources, crawlSources []string) []string {
 	return result
 }
 
+// mergeBestConfidence merges retry results into the base, keeping whichever
+// value has the higher confidence score for each field. Fields that only exist
+// in one side are always included.
+func mergeBestConfidence(
+	base map[string]interface{},
+	baseConf map[string]*models.FieldConfidenceInfo,
+	retry map[string]interface{},
+	retryConf map[string]*models.FieldConfidenceInfo,
+) (map[string]interface{}, map[string]*models.FieldConfidenceInfo) {
+	if base == nil {
+		base = make(map[string]interface{})
+	}
+	if baseConf == nil {
+		baseConf = make(map[string]*models.FieldConfidenceInfo)
+	}
+	for k, v := range retry {
+		current := baseConf[k]
+		candidate := retryConf[k]
+		if current == nil || (candidate != nil && candidate.Score > current.Score) {
+			base[k] = v
+			if candidate != nil {
+				baseConf[k] = candidate
+			}
+		}
+	}
+	return base, baseConf
+}
+
 func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*EnrichmentWorkflowOutput, error) {
 	info := workflow.GetInfo(ctx)
 	event := logger.NewEnrichmentEvent(input.JobID, input.RowKey, "")
@@ -326,23 +354,14 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			return output, err
 		}
 
-		if output.ExtractedData == nil {
-			output.ExtractedData = make(map[string]interface{})
-		}
-		if output.Confidence == nil {
-			output.Confidence = make(map[string]*models.FieldConfidenceInfo)
-		}
-
-		if retryOutput.ExtractedData != nil {
-			for k, v := range retryOutput.ExtractedData {
-				output.ExtractedData[k] = v
-			}
-		}
-		if retryOutput.Confidence != nil {
-			for k, v := range retryOutput.Confidence {
-				output.Confidence[k] = v
-			}
-		}
+		// Merge: keep the highest-confidence value per field across this attempt
+		// and all retry attempts. The retry only re-ran problematic columns, but
+		// its LLM may still return values for other fields — only upgrade when
+		// confidence actually improves.
+		output.ExtractedData, output.Confidence = mergeBestConfidence(
+			output.ExtractedData, output.Confidence,
+			retryOutput.ExtractedData, retryOutput.Confidence,
+		)
 		// Deduplicate: the retry may select the same SERP URLs or crawl targets as the
 		// initial attempt if the same sources are relevant to the missing columns.
 		// This shouldn't usually happen since the feedback loop generates different query
@@ -351,6 +370,22 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		output.ExtractionHistory = append(output.ExtractionHistory, retryOutput.ExtractionHistory...)
 
 		output.IterationCount = retryOutput.IterationCount
+
+		// Persist the best-merged result. The retry's own UpdateState already wrote
+		// its values to the DB; we overwrite here with the correctly merged data.
+		bestMerged := &models.StateUpdate{
+			ExtractedData: output.ExtractedData,
+			Confidence:    output.Confidence,
+			Sources:       output.Sources,
+		}
+		workflow.ExecuteActivity(ctx, "UpdateState", activities.StateUpdateInput{
+			JobID:  input.JobID,
+			RowKey: input.RowKey,
+			Stage:  models.StageCompleted,
+			Data:   bestMerged,
+		}).Get(ctx, nil)
+
+		event.EmitSuccess(ctx)
 
 		if input.RetryCount == 0 {
 			var reportErr error
