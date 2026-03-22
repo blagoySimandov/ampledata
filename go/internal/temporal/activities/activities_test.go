@@ -8,6 +8,8 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 )
 
+// TestCollectPreviouslyCrawledURLs verifies that URLs are collected from all
+// previous enrichment attempts, deduplicated, and empty strings are skipped.
 func TestCollectPreviouslyCrawledURLs(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -67,6 +69,9 @@ func TestCollectPreviouslyCrawledURLs(t *testing.T) {
 	}
 }
 
+// TestAnalyzeFeedback_DataNotFoundExclusion verifies that columns flagged in
+// DataNotFound are excluded from both MissingColumns and LowConfidenceColumns,
+// preventing wasteful retries for data that genuinely doesn't exist publicly.
 func TestAnalyzeFeedback_DataNotFoundExclusion(t *testing.T) {
 	a := &Activities{}
 
@@ -203,6 +208,8 @@ func TestAnalyzeFeedback_DataNotFoundExclusion(t *testing.T) {
 	}
 }
 
+// TestFilterMissingColumnsMetadata verifies that only columns named in the
+// missing list are returned, preserving order and ignoring nonexistent names.
 func TestFilterMissingColumnsMetadata(t *testing.T) {
 	allColumns := []*models.ColumnMetadata{
 		{Name: "a", Type: "string"},

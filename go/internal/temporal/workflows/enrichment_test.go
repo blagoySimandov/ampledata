@@ -6,6 +6,8 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 )
 
+// TestMergeBestConfidence verifies that retry results are merged per-field,
+// keeping whichever value has the higher confidence score.
 func TestMergeBestConfidence(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -91,6 +93,8 @@ func TestMergeBestConfidence(t *testing.T) {
 	}
 }
 
+// TestMergeSources verifies deduplication and empty-string filtering
+// when combining SERP and crawl source URLs.
 func TestMergeSources(t *testing.T) {
 	tests := []struct {
 		name string
@@ -118,6 +122,8 @@ func TestMergeSources(t *testing.T) {
 	}
 }
 
+// TestMergeDataNotFound verifies that data-not-found conclusions accumulate
+// across retry attempts and that the current attempt's reasons override older ones.
 func TestMergeDataNotFound(t *testing.T) {
 	tests := []struct {
 		name     string
