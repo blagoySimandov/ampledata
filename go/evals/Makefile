@@ -1,17 +1,20 @@
 PRODUCTION_DIR := ../internal/services/prompts
 
-promote-decision-maker:
-	cp prompts/decision-maker-v1.txt $(PRODUCTION_DIR)/decision-maker.txt
-	@echo "Promoted decision-maker-v1.txt -> $(PRODUCTION_DIR)/decision-maker.txt"
+PROMPTS := decision-maker extraction
 
-promote-extraction:
-	cp prompts/extraction-v1.txt $(PRODUCTION_DIR)/extraction.txt
-	@echo "Promoted extraction-v1.txt -> $(PRODUCTION_DIR)/extraction.txt"
+# Current versions
+decision-maker_VERSION := v2-clear
+extraction_VERSION := v1
 
-eval-decision-maker:
-	promptfoo eval -c decision-maker.yaml
+define PROMPT_RULES
+promote-$(1):
+	cp prompts/$(1)-$($(1)_VERSION).txt $(PRODUCTION_DIR)/$(1).txt
+	@echo "Promoted $(1)-$($(1)_VERSION).txt -> $(PRODUCTION_DIR)/$(1).txt"
 
-eval-extraction:
-	promptfoo eval -c extraction.yaml
+eval-$(1):
+	promptfoo eval -c $(1).yaml
+endef
 
-.PHONY: promote-decision-maker promote-extraction eval-decision-maker eval-extraction
+$(foreach p,$(PROMPTS),$(eval $(call PROMPT_RULES,$(p))))
+
+.PHONY: $(addprefix promote-,$(PROMPTS)) $(addprefix eval-,$(PROMPTS))

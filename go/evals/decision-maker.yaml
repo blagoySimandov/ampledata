@@ -2,13 +2,14 @@
 description: "Decision maker — v1 vs v2 on Gemini 2.5 Flash"
 
 prompts:
-  - id: file://prompts/decision-maker-v1.txt
-    label: v1-verbose
+  # - id: file://prompts/decision-maker-v2-clear.txt
+  #   label: v1-verbose
   - id: file://../internal/services/prompts/decision-maker.txt
     label: v2-production
 
 providers:
   - id: google:gemini-2.5-flash
+  - id: google:gemini-3-flash-preview
 
 defaultTest:
   options:
@@ -112,69 +113,6 @@ tests:
           }
           return true;
 
-  - description: "Data missing from snippets — must select URLs to crawl"
-    vars:
-      entity_context: '"Anthropic"'
-      entity: "Anthropic"
-      columns: "- logo_url [type: string]\n- ceo_picture_url [type: string]"
-      search_results: |
-        Position 1: Home \ Anthropic
-        URL: https://www.anthropic.com/
-        Snippet: Anthropic is an AI safety and research company that's working to build reliable, interpretable, and steerable AI systems.
-        ---
-        Position 2: The Making Of Anthropic CEO Dario Amodei
-        URL: https://kantrowitz.medium.com/the-making-of-anthropic-ceo-dario-amodei-449777529dd6
-        Date: Jul 29, 2025
-        Snippet: Dario Amodei doesn't hesitate when I ask what's gotten into him. The Anthropic CEO has spent 2025 at war, feuding with industry counterparts ...
-        ---
-        Position 3: Anthropic Ai Company Logo And Office
-        URL: https://www.instagram.com/popular/anthropic-ai-company-logo-and-office/
-        Date: Feb 26, 2026
-        Snippet: Anthropic CEO Dario Amodei predicts that AI models will be able to do the work of a PhD researcher within 18 months.
-        ---
-        Position 4: Inspiration behind Anthropic's logo
-        URL: https://www.reddit.com/r/Anthropic/comments/1qzop13/inspiration_behind_anthropics_logo/
-        Date: Feb 8, 2026
-        Snippet: Just a fun observation. While researching proto-cuneiform for a logo design, I came across the symbol in the image.
-        ---
-        Position 5: Dario Amodei
-        URL: https://en.wikipedia.org/wiki/Dario_Amodei
-        Snippet: Dario Amodei (born 1983) is an American artificial intelligence (AI) researcher and entrepreneur. In 2021, he and his sister Daniela Amodei co-founded Anthropic ...
-        ---
-        Position 6: Company \ Anthropic
-        URL: https://www.anthropic.com/company
-        Snippet: Making AI systems you can rely on. Anthropic is an AI safety and research company. We build reliable, interpretable, and steerable AI systems.
-        ---
-        Position 7: Anthropic Logo On Smartphone Screen Claude Stock
-        URL: https://www.shutterstock.com/image-photo/anthropic-logo-on-smartphone-screen-claude-2635155591
-        Snippet: Anthropic logo on smartphone screen.
-        ---
-        Position 8: 659 Anthropic Photos & High Res Pictures
-        URL: https://www.gettyimages.com/photos/anthropic
-        Snippet: The Anthropic AI logo is displayed on a mobile phone screen in this photo illustration in Brussels, Belgium, on February 24, 2026.
-        ---
-        Position 9: Anthropic Claude Ai Branding Logo
-        URL: https://www.instagram.com/popular/anthropic-claude-ai-branding-logo/
-        Snippet: Watch short videos about anthropic claude ai branding logo from people around the world.
-        ---
-        Position 10: Anthropic
-        URL: https://www.linkedin.com/company/anthropicresearch
-        Snippet: Anthropic is an AI safety and research company working to build reliable, interpretable, and steerable AI systems.
-        ---
-      people_also_ask: ""
-      max_urls: "3"
-    assert:
-      - type: javascript
-        label: "urls_to_crawl is not empty when data is missing"
-        value: |
-          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
-          return d.urls_to_crawl.length > 0;
-      - type: javascript
-        label: "anthropic.com selected for crawling"
-        value: |
-          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
-          return d.urls_to_crawl.some(u => u.includes('anthropic.com'));
-
   - description: "Entity disambiguation — person vs company"
     vars:
       entity_context: '"Elon Musk"'
@@ -243,73 +181,6 @@ tests:
           1. Correctness: net_worth_usd either reflects his personal fortune (~$852B as of Feb 2026 per Forbes) or is omitted in favour of crawling — not a company revenue figure.
           2. URL quality: if urls_to_crawl is populated, it should prefer authoritative sources (forbes.com profile, en.wikipedia.org/wiki/Wealth_of_Elon_Musk) over SEO aggregators or social media posts.
           3. Confidence calibration: if net_worth_usd is extracted from a snippet that is more than 6 months old relative to today (2026-03-20), the confidence score should be ≤0.7 to reflect staleness.
-
-  - description: "Mixed — some data in snippets, some needs crawling"
-    vars:
-      entity_context: '"OpenAI"'
-      entity: "OpenAI"
-      columns: "- employee_count [type: number]\n- ceo [type: string]\n- logo_url [type: string]"
-      search_results: |
-        Position 1: OpenAI staffers reportedly 'taken aback' by 'ominous' logo rebranding
-        URL: https://www.yahoo.com/news/openai-staffers-reportedly-taken-aback-by-ominous-logo-rebranding-160017936.html
-        Date: Sep 21, 2024
-        Snippet: OpenAI is changing its logo to a large black "O," Fortune says, and the company's own staff members reportedly find it ominous.
-        ---
-        Position 2: OpenAI Is Testing a New Logo. Its Employees Hate It - Inc. Magazine
-        URL: https://www.inc.com/kit-eaton/openai-is-testing-a-new-logo-its-employees-hate-it.html
-        Date: Sep 23, 2024
-        Snippet: In a planned rebrand, OpenAI considers using a big O to symbolize the future of AI tech.
-        ---
-        Position 3: OpenAI's 'Ominous' New Logo Leaves Staffers Reportedly Stunned
-        URL: https://medium.com/design-bootcamp/openais-ominous-new-logo-leaves-staffers-reportedly-stunned-75f2162642c2
-        Snippet: It will be replaced by a large black "O" or a simple ring, a design that many employees reportedly found uninspiring, even foreboding.
-        ---
-        Position 4: OpenAI's newest creation is raising shock, alarm, and horror among staffers
-        URL: https://fortune.com/2024/09/20/openai-staffers-unhappy-new-logo-design-ominous/
-        Date: Sep 20, 2024
-        Snippet: The new logo presented was a simple, large black "O," easily interpreted as a ring or a zero, as one of the sources described it.
-        ---
-        Position 5: OpenAI Staff Upset by Company's Horrendous New Logo - Futurism
-        URL: https://futurism.com/the-byte/openai-staff-upset-new-logo
-        Date: Sep 23, 2024
-        Snippet: The new logo is a dramatic departure from OpenAI's iconic floral symbol, which is meant to evoke precision, potential and optimism.
-        ---
-        Position 6: Design Guidelines - OpenAI
-        URL: https://openai.com/brand/
-        Snippet: Ensure each logo is displayed at an appropriate size, uses its approved color format, and is not distorted or altered in any way. All co-branded materials must ...
-        ---
-        Position 7: OpenAI staff 'taken aback' by new 'ominous' logo rebranding
-        URL: https://www.storyboard18.com/digital/openai-staff-taken-aback-by-new-ominous-logo-rebranding-42896.htm
-        Date: Sep 23, 2024
-        Snippet: Reported internal reactions reveal unease over OpenAI's new logo, described as a stark departure from its previous design.
-        ---
-        Position 8: Why concerns about OpenAI's new logo are about more than design
-        URL: https://www.fastcompany.com/91200958/concerns-openai-new-circle-logo-more-than-design
-        Date: Oct 2, 2024
-        Snippet: OpenAI employees were reportedly "taken aback" by the company's plans to introduce the black circle or letter "O" as its new logo.
-        ---
-        Position 9: The Evolution of OpenAI's Logo - LinkedIn
-        URL: https://www.linkedin.com/pulse/evolution-openais-logo-siraj-ahmad-4wvzc
-        Snippet: The OpenAI in-house team under leadership from Veit Moeller and Shannon Jager designed a modified brand identity after OpenAI CEO Sam Altman ...
-        ---
-        Position 10: OpenAI unveils its first ever rebrand | Wallpaper*
-        URL: https://www.wallpaper.com/tech/openai-has-undergone-its-first-ever-rebrand-giving-fresh-life-to-chatgpt-interactions
-        Date: Feb 4, 2025
-        Snippet: A new typeface, word mark, symbol and palette underpin all the ways in which OpenAI's technology interacts with the real world.
-        ---
-      people_also_ask: "Q: Who owns the other 51% of OpenAI? A: The OpenAI Foundation holds a 26% stake in the PBC, while Microsoft holds a 27% stake and the remaining 47% is owned by employees and other investors."
-      max_urls: "3"
-    assert:
-      - type: javascript
-        label: "ceo is a string"
-        value: |
-          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
-          return typeof d.extracted_data?.ceo === 'string';
-      - type: javascript
-        label: "selects openai.com for logo_url crawl"
-        value: |
-          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
-          return d.urls_to_crawl.some(u => u.includes('openai.com'));
 
   - description: "Approximate values — must not be fabricated"
     vars:
@@ -387,3 +258,240 @@ tests:
           1. Recency: the model should prefer the most recently dated snippet (Mar 12, 2026 from toolfinder.com) or acknowledge the conflict and defer to crawling — not blindly pick an older figure.
           2. URL quality: if urls_to_crawl is populated for user_count, it should prefer notion.com or wikipedia.org over YouTube videos, Reddit posts, or SEO aggregator blogs.
           3. Confidence calibration: if a figure older than 6 months relative to today (2026-03-20) is used, the confidence score for user_count should be ≤0.7. A figure from a secondary/aggregator source should score no higher than 0.8 even if recent.
+
+  - description: "E-commerce product — Sony WH-1000XM5 (price/manufacturer/release year)"
+    vars:
+      entity_context: '"Sony WH-1000XM5 headphones"'
+      entity: "Sony WH-1000XM5"
+      columns: "- average_price_usd [type: number]\n- manufacturer [type: string]\n- release_year [type: number]"
+      search_results: |
+        Position 1: Sony WH-1000XM5: info, specifications, pricing, release date
+        URL: https://pocketnow.com/sony-wh-1000xm5/
+        Date: May 6, 2022
+        Snippet: With the XM5, Sony will be running a $50 premium, bringing its price to $399 (or £379).
+        ---
+        Position 2: Sony announces WH-1000XM5 headphones with new design - The Verge
+        URL: https://www.theverge.com/2022/5/12/23068504/sony-wh-1000xm5-headphones-review-price
+        Date: May 12, 2022
+        Snippet: They cost $399.99, an increase from the prior 1000XM4s, and will go on sale May 20, 2022.
+        ---
+        Position 3: Sony WH-1000XM5 Premium Wireless Noise Canceling Headphones
+        URL: https://electronics.sony.com/audio/headphones/headband/p/wh1000xm5-b
+        Snippet: Sale Price $279.99, Original Price $400.00. Rating: 4.4 out of 5 stars (6,267 reviews). Manufacturer: Sony.
+        ---
+        Position 4: Sony WH-1000XM5: Release Date, Price & Specs
+        URL: https://www.techadvisor.com/article/742660/sony-wh-1000xm5-release-date.html
+        Date: May 13, 2022
+        Snippet: The XM5 are more expensive than their predecessor at £379/US$399/€420. Released May 20, 2022.
+        ---
+        Position 5: Sony WH-1000XM5 price and release date confirmed
+        URL: https://www.laptopmag.com/news/sony-wh-1000xm5-confirmed-price
+        Date: May 13, 2022
+        Snippet: You can now pre-order the Sony WH-1000XM5 for $399 at Amazon, Best Buy, and Adorama.
+        ---
+        Position 6: Sony's WH-1000XM5 headphones — Ars Technica
+        URL: https://arstechnica.com/gadgets/2022/05/sonys-wh-1000xm5-headphones-come-with-a-new-design/
+        Date: May 12, 2022
+        Snippet: They'll arrive on May 20 for $400, which is a $50 increase over the existing XM4. Sony's flagship noise-canceling headphones.
+        ---
+        Position 7: Sony WH 1000XM5 Review: WORTH IT in 2025?
+        URL: https://recordingnow.com/blog/sony-wh-1000xm5-review/
+        Date: May 21, 2025
+        Snippet: Currently sits between $279 to $399 market price. Still one of Sony's flagship headphones released in 2022.
+        ---
+        Position 8: Sony WH-1000XM5 Wireless Headphones
+        URL: https://www.amazon.com/Sony-WH-1000XM5-Canceling-Headphones/dp/B09XS7JWHH
+        Snippet: Sony WH-1000XM5 Premium Noise Canceling Headphones. Price: $279.99. Sold and shipped by Sony.
+        ---
+      people_also_ask: "Q: Is the Sony WH-1000XM5 worth it in 2025? A: Yes, the WH-1000XM5 remains one of the best noise-canceling headphones, with current prices around $279–$399."
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "manufacturer is Sony"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const m = d.extracted_data?.manufacturer;
+          return typeof m === 'string' && m.toLowerCase().includes('sony');
+      - type: javascript
+        label: "release_year is 2022"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          return d.extracted_data?.release_year === 2022;
+      - type: javascript
+        label: "average_price_usd is a number in plausible range ($250–$420)"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const p = d.extracted_data?.average_price_usd;
+          return typeof p === 'number' && p >= 250 && p <= 420;
+
+  - description: "Restaurant location scope — Nobu Downtown, New York City"
+    vars:
+      entity_context: '"restaurant in New York City"'
+      entity: "Nobu Downtown"
+      columns: "- cuisine_type [type: string]\n- average_rating [type: number]\n- price_range [type: string]"
+      search_results: |
+        Position 1: NOBU DOWNTOWN - Tripadvisor
+        URL: https://www.tripadvisor.com/Restaurant_Review-g60763-d446695-Reviews-Nobu_Downtown-New_York_City_New_York.html
+        Snippet: Rating: 4.3 out of 5. 1,604 reviews. Cuisines: Japanese, Sushi. "Food is good but very expensive — 6 of us spent $1,200."
+        ---
+        Position 2: Nobu Downtown - Yelp
+        URL: https://www.yelp.com/biz/nobu-downtown-new-york
+        Snippet: 3.8 stars — 707 reviews. Japanese cuisine. Price: $$$$. Located in Manhattan's Financial District.
+        ---
+        Position 3: Nobu Downtown Restaurant - OpenTable
+        URL: https://www.opentable.com/r/nobu-downtown-new-york
+        Snippet: Dining style: Casual Elegant. Price: $50 and over. Cuisines: Japanese, Sushi, Creative Japanese. Nobu Downtown offers the creative Japanese-Peruvian cuisine chef Nobu Matsuhisa is celebrated for.
+        ---
+        Position 4: NOBU FIFTY SEVEN - Tripadvisor
+        URL: https://www.tripadvisor.com/Restaurant_Review-g60763-d1166866-Reviews-Nobu_Fifty_Seven-New_York_City_New_York.html
+        Snippet: A separate Nobu location in Midtown. Cuisines: Japanese, Sushi, Contemporary. Rating: 4.3 out of 5 (1,959 reviews).
+        ---
+        Position 5: Menus - Nobu New York Downtown
+        URL: https://www.noburestaurants.com/downtown/menus
+        Snippet: Crispy Rice with Spicy Tuna $36, Sashimi Salad $38, Lobster Ceviche (2 pcs) $24. Japanese-Peruvian signature dishes.
+        ---
+        Position 6: Nobu - The Sushi Legend
+        URL: https://thesushilegend.com/reviews/nobu/
+        Snippet: Nobu is a legendary Japanese restaurant with Peruvian influences — sushi as well as cooked dishes inspired by South American flavors. A fine dining destination since 1994.
+        ---
+      people_also_ask: "Q: What type of food does Nobu serve? A: Nobu serves Japanese cuisine with Peruvian influences, a fusion pioneered by chef Nobu Matsuhisa."
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "cuisine_type is a non-empty string"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const c = d.extracted_data?.cuisine_type;
+          return typeof c === 'string' && c.length > 0;
+      - type: javascript
+        label: "average_rating is a number between 3.5 and 4.5"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const r = d.extracted_data?.average_rating;
+          return typeof r === 'number' && r >= 3.5 && r <= 4.5;
+      - type: llm-rubric
+        label: "cuisine and price_range correctly reflect Nobu Downtown NYC"
+        value: |
+          The entity is Nobu Downtown in New York City (not Nobu Fifty Seven, which is a different NYC location). Evaluate:
+          1. Cuisine: should mention Japanese or Japanese-Peruvian/fusion — not generic "Asian" or any other category.
+          2. Price range: should reflect $50+ per person (OpenTable) or $$$$. A value like "$10–$20" would be wrong.
+          3. Source quality: if urls_to_crawl is populated, prefer opentable.com, tripadvisor.com, or noburestaurants.com over food blogs or Yelp aggregators.
+
+  - description: "Defunct/acquired company — Sun Microsystems (status + private column)"
+    vars:
+      entity_context: '"technology company"'
+      entity: "Sun Microsystems"
+      columns: "- status [type: string]\n- acquired_by [type: string]\n- acquisition_year [type: number]\n- internal_slack_channel [type: string]"
+      search_results: |
+        Position 1: Acquisition of Sun Microsystems by Oracle Corporation - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Acquisition_of_Sun_Microsystems_by_Oracle_Corporation
+        Snippet: The acquisition of Sun Microsystems by Oracle Corporation was completed on January 27, 2010, after regulatory approval from the US Department of Justice and the European Commission.
+        ---
+        Position 2: Oracle Buys Sun
+        URL: https://www.oracle.com/corporate/pressrelease/oracle-buys-sun-042009.html
+        Date: Apr 20, 2009
+        Snippet: Oracle will acquire Sun common stock for $9.50 per share in cash for a total value of approximately $7.4 billion. Oracle CEO Larry Ellison announced the deal.
+        ---
+        Position 3: Oracle to Acquire Sun Microsystems for $7.4 Billion
+        URL: https://www.networkcomputing.com/it-infrastructure/oracle-acquire-sun-microsystems-74-billion
+        Snippet: Oracle agreed to acquire Sun Microsystems for $7.4 billion, effectively ending Sun's existence as an independent company.
+        ---
+        Position 4: Sun Microsystems - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Sun_Microsystems
+        Snippet: Sun Microsystems, Inc. was an American technology company that sold computers, software, and IT services. It was acquired by Oracle Corporation in 2010 and no longer exists as an independent entity.
+        ---
+        Position 5: How the Sun Microsystems acquisition made Oracle the cloud company it is today
+        URL: https://siliconangle.com/2025/09/11/sun-microsystems-oracle-cloud/
+        Date: Sep 11, 2025
+        Snippet: In 2009, Oracle announced the acquisition of Sun Microsystems. The deal closed in January 2010, folding Java, Solaris, and MySQL into Oracle's portfolio.
+        ---
+        Position 6: Oracle to buy Sun for $7.4B after IBM drops bid - ABC News
+        URL: https://abcnews.com/Technology/story?id=7395780
+        Snippet: Sun Microsystems' 27-year history as Silicon Valley's maverick independent company came to an end with Oracle's acquisition.
+        ---
+      people_also_ask: "Q: Does Sun Microsystems still exist? A: No. Sun Microsystems was acquired by Oracle Corporation in January 2010 and its brand was retired."
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "acquisition_year is 2010"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          return d.extracted_data?.acquisition_year === 2010;
+      - type: javascript
+        label: "acquired_by mentions Oracle"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const a = d.extracted_data?.acquired_by;
+          return typeof a === 'string' && a.toLowerCase().includes('oracle');
+      - type: javascript
+        label: "internal_slack_channel is null — not fabricated"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          return d.extracted_data?.internal_slack_channel === null || d.extracted_data?.internal_slack_channel === undefined;
+      - type: javascript
+        label: "confidence for internal_slack_channel is 0"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const conf = d.extracted_confidence?.internal_slack_channel;
+          return conf === undefined || conf?.score === 0;
+
+  - description: "Name collision — Mercury disambiguated to planet via entity_context"
+    vars:
+      entity_context: '"the innermost planet orbiting the Sun"'
+      entity: "Mercury"
+      columns: "- orbital_period_days [type: number]\n- distance_from_sun_km [type: number]"
+      search_results: |
+        Position 1: Mercury - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Mercury
+        Snippet: Mercury most commonly refers to: Mercury (planet), the innermost planet of the Solar System; Mercury (element), a chemical element with symbol Hg and atomic number 80; Mercury (mythology), a Roman deity; Mercury (automobile), a discontinued Ford brand.
+        ---
+        Position 2: Mercury (planet) - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Mercury_(planet)
+        Snippet: Mercury is the first planet from the Sun and the smallest in the Solar System. It has an orbital period of 87.97 Earth days and a mean distance from the Sun of 57.91 million kilometres (0.387 AU).
+        ---
+        Position 3: Mercury (element) - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Mercury_(element)
+        Snippet: Mercury is a chemical element with symbol Hg and atomic number 80. The only metal that is liquid at standard conditions for temperature and pressure. Boiling point 356.73 °C.
+        ---
+        Position 4: Mercury | Facts, Size, Distance from Sun - Britannica
+        URL: https://www.britannica.com/place/Mercury-planet
+        Snippet: Mercury, innermost planet of the solar system. Its mean distance from the Sun is 57.9 million km (36 million miles) and it has a period of revolution of 87.97 Earth days.
+        ---
+        Position 5: Mercury - NASA Solar System Exploration
+        URL: https://science.nasa.gov/mercury/
+        Snippet: Mercury is the smallest planet in our solar system and is closest to the Sun, completing one orbit approximately every 88 Earth days.
+        ---
+        Position 6: Mercury Technologies - Banking for Startups
+        URL: https://mercury.com
+        Snippet: Mercury is a financial technology company providing banking services to startups and small businesses. Founded 2019, headquartered in San Francisco.
+        ---
+        Position 7: Ford Mercury - Classic Cars
+        URL: https://www.hemmings.com/ford-mercury
+        Snippet: Mercury was a brand of automobiles sold by Ford Motor Company from 1938 until Ford discontinued it in 2011.
+        ---
+        Position 8: Mercury - Space.com
+        URL: https://www.space.com/36-mercury-the-solar-systems-innermost-planet.html
+        Snippet: Mercury has the shortest year of all the planets — just 87.97 Earth days. Its mean distance from the Sun is 0.387 AU (about 57.9 million km).
+        ---
+      people_also_ask: "Q: How long is a year on Mercury? A: A year on Mercury lasts approximately 87.97 Earth days. Q: How far is Mercury from the Sun? A: Mercury's average distance from the Sun is about 57.9 million kilometres (0.387 AU)."
+      max_urls: "2"
+    assert:
+      - type: javascript
+        label: "orbital_period_days is approximately 88 days (85–91)"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const op = d.extracted_data?.orbital_period_days;
+          return typeof op === 'number' && op >= 85 && op <= 91;
+      - type: javascript
+        label: "distance_from_sun_km is in planetary range (55M–62M km)"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const dist = d.extracted_data?.distance_from_sun_km;
+          return typeof dist === 'number' && dist >= 55000000 && dist <= 62000000;
+      - type: llm-rubric
+        label: "entity_context correctly steered disambiguation to the planet"
+        value: |
+          The entity_context explicitly identifies Mercury as the innermost planet. Evaluate:
+          1. Disambiguation: the model extracted planetary data (orbital period ~87.97 days, distance ~57.9M km) — not element properties (atomic number, boiling point), not company data (founded year, headquarters), and not car brand data.
+          2. Source quality: source_urls or urls_to_crawl should reference en.wikipedia.org/wiki/Mercury_(planet), britannica.com, or nasa.gov — not the element, fintech, or automobile pages.
+          3. Confidence: both columns are stable scientific constants available in multiple authoritative snippets, so confidence scores should be ≥ 0.9.
