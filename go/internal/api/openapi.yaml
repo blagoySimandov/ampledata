@@ -130,7 +130,7 @@ components:
 
     EnrichmentResult:
       type: object
-      required: [key, extracted_data, sources]
+      required: [key, extracted_data, sources, extraction_history]
       properties:
         key:
           type: string
@@ -146,9 +146,34 @@ components:
           type: array
           items:
             type: string
+        extraction_history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractionHistoryEntry"
         error:
           type: string
           nullable: true
+
+    ExtractionHistoryEntry:
+      type: object
+      required: [attempt_number, extracted_data, sources, reasoning]
+      properties:
+        attempt_number:
+          type: integer
+        extracted_data:
+          type: object
+          additionalProperties: true
+        confidence:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/FieldConfidenceInfo"
+          nullable: true
+        sources:
+          type: array
+          items:
+            type: string
+        reasoning:
+          type: string
 
     PaginationInfo:
       type: object
@@ -165,7 +190,7 @@ components:
 
     RowProgressItem:
       type: object
-      required: [key, stage, updated_at]
+      required: [key, stage, updated_at, extraction_history]
       properties:
         key:
           type: string
@@ -185,6 +210,10 @@ components:
           items:
             type: string
           nullable: true
+        extraction_history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractionHistoryEntry"
         error:
           type: string
           nullable: true

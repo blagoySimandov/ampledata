@@ -51,21 +51,23 @@ func toAPIRowsByStage(m map[models.RowStage]int) map[string]int {
 
 func toAPIEnrichmentResult(r *models.EnrichmentResult) EnrichmentResult {
 	return EnrichmentResult{
-		Key:           r.Key,
-		ExtractedData: r.ExtractedData,
-		Confidence:    toAPIConfidence(r.Confidence),
-		Sources:       r.Sources,
-		Error:         r.Error,
+		Key:               r.Key,
+		ExtractedData:     r.ExtractedData,
+		Confidence:        toAPIConfidence(r.Confidence),
+		Sources:           r.Sources,
+		ExtractionHistory: toAPIExtractionHistory(r.ExtractionHistory),
+		Error:             r.Error,
 	}
 }
 
 func toAPIRowProgressItem(r *models.RowProgressItem) RowProgressItem {
 	item := RowProgressItem{
-		Key:        r.Key,
-		Stage:      RowStage(r.Stage),
-		Confidence: toAPIConfidence(r.Confidence),
-		Error:      r.Error,
-		UpdatedAt:  r.UpdatedAt,
+		Key:               r.Key,
+		Stage:             RowStage(r.Stage),
+		Confidence:        toAPIConfidence(r.Confidence),
+		ExtractionHistory: toAPIExtractionHistory(r.ExtractionHistory),
+		Error:             r.Error,
+		UpdatedAt:         r.UpdatedAt,
 	}
 	if r.ExtractedData != nil {
 		item.ExtractedData = &r.ExtractedData
@@ -94,6 +96,28 @@ func toAPIPagination(p *models.PaginationInfo) PaginationInfo {
 		Limit:   p.Limit,
 		HasMore: p.HasMore,
 	}
+}
+
+func toAPIExtractionHistory(h []*models.ExtractionHistoryEntry) []ExtractionHistoryEntry {
+	result := make([]ExtractionHistoryEntry, len(h))
+	for i, e := range h {
+		sources := e.Sources
+		if sources == nil {
+			sources = []string{}
+		}
+		extractedData := e.ExtractedData
+		if extractedData == nil {
+			extractedData = map[string]interface{}{}
+		}
+		result[i] = ExtractionHistoryEntry{
+			AttemptNumber: e.AttemptNumber,
+			ExtractedData: extractedData,
+			Confidence:    toAPIConfidence(e.Confidence),
+			Sources:       sources,
+			Reasoning:     e.Reasoning,
+		}
+	}
+	return result
 }
 
 func toAPIConfidence(c map[string]*models.FieldConfidenceInfo) *map[string]FieldConfidenceInfo {

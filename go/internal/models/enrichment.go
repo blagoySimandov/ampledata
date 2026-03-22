@@ -38,11 +38,12 @@ type JobListResponse struct {
 }
 
 type EnrichmentResult struct {
-	Key           string                          `json:"key"`
-	ExtractedData map[string]interface{}          `json:"extracted_data"`
-	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
-	Sources       []string                        `json:"sources"`
-	Error         *string                         `json:"error,omitempty"`
+	Key               string                          `json:"key"`
+	ExtractedData     map[string]interface{}          `json:"extracted_data"`
+	Confidence        map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources           []string                        `json:"sources"`
+	ExtractionHistory []*ExtractionHistoryEntry       `json:"extraction_history,omitempty"`
+	Error             *string                         `json:"error,omitempty"`
 }
 
 type EnrichmentResponse struct {
@@ -87,22 +88,24 @@ func ToEnrichmentResult(row *RowState) *EnrichmentResult {
 	}
 
 	return &EnrichmentResult{
-		Key:           row.Key,
-		ExtractedData: row.ExtractedData,
-		Confidence:    row.Confidence,
-		Sources:       sources,
-		Error:         row.Error,
+		Key:               row.Key,
+		ExtractedData:     row.ExtractedData,
+		Confidence:        row.Confidence,
+		Sources:           sources,
+		ExtractionHistory: row.ExtractionHistory,
+		Error:             row.Error,
 	}
 }
 
 type RowProgressItem struct {
-	Key           string                          `json:"key"`
-	Stage         RowStage                        `json:"stage"`
-	ExtractedData map[string]interface{}          `json:"extracted_data,omitempty"`
-	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
-	Sources       []string                        `json:"sources,omitempty"`
-	Error         *string                         `json:"error,omitempty"`
-	UpdatedAt     time.Time                       `json:"updated_at"`
+	Key               string                          `json:"key"`
+	Stage             RowStage                        `json:"stage"`
+	ExtractedData     map[string]interface{}          `json:"extracted_data,omitempty"`
+	Confidence        map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources           []string                        `json:"sources,omitempty"`
+	ExtractionHistory []*ExtractionHistoryEntry       `json:"extraction_history,omitempty"`
+	Error             *string                         `json:"error,omitempty"`
+	UpdatedAt         time.Time                       `json:"updated_at"`
 }
 
 type PaginationInfo struct {
@@ -163,12 +166,13 @@ func ToRowProgressItem(row *RowState) *RowProgressItem {
 	}
 
 	return &RowProgressItem{
-		Key:           row.Key,
-		Stage:         row.Stage,
-		ExtractedData: row.ExtractedData,
-		Confidence:    row.Confidence,
-		Sources:       sources,
-		Error:         row.Error,
-		UpdatedAt:     row.UpdatedAt,
+		Key:               row.Key,
+		Stage:             row.Stage,
+		ExtractedData:     row.ExtractedData,
+		Confidence:        row.Confidence,
+		Sources:           sources,
+		ExtractionHistory: row.ExtractionHistory,
+		Error:             row.Error,
+		UpdatedAt:         row.UpdatedAt,
 	}
 }
