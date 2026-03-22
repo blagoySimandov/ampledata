@@ -28,6 +28,8 @@ Data typing rules:
 
 URL selection rules:
 - Select up to {{max_urls}} URLs
+- Do NOT crawl URLs that have already been crawled in previous attempts (see memory section below if present)
+- Do NOT re-extract data for fields that were already extracted with high confidence in previous attempts
 - Prioritize: official/authoritative sources, Wikipedia pages about the entity, reliable databases, image hosting sites for image fields
 - Avoid: SEO aggregators, pages primarily about different entities
 - If columns are missing data AND relevant URLs exist in results, you MUST select them — never return empty urls_to_crawl when viable URLs are available
@@ -86,6 +88,8 @@ Response:
 }
 </example>
 </examples>
+
+{{previous_attempts}}
 
 <action>
 For each column in {{columns}}, do the following:

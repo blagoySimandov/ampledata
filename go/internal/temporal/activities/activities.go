@@ -68,11 +68,12 @@ type SerpFetchOutput struct {
 }
 
 type DecisionInput struct {
-	JobID           string
-	RowKey          string
-	SerpData        *models.SerpData
-	ColumnsMetadata []*models.ColumnMetadata
+	JobID            string
+	RowKey           string
+	SerpData         *models.SerpData
+	ColumnsMetadata  []*models.ColumnMetadata
 	KeyColumnDescription      string
+	PreviousAttempts []*models.EnrichmentAttempt
 }
 
 type DecisionOutput struct {
@@ -232,7 +233,7 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 	}
 
 	mergedResults := mergeSerpResults(input.SerpData.Results)
-	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata, input.KeyColumnDescription)
+	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata, input.KeyColumnDescription, input.PreviousAttempts)
 	if err != nil {
 		event.EmitActivityError(ctx, fmt.Errorf("decision making failed: %w", err))
 		return nil, fmt.Errorf("decision making failed: %w", err)

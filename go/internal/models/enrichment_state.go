@@ -69,10 +69,12 @@ type FieldConfidenceInfo struct {
 }
 
 type EnrichmentAttempt struct {
-	AttemptNumber        int      `json:"attempt_number"`
-	QueryPatterns        []string `json:"query_patterns"`
-	LowConfidenceColumns []string `json:"low_confidence_columns"`
-	MissingColumns       []string `json:"missing_columns"`
+	AttemptNumber        int                             `json:"attempt_number"`
+	QueryPatterns        []string                        `json:"query_patterns"`
+	LowConfidenceColumns []string                       `json:"low_confidence_columns"`
+	MissingColumns       []string                       `json:"missing_columns"`
+	CrawledURLs          []string                       `json:"crawled_urls,omitempty"`
+	ExtractedData        map[string]*FieldConfidenceInfo `json:"extracted_data,omitempty"`
 }
 
 type ExtractionHistoryEntry struct {

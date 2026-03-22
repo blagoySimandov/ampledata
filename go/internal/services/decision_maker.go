@@ -19,7 +19,7 @@ type CrawlDecision struct {
 }
 
 type DecisionMaker interface {
-	MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error)
+	MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string, previousAttempts []*models.EnrichmentAttempt) (*CrawlDecision, error)
 }
 
 type AIDecisionMaker struct {
@@ -34,8 +34,8 @@ func NewGeminiDecisionMaker(promptService IPromptService, client IAIClient) (*AI
 	}, nil
 }
 
-func (g *AIDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error) {
-	prompt := g.promptService.DecisionMakerPrompt(rowKey, keyColumnDescription, columnsMetadata, serp, maxURLs)
+func (g *AIDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string, previousAttempts []*models.EnrichmentAttempt) (*CrawlDecision, error) {
+	prompt := g.promptService.DecisionMakerPrompt(rowKey, keyColumnDescription, columnsMetadata, serp, maxURLs, previousAttempts)
 	result, err := g.client.GenerateContent(ctx, prompt)
 	if err != nil {
 		return nil, err

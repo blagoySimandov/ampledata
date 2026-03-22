@@ -164,11 +164,12 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	event.StartStage(models.StageDecisionMade)
 	var decisionOutput activities.DecisionOutput
 	err = workflow.ExecuteActivity(ctx, "MakeDecision", activities.DecisionInput{
-		JobID:           input.JobID,
-		RowKey:          input.RowKey,
-		SerpData:        serpOutput.SerpData,
-		ColumnsMetadata: input.ColumnsMetadata,
+		JobID:            input.JobID,
+		RowKey:           input.RowKey,
+		SerpData:         serpOutput.SerpData,
+		ColumnsMetadata:  input.ColumnsMetadata,
 		KeyColumnDescription:      input.KeyColumnDescription,
+		PreviousAttempts: input.PreviousAttempts,
 	}).Get(ctx, &decisionOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
@@ -312,11 +313,22 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}).Get(ctx, &feedbackOutput)
 
 	if feedbackOutput.NeedsFeedback && input.RetryCount < input.MaxRetries {
+		// Build confidence map from this attempt's extracted data for memory
+		var attemptExtractedData map[string]*models.FieldConfidenceInfo
+		if extractOutput.Confidence != nil {
+			attemptExtractedData = make(map[string]*models.FieldConfidenceInfo, len(extractOutput.Confidence))
+			for k, v := range extractOutput.Confidence {
+				attemptExtractedData[k] = v
+			}
+		}
+
 		currentAttempt := &models.EnrichmentAttempt{
 			AttemptNumber:        input.RetryCount + 1,
 			QueryPatterns:        queryPatterns,
 			LowConfidenceColumns: feedbackOutput.LowConfidenceColumns,
 			MissingColumns:       feedbackOutput.MissingColumns,
+			CrawledURLs:          crawlOutput.CrawlResults.Sources,
+			ExtractedData:        attemptExtractedData,
 		}
 
 		previousAttempts := append(input.PreviousAttempts, currentAttempt)
