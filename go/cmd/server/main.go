@@ -66,7 +66,7 @@ func main() {
 		log.Fatalf("Failed to create Gemini pattern generator: %v", err)
 	}
 	webSearcher := services.NewSerperClient(cfg.SerperAPIKey)
-	decisionMaker, err := services.NewGeminiDecisionMaker(promptService)
+	decisionMaker, err := services.NewGeminiDecisionMaker(promptService, aiClient)
 	if err != nil {
 		log.Fatalf("Failed to create Gemini decision maker: %v", err)
 	}

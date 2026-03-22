@@ -7,7 +7,6 @@ import (
 
 	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"google.golang.org/genai"
 )
 
 type CrawlDecision struct {
@@ -23,37 +22,28 @@ type DecisionMaker interface {
 	MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error)
 }
 
-type GeminiDecisionMaker struct {
-	model         string
-	client        *genai.Client
+type AIDecisionMaker struct {
+	client        IAIClient
 	promptService IPromptService
 }
 
-func NewGeminiDecisionMaker(promptService IPromptService) (*GeminiDecisionMaker, error) {
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
-	}
-	return &GeminiDecisionMaker{
-		model:         "gemini-2.5-flash",
-		client:        client,
-		promptService: promptService,
+func NewGeminiDecisionMaker(promptService IPromptService, client IAIClient) (*AIDecisionMaker, error) {
+	return &AIDecisionMaker{
+		client,
+		promptService,
 	}, nil
 }
 
-func (g *GeminiDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error) {
+func (g *AIDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*CrawlDecision, error) {
 	prompt := g.promptService.DecisionMakerPrompt(rowKey, keyColumnDescription, columnsMetadata, serp, maxURLs)
-
-	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
+	result, err := g.client.GenerateContent(ctx, prompt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate content: %w", err)
+		return nil, err
 	}
-
-	return g.parseResponse(result.Text(), serp, columnsMetadata)
+	return g.parseResponse(result, serp, columnsMetadata)
 }
 
-func (g *GeminiDecisionMaker) parseResponse(content string, serp *models.GoogleSearchResults, columnsMetadata []*models.ColumnMetadata) (*CrawlDecision, error) {
+func (g *AIDecisionMaker) parseResponse(content string, serp *models.GoogleSearchResults, columnsMetadata []*models.ColumnMetadata) (*CrawlDecision, error) {
 	content = cleanJSONMarkdown(content)
 
 	var decision CrawlDecision
