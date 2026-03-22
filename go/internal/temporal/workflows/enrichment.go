@@ -164,11 +164,12 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	event.StartStage(models.StageDecisionMade)
 	var decisionOutput activities.DecisionOutput
 	err = workflow.ExecuteActivity(ctx, "MakeDecision", activities.DecisionInput{
-		JobID:           input.JobID,
-		RowKey:          input.RowKey,
-		SerpData:        serpOutput.SerpData,
-		ColumnsMetadata: input.ColumnsMetadata,
+		JobID:            input.JobID,
+		RowKey:           input.RowKey,
+		SerpData:         serpOutput.SerpData,
+		ColumnsMetadata:  input.ColumnsMetadata,
 		KeyColumnDescription:      input.KeyColumnDescription,
+		PreviousAttempts: input.PreviousAttempts,
 	}).Get(ctx, &decisionOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
@@ -317,6 +318,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			QueryPatterns:        queryPatterns,
 			LowConfidenceColumns: feedbackOutput.LowConfidenceColumns,
 			MissingColumns:       feedbackOutput.MissingColumns,
+			CrawledURLs:          crawlOutput.CrawlResults.Sources,
 		}
 
 		previousAttempts := append(input.PreviousAttempts, currentAttempt)

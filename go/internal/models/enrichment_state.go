@@ -73,6 +73,7 @@ type EnrichmentAttempt struct {
 	QueryPatterns        []string `json:"query_patterns"`
 	LowConfidenceColumns []string `json:"low_confidence_columns"`
 	MissingColumns       []string `json:"missing_columns"`
+	CrawledURLs          []string `json:"crawled_urls,omitempty"`
 }
 
 type ExtractionHistoryEntry struct {

@@ -10,7 +10,7 @@ import (
 
 type IPromptService interface {
 	ExtractionPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, content string) string
-	DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int) string
+	DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int, previousAttempts []*models.EnrichmentAttempt) string
 	QueryPatternPrompt(columns []*models.ColumnMetadata) string
 	QueryPatternWithFeedbackPrompt(columns []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) string
 	KeySelectorPrompt(headers []string, columns []*models.ColumnMetadata) string
@@ -30,14 +30,15 @@ func (p *PromptService) ExtractionPrompt(entity, keyDescription string, columns 
 	})
 }
 
-func (p *PromptService) DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int) string {
+func (p *PromptService) DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int, previousAttempts []*models.EnrichmentAttempt) string {
 	return renderPrompt(prompts.DecisionMaker, map[string]string{
-		"entity_context":  formatEntityContext(entity, keyDescription),
-		"entity":          entity,
-		"columns":         columnsText(columns),
-		"search_results":  searchResultsText(serp),
-		"people_also_ask": peopleAlsoAskText(serp),
-		"max_urls":        fmt.Sprintf("%d", maxURLs),
+		"entity_context":    formatEntityContext(entity, keyDescription),
+		"entity":            entity,
+		"columns":           columnsText(columns),
+		"search_results":    searchResultsText(serp),
+		"people_also_ask":   peopleAlsoAskText(serp),
+		"max_urls":          fmt.Sprintf("%d", maxURLs),
+		"previous_attempts": previousAttemptsMemory(previousAttempts),
 	})
 }
 
@@ -131,6 +132,31 @@ func keySelectorColumnsInfo(columns []*models.ColumnMetadata) string {
 		lines = append(lines, line)
 	}
 	return "\nColumn Metadata (columns to be enriched):\n" + strings.Join(lines, "\n")
+}
+
+func previousAttemptsMemory(attempts []*models.EnrichmentAttempt) string {
+	if len(attempts) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n<memory>\nThe following URLs have already been crawled in previous attempts. Do NOT select any of these URLs again:\n")
+	for _, attempt := range attempts {
+		fmt.Fprintf(&sb, "\nAttempt %d:\n", attempt.AttemptNumber)
+		if len(attempt.CrawledURLs) > 0 {
+			sb.WriteString("  Crawled URLs:\n")
+			for _, url := range attempt.CrawledURLs {
+				fmt.Fprintf(&sb, "    - %s\n", url)
+			}
+		}
+		if len(attempt.MissingColumns) > 0 {
+			fmt.Fprintf(&sb, "  Still missing: %s\n", strings.Join(attempt.MissingColumns, ", "))
+		}
+		if len(attempt.LowConfidenceColumns) > 0 {
+			fmt.Fprintf(&sb, "  Low confidence: %s\n", strings.Join(attempt.LowConfidenceColumns, ", "))
+		}
+	}
+	sb.WriteString("\nFocus on finding NEW URLs that may contain the missing or low-confidence data.\n</memory>")
+	return sb.String()
 }
 
 func truncateContent(s string) string {
