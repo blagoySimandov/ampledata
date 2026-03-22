@@ -97,7 +97,7 @@ func (v *JWTVerifier) getKeySet() jwk.Set {
 func (v *JWTVerifier) VerifyToken(tokenString string) (jwt.Token, error) {
 	keySet := v.getKeySet()
 
-	token, err := jwt.ParseString(tokenString, jwt.WithKeySet(keySet), jwt.WithValidate(true))
+	token, err := jwt.ParseString(tokenString, jwt.WithKeySet(keySet), jwt.WithValidate(true), jwt.WithAcceptableSkew(30*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}

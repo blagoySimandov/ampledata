@@ -70,43 +70,46 @@ func JobFromDomain(job *Job) *JobDB {
 type RowStateDB struct {
 	bun.BaseModel `bun:"table:row_states,alias:rs"`
 
-	ID            uuid.UUID                       `bun:"id,pk,type:uuid,default:gen_random_uuid()" json:"id"`
-	JobID         string                          `bun:"job_id,notnull,unique:job_key" json:"job_id"`
-	Job           *JobDB                          `bun:"rel:belongs-to,join:job_id=job_id,on_delete:CASCADE"`
-	Key           string                          `bun:"key,notnull,unique:job_key" json:"key"`
-	Stage         RowStage                        `bun:"stage,notnull" json:"stage"`
-	ExtractedData map[string]interface{}          `bun:"extracted_data,type:jsonb" json:"extracted_data,omitempty"`
-	Confidence    map[string]*FieldConfidenceInfo `bun:"confidence,type:jsonb" json:"confidence,omitempty"`
-	Sources       []string                        `bun:"sources,type:jsonb" json:"sources,omitempty"`
-	Error         *string                         `bun:"error" json:"error,omitempty"`
-	CreatedAt     time.Time                       `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt     time.Time                       `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+	ID                uuid.UUID                       `bun:"id,pk,type:uuid,default:gen_random_uuid()" json:"id"`
+	JobID             string                          `bun:"job_id,notnull,unique:job_key" json:"job_id"`
+	Job               *JobDB                          `bun:"rel:belongs-to,join:job_id=job_id,on_delete:CASCADE"`
+	Key               string                          `bun:"key,notnull,unique:job_key" json:"key"`
+	Stage             RowStage                        `bun:"stage,notnull" json:"stage"`
+	ExtractedData     map[string]interface{}          `bun:"extracted_data,type:jsonb" json:"extracted_data,omitempty"`
+	Confidence        map[string]*FieldConfidenceInfo `bun:"confidence,type:jsonb" json:"confidence,omitempty"`
+	Sources           []string                        `bun:"sources,type:jsonb" json:"sources,omitempty"`
+	ExtractionHistory []*ExtractionHistoryEntry       `bun:"extraction_history,type:jsonb" json:"extraction_history,omitempty"`
+	Error             *string                         `bun:"error" json:"error,omitempty"`
+	CreatedAt         time.Time                       `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt         time.Time                       `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
 func (r *RowStateDB) ToRowState() *RowState {
 	return &RowState{
-		Key:           r.Key,
-		Stage:         r.Stage,
-		ExtractedData: r.ExtractedData,
-		Confidence:    r.Confidence,
-		Sources:       r.Sources,
-		Error:         r.Error,
-		CreatedAt:     r.CreatedAt,
-		UpdatedAt:     r.UpdatedAt,
+		Key:               r.Key,
+		Stage:             r.Stage,
+		ExtractedData:     r.ExtractedData,
+		Confidence:        r.Confidence,
+		Sources:           r.Sources,
+		ExtractionHistory: r.ExtractionHistory,
+		Error:             r.Error,
+		CreatedAt:         r.CreatedAt,
+		UpdatedAt:         r.UpdatedAt,
 	}
 }
 
 func RowStateFromApp(jobID string, state *RowState) *RowStateDB {
 	return &RowStateDB{
-		JobID:         jobID,
-		Key:           state.Key,
-		Stage:         state.Stage,
-		ExtractedData: state.ExtractedData,
-		Confidence:    state.Confidence,
-		Sources:       state.Sources,
-		Error:         state.Error,
-		CreatedAt:     state.CreatedAt,
-		UpdatedAt:     state.UpdatedAt,
+		JobID:             jobID,
+		Key:               state.Key,
+		Stage:             state.Stage,
+		ExtractedData:     state.ExtractedData,
+		Confidence:        state.Confidence,
+		Sources:           state.Sources,
+		ExtractionHistory: state.ExtractionHistory,
+		Error:             state.Error,
+		CreatedAt:         state.CreatedAt,
+		UpdatedAt:         state.UpdatedAt,
 	}
 }
 

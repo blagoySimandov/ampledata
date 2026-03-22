@@ -75,22 +75,32 @@ type EnrichmentAttempt struct {
 	MissingColumns       []string `json:"missing_columns"`
 }
 
-type RowState struct {
-	Key           string                          `json:"key"`
-	Stage         RowStage                        `json:"stage"`
+type ExtractionHistoryEntry struct {
+	AttemptNumber int                             `json:"attempt_number"`
 	ExtractedData map[string]interface{}          `json:"extracted_data,omitempty"`
 	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
 	Sources       []string                        `json:"sources,omitempty"`
-	Error         *string                         `json:"error,omitempty"`
-	CreatedAt     time.Time                       `json:"created_at"`
-	UpdatedAt     time.Time                       `json:"updated_at"`
+	Reasoning     string                          `json:"reasoning,omitempty"`
+}
+
+type RowState struct {
+	Key               string                          `json:"key"`
+	Stage             RowStage                        `json:"stage"`
+	ExtractedData     map[string]interface{}          `json:"extracted_data,omitempty"`
+	Confidence        map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources           []string                        `json:"sources,omitempty"`
+	ExtractionHistory []*ExtractionHistoryEntry       `json:"extraction_history,omitempty"`
+	Error             *string                         `json:"error,omitempty"`
+	CreatedAt         time.Time                       `json:"created_at"`
+	UpdatedAt         time.Time                       `json:"updated_at"`
 }
 
 type StateUpdate struct {
-	ExtractedData map[string]interface{}          `json:"extracted_data,omitempty"`
-	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
-	Sources       []string                        `json:"sources,omitempty"`
-	Error         *string                         `json:"error,omitempty"`
+	ExtractedData     map[string]interface{}          `json:"extracted_data,omitempty"`
+	Confidence        map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
+	Sources           []string                        `json:"sources,omitempty"`
+	ExtractionHistory []*ExtractionHistoryEntry       `json:"extraction_history,omitempty"`
+	Error             *string                         `json:"error,omitempty"`
 }
 
 func (s *RowState) ApplyUpdate(u *StateUpdate) {
@@ -102,6 +112,9 @@ func (s *RowState) ApplyUpdate(u *StateUpdate) {
 	}
 	if u.Sources != nil {
 		s.Sources = u.Sources
+	}
+	if u.ExtractionHistory != nil {
+		s.ExtractionHistory = append(s.ExtractionHistory, u.ExtractionHistory...)
 	}
 	if u.Error != nil {
 		s.Error = u.Error

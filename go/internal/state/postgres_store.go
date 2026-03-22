@@ -341,6 +341,10 @@ func determineColumns(state *models.RowState) (insertCols, updateCols []string) 
 		insertCols = append(insertCols, "sources")
 		updateCols = append(updateCols, "sources")
 	}
+	if state.ExtractionHistory != nil {
+		insertCols = append(insertCols, "extraction_history")
+		updateCols = append(updateCols, "extraction_history")
+	}
 	if state.Error != nil {
 		insertCols = append(insertCols, "error")
 		updateCols = append(updateCols, "error")

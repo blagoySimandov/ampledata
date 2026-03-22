@@ -103,6 +103,7 @@ type ExtractInput struct {
 type ExtractOutput struct {
 	ExtractedData map[string]interface{}
 	Confidence    map[string]*models.FieldConfidenceInfo
+	Reasoning     string
 }
 
 type StateUpdateInput struct {
@@ -319,17 +320,17 @@ func filterMissingColumnsMetadata(missingColumns []string, allColumns []*models.
 	return result
 }
 
-func (a *Activities) extractFromContent(ctx context.Context, content, rowKey string, metadata []*models.ColumnMetadata, entityType string) (map[string]interface{}, map[string]*models.FieldConfidenceInfo, error) {
+func (a *Activities) extractFromContent(ctx context.Context, content, rowKey string, metadata []*models.ColumnMetadata, entityType string) (map[string]interface{}, map[string]*models.FieldConfidenceInfo, string, error) {
 	result, err := a.contentExtractor.Extract(ctx, content, rowKey, metadata, entityType)
 	if err != nil {
-		return nil, nil, fmt.Errorf("content extraction failed: %w", err)
+		return nil, nil, "", fmt.Errorf("content extraction failed: %w", err)
 	}
 
 	confidence := result.Confidence
 	if confidence == nil {
 		confidence = make(map[string]*models.FieldConfidenceInfo)
 	}
-	return result.ExtractedData, confidence, nil
+	return result.ExtractedData, confidence, result.Reasoning, nil
 }
 
 func mergeDecisionData(extractedData map[string]interface{}, confidence map[string]*models.FieldConfidenceInfo, decision *models.Decision) {
@@ -368,13 +369,14 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 
 	var extractedData map[string]interface{}
 	var confidence map[string]*models.FieldConfidenceInfo
+	var reasoning string
 
 	if input.CrawlResults != nil && input.CrawlResults.Content != nil && *input.CrawlResults.Content != "" {
 		missingColsMetadata := filterMissingColumnsMetadata(input.Decision.MissingColumns, input.ColumnsMetadata)
 
 		if len(missingColsMetadata) > 0 {
 			var err error
-			extractedData, confidence, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata, input.KeyColumnDescription)
+			extractedData, confidence, reasoning, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata, input.KeyColumnDescription)
 			if err != nil {
 				event.EmitActivityError(ctx, err)
 				return nil, err
@@ -418,6 +420,7 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 	return &ExtractOutput{
 		ExtractedData: finalExtractedData,
 		Confidence:    finalConfidence,
+		Reasoning:     reasoning,
 	}, nil
 }
 
