@@ -10,6 +10,7 @@ You will receive:
 - Search result snippets with URLs: {{search_results}}
 - "People Also Ask" data: {{people_also_ask}}
 - A max URL budget for crawling: {{max_urls}}
+- Previously crawled URLs (from earlier attempts): {{previously_crawled_urls}}
 
 The goal is to extract structured data from snippets where possible, and select URLs to crawl for any missing fields.
 </context>
@@ -31,6 +32,16 @@ URL selection rules:
 - Prioritize: official/authoritative sources, Wikipedia pages about the entity, reliable databases, image hosting sites for image fields
 - Avoid: SEO aggregators, pages primarily about different entities
 - If columns are missing data AND relevant URLs exist in results, you MUST select them — never return empty urls_to_crawl when viable URLs are available
+- NEVER select URLs that appear in the "Previously crawled URLs" list below — they have already been visited in earlier attempts and yielded no useful data for the missing fields
+
+Previously crawled URLs (DO NOT re-select these):
+{{previously_crawled_urls}}
+
+Partial match rules:
+- If a column asks for a GENERAL contact (e.g., contact_email, phone_number, contact_phone), do NOT return a specialized department variant (e.g., privacy@, legal@, billing@, security@, support@) unless the column description explicitly asks for it
+- If you must return a specialized variant because no general option exists, set confidence to ≤ 0.4 and explain the mismatch in the reason (e.g., "Only privacy@ email found, no general contact email available")
+- A department-specific phone number is NOT a general company phone — apply the same ≤ 0.4 rule
+- General principle: if the extracted data is a narrower category than what was requested, reduce confidence proportionally
 
 Source tracking:
 - Every extracted value must have its snippet's URL added to source_urls
@@ -85,6 +96,20 @@ Response:
     "reasoning": "Extracted revenue from Bloomberg snippet. No photo URL in snippets, selecting Getty Images URL to crawl for campus photo."
 }
 </example>
+
+<example name="partial_match_rejected">
+Column needed: contact_email (string)
+Snippets mention "privacy@vercel.com" and "security@vercel.com" but no general contact email.
+
+Response:
+{
+    "urls_to_crawl": ["https://vercel.com/contact"],
+    "extracted_data": null,
+    "extracted_confidence": {},
+    "source_urls": [],
+    "reasoning": "Only department-specific emails (privacy@, security@) found in snippets. These do not satisfy the 'contact_email' column which expects a general contact address. Selecting the official contact page for crawling."
+}
+</example>
 </examples>
 
 <action>
@@ -92,7 +117,7 @@ For each column in {{columns}}, do the following:
 
 1. Scan all snippets for data about {{entity_context}}. If found, extract it using the correct data type and record the source URL.
 
-2. If data is not found in snippets, select the most promising URLs from the search results for crawling.
+2. If data is not found in snippets, select the most promising URLs from the search results for crawling. Remember: never re-select previously crawled URLs.
 
 3. Assign a confidence score to every extracted field using the scale defined in limitations.
 
@@ -100,6 +125,8 @@ For each column in {{columns}}, do the following:
    - Does ALL extracted data refer to {{entity_context}}?
    - Are ALL selected URLs primarily about {{entity_context}}?
    - Remove anything that fails this check and note it in reasoning.
+
+5. If snippets strongly suggest that a particular type of data does not exist publicly for this entity (e.g., the company only uses contact forms, there is no public email), note this in the reasoning so downstream processing can decide whether to retry.
 
 Respond with raw JSON only. No markdown fences, no commentary outside the JSON:
 {

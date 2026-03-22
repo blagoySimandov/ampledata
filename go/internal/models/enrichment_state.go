@@ -73,6 +73,8 @@ type EnrichmentAttempt struct {
 	QueryPatterns        []string `json:"query_patterns"`
 	LowConfidenceColumns []string `json:"low_confidence_columns"`
 	MissingColumns       []string `json:"missing_columns"`
+	CrawledURLs          []string `json:"crawled_urls,omitempty"`
+	DataNotFoundColumns  []string `json:"data_not_found_columns,omitempty"`
 }
 
 type ExtractionHistoryEntry struct {
@@ -81,6 +83,7 @@ type ExtractionHistoryEntry struct {
 	Confidence    map[string]*FieldConfidenceInfo `json:"confidence,omitempty"`
 	Sources       []string                        `json:"sources,omitempty"`
 	Reasoning     string                          `json:"reasoning,omitempty"`
+	DataNotFound  map[string]string               `json:"data_not_found,omitempty"`
 }
 
 type RowState struct {

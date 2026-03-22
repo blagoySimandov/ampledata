@@ -68,11 +68,12 @@ type SerpFetchOutput struct {
 }
 
 type DecisionInput struct {
-	JobID           string
-	RowKey          string
-	SerpData        *models.SerpData
-	ColumnsMetadata []*models.ColumnMetadata
-	KeyColumnDescription      string
+	JobID                string
+	RowKey               string
+	SerpData             *models.SerpData
+	ColumnsMetadata      []*models.ColumnMetadata
+	KeyColumnDescription string
+	PreviousAttempts     []*models.EnrichmentAttempt
 }
 
 type DecisionOutput struct {
@@ -104,6 +105,7 @@ type ExtractOutput struct {
 	ExtractedData map[string]interface{}
 	Confidence    map[string]*models.FieldConfidenceInfo
 	Reasoning     string
+	DataNotFound  map[string]string
 }
 
 type StateUpdateInput struct {
@@ -119,6 +121,7 @@ type FeedbackAnalysisInput struct {
 	ExtractedData   map[string]interface{}
 	Confidence      map[string]*models.FieldConfidenceInfo
 	ColumnsMetadata []*models.ColumnMetadata
+	DataNotFound    map[string]string
 }
 
 type FeedbackAnalysisOutput struct {
@@ -232,7 +235,8 @@ func (a *Activities) MakeDecision(ctx context.Context, input DecisionInput) (*De
 	}
 
 	mergedResults := mergeSerpResults(input.SerpData.Results)
-	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata, input.KeyColumnDescription)
+	previouslyCrawledURLs := collectPreviouslyCrawledURLs(input.PreviousAttempts)
+	crawlDecision, err := a.decisionMaker.MakeDecision(ctx, mergedResults, input.RowKey, 3, input.ColumnsMetadata, input.KeyColumnDescription, previouslyCrawledURLs)
 	if err != nil {
 		event.EmitActivityError(ctx, fmt.Errorf("decision making failed: %w", err))
 		return nil, fmt.Errorf("decision making failed: %w", err)
@@ -307,6 +311,20 @@ func (a *Activities) Crawl(ctx context.Context, input CrawlInput) (*CrawlOutput,
 	}, nil
 }
 
+func collectPreviouslyCrawledURLs(attempts []*models.EnrichmentAttempt) []string {
+	seen := make(map[string]bool)
+	var urls []string
+	for _, attempt := range attempts {
+		for _, url := range attempt.CrawledURLs {
+			if url != "" && !seen[url] {
+				seen[url] = true
+				urls = append(urls, url)
+			}
+		}
+	}
+	return urls
+}
+
 func filterMissingColumnsMetadata(missingColumns []string, allColumns []*models.ColumnMetadata) []*models.ColumnMetadata {
 	result := []*models.ColumnMetadata{}
 	for _, colName := range missingColumns {
@@ -320,17 +338,17 @@ func filterMissingColumnsMetadata(missingColumns []string, allColumns []*models.
 	return result
 }
 
-func (a *Activities) extractFromContent(ctx context.Context, content, rowKey string, metadata []*models.ColumnMetadata, entityType string) (map[string]interface{}, map[string]*models.FieldConfidenceInfo, string, error) {
+func (a *Activities) extractFromContent(ctx context.Context, content, rowKey string, metadata []*models.ColumnMetadata, entityType string) (map[string]interface{}, map[string]*models.FieldConfidenceInfo, string, map[string]string, error) {
 	result, err := a.contentExtractor.Extract(ctx, content, rowKey, metadata, entityType)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("content extraction failed: %w", err)
+		return nil, nil, "", nil, fmt.Errorf("content extraction failed: %w", err)
 	}
 
 	confidence := result.Confidence
 	if confidence == nil {
 		confidence = make(map[string]*models.FieldConfidenceInfo)
 	}
-	return result.ExtractedData, confidence, result.Reasoning, nil
+	return result.ExtractedData, confidence, result.Reasoning, result.DataNotFound, nil
 }
 
 func mergeDecisionData(extractedData map[string]interface{}, confidence map[string]*models.FieldConfidenceInfo, decision *models.Decision) {
@@ -370,13 +388,14 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 	var extractedData map[string]interface{}
 	var confidence map[string]*models.FieldConfidenceInfo
 	var reasoning string
+	var dataNotFound map[string]string
 
 	if input.CrawlResults != nil && input.CrawlResults.Content != nil && *input.CrawlResults.Content != "" {
 		missingColsMetadata := filterMissingColumnsMetadata(input.Decision.MissingColumns, input.ColumnsMetadata)
 
 		if len(missingColsMetadata) > 0 {
 			var err error
-			extractedData, confidence, reasoning, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata, input.KeyColumnDescription)
+			extractedData, confidence, reasoning, dataNotFound, err = a.extractFromContent(ctx, *input.CrawlResults.Content, input.RowKey, missingColsMetadata, input.KeyColumnDescription)
 			if err != nil {
 				event.EmitActivityError(ctx, err)
 				return nil, err
@@ -421,6 +440,7 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 		ExtractedData: finalExtractedData,
 		Confidence:    finalConfidence,
 		Reasoning:     reasoning,
+		DataNotFound:  dataNotFound,
 	}, nil
 }
 
@@ -441,7 +461,17 @@ func (a *Activities) AnalyzeFeedback(ctx context.Context, input FeedbackAnalysis
 		AverageConfidence:    1.0,
 	}
 
+	// Build set of columns the LLM determined don't exist publicly.
+	// These should NOT trigger a retry — the data genuinely isn't there.
+	notFoundSet := make(map[string]bool, len(input.DataNotFound))
+	for col := range input.DataNotFound {
+		notFoundSet[col] = true
+	}
+
 	for _, col := range input.ColumnsMetadata {
+		if notFoundSet[col.Name] {
+			continue
+		}
 		if _, exists := input.ExtractedData[col.Name]; !exists {
 			output.MissingColumns = append(output.MissingColumns, col.Name)
 		}
@@ -452,6 +482,9 @@ func (a *Activities) AnalyzeFeedback(ctx context.Context, input FeedbackAnalysis
 	var confidenceCount int
 
 	for colName, confInfo := range input.Confidence {
+		if notFoundSet[colName] {
+			continue
+		}
 		totalConfidence += confInfo.Score
 		confidenceCount++
 

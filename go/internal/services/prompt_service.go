@@ -10,7 +10,7 @@ import (
 
 type IPromptService interface {
 	ExtractionPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, content string) string
-	DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int) string
+	DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int, previouslyCrawledURLs []string) string
 	QueryPatternPrompt(columns []*models.ColumnMetadata) string
 	QueryPatternWithFeedbackPrompt(columns []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) string
 	KeySelectorPrompt(headers []string, columns []*models.ColumnMetadata) string
@@ -30,15 +30,27 @@ func (p *PromptService) ExtractionPrompt(entity, keyDescription string, columns 
 	})
 }
 
-func (p *PromptService) DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int) string {
+func (p *PromptService) DecisionMakerPrompt(entity, keyDescription string, columns []*models.ColumnMetadata, serp *models.GoogleSearchResults, maxURLs int, previouslyCrawledURLs []string) string {
 	return renderPrompt(prompts.DecisionMaker, map[string]string{
-		"entity_context":  formatEntityContext(entity, keyDescription),
-		"entity":          entity,
-		"columns":         columnsText(columns),
-		"search_results":  searchResultsText(serp),
-		"people_also_ask": peopleAlsoAskText(serp),
-		"max_urls":        fmt.Sprintf("%d", maxURLs),
+		"entity_context":         formatEntityContext(entity, keyDescription),
+		"entity":                 entity,
+		"columns":                columnsText(columns),
+		"search_results":         searchResultsText(serp),
+		"people_also_ask":        peopleAlsoAskText(serp),
+		"max_urls":               fmt.Sprintf("%d", maxURLs),
+		"previously_crawled_urls": previouslyCrawledURLsText(previouslyCrawledURLs),
 	})
+}
+
+func previouslyCrawledURLsText(urls []string) string {
+	if len(urls) == 0 {
+		return "None"
+	}
+	var sb strings.Builder
+	for _, url := range urls {
+		fmt.Fprintf(&sb, "- %s\n", url)
+	}
+	return sb.String()
 }
 
 func (p *PromptService) QueryPatternPrompt(columns []*models.ColumnMetadata) string {

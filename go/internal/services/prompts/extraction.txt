@@ -45,6 +45,13 @@
     <example>Content says "CEO since 2019" and current_date is 2025 → extract with score ≤0.6, reason: "CEO role stated as of 2019, may have changed in 6 years"</example>
   </inference_guidelines>
 
+  <partial_match_rules>
+    <rule>If a column asks for a GENERAL contact (e.g., contact_email, phone_number), do NOT return a specialized department variant (e.g., privacy@, legal@, billing@, support@) as if it were the general contact.</rule>
+    <rule>If you must return a specialized variant because no general option exists, set confidence to ≤ 0.4 and explain the mismatch: "Only privacy@ email found, no general contact email in content"</rule>
+    <rule>A department phone number is NOT a general company phone — same ≤ 0.4 rule applies.</rule>
+    <rule>General principle: if the extracted data is a narrower or more specific category than what was requested, reduce confidence proportionally to reflect the mismatch.</rule>
+  </partial_match_rules>
+
   <temporal_awareness>
     <rule>Use current_date ({{current_date}}) to assess how fresh the extracted data is.</rule>
     <rule>If the content references a specific date or year for a data point, compare it to current_date to gauge staleness.</rule>
@@ -72,6 +79,22 @@
     Always accompany null with a confidence score of 0.0 and a reason explaining the absence.
   </null_values>
 </extraction_rules>
+
+<data_not_found_rules>
+  Sometimes data genuinely does not exist publicly. Use the "data_not_found" field to signal this.
+
+  Add a column to "data_not_found" ONLY when you have STRONG EVIDENCE that the information does not exist publicly — not merely when you failed to find it in this particular page. Examples:
+  - The entity's official contact page shows only a contact form / ticketing system with no email address
+  - The page explicitly states "We do not publish [X]"
+  - The content is the entity's official page and comprehensively covers the topic area but the specific data point is absent
+
+  Do NOT use "data_not_found" when:
+  - The page simply doesn't mention the field (it might exist elsewhere)
+  - The page is a third-party source that may be incomplete
+  - You're uncertain whether the data exists
+
+  When a column appears in "data_not_found", also set it to null in "extracted_data" with confidence 0.0.
+</data_not_found_rules>
 
 <validation>
   <step name="entity_check">
@@ -106,10 +129,14 @@
             "reason": "Brief 1-sentence explanation"
         }
     },
+    "data_not_found": {
+        "field_name": "Brief explanation of why this data does not exist publicly"
+    },
     "reasoning": "Overall extraction summary including any inferences made and why"
 }
   </schema>
   <requirement>Every field listed in fields_to_extract MUST appear in both extracted_data and confidence, even if the value is null.</requirement>
+  <requirement>The "data_not_found" object should only contain fields for which you have strong evidence the data does not exist publicly. It may be empty ({}) if all fields could potentially exist.</requirement>
 </response_format>
 
 <confidence_scoring>
@@ -147,5 +174,6 @@
     - Source is indirect (third-party descriptions, not primary source)
     - Value is inferred rather than explicitly stated
     - Data is stale relative to current_date for time-sensitive fields (see temporal_awareness rules)
+    - Extracted data is a narrower/specialized category than what the column requested (see partial_match_rules)
   </penalty>
 </confidence_scoring>

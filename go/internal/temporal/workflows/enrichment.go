@@ -82,6 +82,23 @@ func mergeBestConfidence(
 	return base, baseConf
 }
 
+// mergeDataNotFound collects all data-not-found conclusions from previous
+// attempts and merges them with the current attempt's findings. This prevents
+// the retry loop from re-attempting columns that have been conclusively
+// determined to not exist publicly.
+func mergeDataNotFound(previousAttempts []*models.EnrichmentAttempt, current map[string]string) map[string]string {
+	merged := make(map[string]string)
+	for _, attempt := range previousAttempts {
+		for _, col := range attempt.DataNotFoundColumns {
+			merged[col] = "Determined not to exist in a previous attempt"
+		}
+	}
+	for col, reason := range current {
+		merged[col] = reason
+	}
+	return merged
+}
+
 func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*EnrichmentWorkflowOutput, error) {
 	info := workflow.GetInfo(ctx)
 	event := logger.NewEnrichmentEvent(input.JobID, input.RowKey, "")
@@ -164,11 +181,12 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	event.StartStage(models.StageDecisionMade)
 	var decisionOutput activities.DecisionOutput
 	err = workflow.ExecuteActivity(ctx, "MakeDecision", activities.DecisionInput{
-		JobID:           input.JobID,
-		RowKey:          input.RowKey,
-		SerpData:        serpOutput.SerpData,
-		ColumnsMetadata: input.ColumnsMetadata,
-		KeyColumnDescription:      input.KeyColumnDescription,
+		JobID:                input.JobID,
+		RowKey:               input.RowKey,
+		SerpData:             serpOutput.SerpData,
+		ColumnsMetadata:      input.ColumnsMetadata,
+		KeyColumnDescription: input.KeyColumnDescription,
+		PreviousAttempts:     input.PreviousAttempts,
 	}).Get(ctx, &decisionOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("Decision making failed: %v", err)
@@ -286,6 +304,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		Confidence:    extractOutput.Confidence,
 		Sources:       allSources,
 		Reasoning:     extractOutput.Reasoning,
+		DataNotFound:  extractOutput.DataNotFound,
 	}
 	enrichedData.ExtractionHistory = []*models.ExtractionHistoryEntry{historyEntry}
 
@@ -302,6 +321,9 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	output.ExtractionHistory = []*models.ExtractionHistoryEntry{historyEntry}
 	output.Success = true
 
+	// Accumulate data_not_found from all previous attempts plus this one
+	allDataNotFound := mergeDataNotFound(input.PreviousAttempts, extractOutput.DataNotFound)
+
 	var feedbackOutput activities.FeedbackAnalysisOutput
 	workflow.ExecuteActivity(ctx, "AnalyzeFeedback", activities.FeedbackAnalysisInput{
 		JobID:           input.JobID,
@@ -309,14 +331,22 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		ExtractedData:   extractOutput.ExtractedData,
 		Confidence:      extractOutput.Confidence,
 		ColumnsMetadata: input.ColumnsMetadata,
+		DataNotFound:    allDataNotFound,
 	}).Get(ctx, &feedbackOutput)
 
 	if feedbackOutput.NeedsFeedback && input.RetryCount < input.MaxRetries {
+		dataNotFoundCols := make([]string, 0, len(allDataNotFound))
+		for col := range allDataNotFound {
+			dataNotFoundCols = append(dataNotFoundCols, col)
+		}
+
 		currentAttempt := &models.EnrichmentAttempt{
 			AttemptNumber:        input.RetryCount + 1,
 			QueryPatterns:        queryPatterns,
 			LowConfidenceColumns: feedbackOutput.LowConfidenceColumns,
 			MissingColumns:       feedbackOutput.MissingColumns,
+			CrawledURLs:          crawlOutput.CrawlResults.Sources,
+			DataNotFoundColumns:  dataNotFoundCols,
 		}
 
 		previousAttempts := append(input.PreviousAttempts, currentAttempt)

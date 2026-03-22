@@ -12,6 +12,7 @@ type ExtractionResult struct {
 	ExtractedData map[string]interface{}                 `json:"extracted_data"`
 	Confidence    map[string]*models.FieldConfidenceInfo `json:"confidence"`
 	Reasoning     string                                 `json:"reasoning"`
+	DataNotFound  map[string]string                      `json:"data_not_found,omitempty"`
 }
 
 type IContentExtractor interface {
