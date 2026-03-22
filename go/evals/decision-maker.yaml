@@ -16,6 +16,7 @@ defaultTest:
     provider: openai:gpt-5.4
   vars:
     current_date: "2026-03-20"
+    previously_crawled_urls: "None"
   assert:
     - type: javascript
       label: "valid JSON (with or without markdown fences)"
@@ -495,3 +496,123 @@ tests:
           1. Disambiguation: the model extracted planetary data (orbital period ~87.97 days, distance ~57.9M km) — not element properties (atomic number, boiling point), not company data (founded year, headquarters), and not car brand data.
           2. Source quality: source_urls or urls_to_crawl should reference en.wikipedia.org/wiki/Mercury_(planet), britannica.com, or nasa.gov — not the element, fintech, or automobile pages.
           3. Confidence: both columns are stable scientific constants available in multiple authoritative snippets, so confidence scores should be ≥ 0.9.
+
+  # ──────────────────────────────────────────────
+  # Crawl memory — must not re-select previously crawled URLs
+  # ──────────────────────────────────────────────
+  - description: "Crawl memory — avoids previously crawled URLs"
+    vars:
+      entity_context: '"Vercel" (context: cloud platform for frontend frameworks)'
+      entity: "Vercel"
+      columns: "- employee_count [type: number]\n- annual_revenue_usd [type: number]"
+      previously_crawled_urls: |
+        - https://en.wikipedia.org/wiki/Vercel
+        - https://www.crunchbase.com/organization/vercel
+      search_results: |
+        Position 1: Vercel - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Vercel
+        Snippet: Vercel Inc. is an American cloud computing company. The company maintains the Next.js web development framework. Vercel has approximately 600 employees.
+        ---
+        Position 2: Vercel - Crunchbase Company Profile & Funding
+        URL: https://www.crunchbase.com/organization/vercel
+        Snippet: Vercel has 600 employees and has raised $563M in funding. Last funding round was Series D in 2022 at $2.5B valuation.
+        ---
+        Position 3: Vercel 2026 Company Profile - PitchBook
+        URL: https://pitchbook.com/profiles/company/vercel-234567
+        Snippet: Vercel company profile including valuation, funding, revenue estimates. Estimated annual revenue: $200M+.
+        ---
+        Position 4: Vercel | Company Overview & News - Forbes
+        URL: https://www.forbes.com/companies/vercel/
+        Date: Jan 15, 2026
+        Snippet: Vercel is a cloud platform for frontend frameworks and static sites. Employees: ~600.
+        ---
+        Position 5: Vercel - LinkedIn
+        URL: https://www.linkedin.com/company/vercel
+        Snippet: Vercel is a platform for frontend developers, providing the speed and reliability innovators need to create at the moment of inspiration.
+        ---
+      people_also_ask: ""
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "urls_to_crawl does NOT contain previously crawled Wikipedia URL"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          return !d.urls_to_crawl.includes('https://en.wikipedia.org/wiki/Vercel');
+      - type: javascript
+        label: "urls_to_crawl does NOT contain previously crawled Crunchbase URL"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          return !d.urls_to_crawl.includes('https://www.crunchbase.com/organization/vercel');
+      - type: javascript
+        label: "urls_to_crawl contains only fresh (non-crawled) URLs"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const blocklist = ['https://en.wikipedia.org/wiki/Vercel', 'https://www.crunchbase.com/organization/vercel'];
+          return d.urls_to_crawl.every(u => !blocklist.includes(u));
+
+  # ──────────────────────────────────────────────
+  # Partial match — department email should not satisfy general contact_email
+  # ──────────────────────────────────────────────
+  - description: "Partial match — department email rejected for contact_email"
+    vars:
+      entity_context: '"Vercel" (context: cloud platform company)'
+      entity: "Vercel"
+      columns: "- contact_email [type: string]\n- headquarters [type: string]"
+      search_results: |
+        Position 1: Vercel Privacy Policy
+        URL: https://vercel.com/legal/privacy-policy
+        Snippet: For privacy inquiries, contact privacy@vercel.com. Vercel Inc., 340 S Lemon Ave #4133, Walnut, CA 91789.
+        ---
+        Position 2: Vercel Security
+        URL: https://vercel.com/security
+        Snippet: Report security vulnerabilities to security@vercel.com. We take security seriously.
+        ---
+        Position 3: Vercel - Contact Us
+        URL: https://vercel.com/contact
+        Snippet: Get in touch with the Vercel team. For sales inquiries, enterprise plans, and partnerships.
+        ---
+        Position 4: Vercel Support
+        URL: https://vercel.com/help
+        Snippet: Get help with your Vercel account. Submit a support ticket or browse our documentation.
+        ---
+        Position 5: Vercel - Wikipedia
+        URL: https://en.wikipedia.org/wiki/Vercel
+        Snippet: Vercel Inc. is headquartered in San Francisco, California. The company was founded by Guillermo Rauch in 2015.
+        ---
+      people_also_ask: ""
+      max_urls: "3"
+    assert:
+      - type: javascript
+        label: "contact_email is NOT privacy@ or security@ (or is null)"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const email = d.extracted_data?.contact_email;
+          if (email === null || email === undefined) return true;
+          const lower = email.toLowerCase();
+          return !lower.startsWith('privacy@') && !lower.startsWith('security@');
+      - type: javascript
+        label: "if contact_email is a dept email, confidence is ≤ 0.4"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const email = d.extracted_data?.contact_email;
+          if (email === null || email === undefined) return true;
+          const lower = email.toLowerCase();
+          const isDept = lower.startsWith('privacy@') || lower.startsWith('security@') || lower.startsWith('legal@') || lower.startsWith('billing@');
+          if (!isDept) return true;
+          const conf = d.extracted_confidence?.contact_email;
+          return conf && conf.score <= 0.4;
+      - type: javascript
+        label: "headquarters mentions San Francisco or Walnut CA"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const hq = d.extracted_data?.headquarters;
+          if (hq === null || hq === undefined) return false;
+          const lower = hq.toLowerCase();
+          return lower.includes('san francisco') || lower.includes('walnut');
+      - type: javascript
+        label: "urls_to_crawl includes contact page for missing email"
+        value: |
+          const d = JSON.parse(output.replace(/^```(?:json)?\s*/, "").replace(/```\s*$/, ""));
+          const email = d.extracted_data?.contact_email;
+          if (email !== null && email !== undefined) return true;
+          return d.urls_to_crawl.some(u => u.includes('vercel.com/contact'));

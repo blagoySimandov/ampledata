@@ -2,10 +2,10 @@
 description: "Extraction prompt — v1 vs v2 on Gemini 2.5 Flash"
 
 prompts:
-  - id: file://prompts/extraction-v2-clear.txt
-    label: v2-clear
-  # - id: file://../internal/services/prompts/extraction.txt
-  #   label: v1-verbose
+  - id: file://../internal/services/prompts/extraction.txt
+    label: v3-production
+  # - id: file://prompts/extraction-v2-clear.txt
+  #   label: v2-clear
 
 providers:
   - id: google:gemini-2.5-flash
@@ -42,6 +42,13 @@ defaultTest:
           typeof c.score === 'number' && c.score >= 0 && c.score <= 1 &&
           typeof c.reason === 'string'
         );
+    - type: javascript
+      label: "data_not_found is an object or absent"
+      value: |
+        const d = JSON.parse(output);
+        if (!('data_not_found' in d)) return true;
+        const dnf = d.data_not_found;
+        return typeof dnf === 'object' && dnf !== null && !Array.isArray(dnf);
 
 tests:
   # ──────────────────────────────────────────────
@@ -506,3 +513,134 @@ tests:
         value: |
           const d = JSON.parse(output);
           return d.extracted_data?.ipo_date === null || d.extracted_data?.ipo_date === undefined;
+
+  # ──────────────────────────────────────────────
+  # 13. Partial match — department email for general contact
+  # ──────────────────────────────────────────────
+  - description: "Partial match — department email penalized for general contact_email"
+    vars:
+      entity_context: '"Acme Corp" (context: B2B SaaS company)'
+      entity: "Acme Corp"
+      columns: |
+        - contact_email [type: string]
+        - contact_phone [type: string]
+        - headquarters [type: string]
+      content: |
+        Acme Corp - Legal Notices
+
+        For legal inquiries, please contact legal@acmecorp.com. For data protection requests under GDPR, email dpo@acmecorp.com.
+
+        Acme Corp is headquartered in Austin, Texas. For billing disputes, call our billing department at +1-555-0199.
+
+        © 2024 Acme Corp. All rights reserved.
+    assert:
+      - type: javascript
+        label: "contact_email is null or has ≤0.4 confidence if dept email"
+        value: |
+          const d = JSON.parse(output);
+          const email = d.extracted_data?.contact_email;
+          if (email === null || email === undefined) return true;
+          const lower = email.toLowerCase();
+          const isDept = lower.startsWith('legal@') || lower.startsWith('dpo@') || lower.startsWith('billing@');
+          if (!isDept) return true;
+          const conf = d.confidence?.contact_email;
+          return conf && conf.score <= 0.4;
+      - type: javascript
+        label: "contact_phone is null or has ≤0.4 confidence if billing dept phone"
+        value: |
+          const d = JSON.parse(output);
+          const phone = d.extracted_data?.contact_phone;
+          if (phone === null || phone === undefined) return true;
+          const conf = d.confidence?.contact_phone;
+          return conf && conf.score <= 0.4;
+      - type: javascript
+        label: "headquarters mentions Austin"
+        value: |
+          const d = JSON.parse(output);
+          const hq = d.extracted_data?.headquarters;
+          return typeof hq === 'string' && hq.toLowerCase().includes('austin');
+
+  # ──────────────────────────────────────────────
+  # 14. Data not found — contact form only, no email exists
+  # ──────────────────────────────────────────────
+  - description: "Data not found — entity uses contact form only, no public email"
+    vars:
+      entity_context: '"CloudWidget" (context: cloud infrastructure company)'
+      entity: "CloudWidget"
+      columns: |
+        - contact_email [type: string]
+        - founded_year [type: number]
+        - headquarters [type: string]
+      content: |
+        CloudWidget - Contact Us
+
+        We'd love to hear from you! Please use the contact form below to reach our team.
+        We do not publish email addresses. All inquiries must be submitted through this form.
+
+        Our support team typically responds within 24 hours.
+
+        CloudWidget was founded in 2021 and is headquartered in Portland, Oregon.
+
+        For press inquiries, please use the form above and select "Press" as the inquiry type.
+    assert:
+      - type: javascript
+        label: "contact_email is null"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.contact_email === null || d.extracted_data?.contact_email === undefined;
+      - type: javascript
+        label: "data_not_found includes contact_email"
+        value: |
+          const d = JSON.parse(output);
+          const dnf = d.data_not_found || {};
+          return 'contact_email' in dnf;
+      - type: javascript
+        label: "data_not_found does NOT include founded_year or headquarters"
+        value: |
+          const d = JSON.parse(output);
+          const dnf = d.data_not_found || {};
+          return !('founded_year' in dnf) && !('headquarters' in dnf);
+      - type: javascript
+        label: "founded_year is 2021"
+        value: |
+          const d = JSON.parse(output);
+          return d.extracted_data?.founded_year === 2021;
+      - type: javascript
+        label: "headquarters mentions Portland"
+        value: |
+          const d = JSON.parse(output);
+          const hq = d.extracted_data?.headquarters;
+          return typeof hq === 'string' && hq.toLowerCase().includes('portland');
+
+  # ──────────────────────────────────────────────
+  # 15. Data not found — must NOT trigger for absent-but-plausible data
+  # ──────────────────────────────────────────────
+  - description: "Data not found — third-party page should NOT trigger data_not_found"
+    vars:
+      entity_context: '"Raycast" (context: productivity launcher app)'
+      entity: "Raycast"
+      columns: |
+        - annual_revenue_usd [type: number]
+        - contact_email [type: string]
+        - employee_count [type: number]
+      content: |
+        Raycast – Your Shortcut to Everything
+
+        Raycast is a blazingly fast, extensible launcher for macOS. Founded in 2020 by Thomas Paul Mann and Petr Nikolaev, the company is based in Berlin, Germany.
+
+        Raycast has a growing team and an active community of developers building extensions.
+
+        The company has raised over $30 million in venture funding from Accel and Coatue Management.
+    assert:
+      - type: javascript
+        label: "data_not_found is empty or absent (no strong evidence these don't exist)"
+        value: |
+          const d = JSON.parse(output);
+          const dnf = d.data_not_found || {};
+          return Object.keys(dnf).length === 0;
+      - type: javascript
+        label: "annual_revenue_usd is null (not hallucinated from funding)"
+        value: |
+          const d = JSON.parse(output);
+          const rev = d.extracted_data?.annual_revenue_usd;
+          return rev === null || rev === undefined;
