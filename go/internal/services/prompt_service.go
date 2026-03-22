@@ -148,12 +148,6 @@ func previousAttemptsMemory(attempts []*models.EnrichmentAttempt) string {
 				fmt.Fprintf(&sb, "    - %s\n", url)
 			}
 		}
-		if len(attempt.ExtractedData) > 0 {
-			sb.WriteString("  Already extracted (do not re-extract these):\n")
-			for field, conf := range attempt.ExtractedData {
-				fmt.Fprintf(&sb, "    - %s (confidence: %.2f)\n", field, conf.Score)
-			}
-		}
 		if len(attempt.MissingColumns) > 0 {
 			fmt.Fprintf(&sb, "  Still missing: %s\n", strings.Join(attempt.MissingColumns, ", "))
 		}

@@ -313,22 +313,12 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}).Get(ctx, &feedbackOutput)
 
 	if feedbackOutput.NeedsFeedback && input.RetryCount < input.MaxRetries {
-		// Build confidence map from this attempt's extracted data for memory
-		var attemptExtractedData map[string]*models.FieldConfidenceInfo
-		if extractOutput.Confidence != nil {
-			attemptExtractedData = make(map[string]*models.FieldConfidenceInfo, len(extractOutput.Confidence))
-			for k, v := range extractOutput.Confidence {
-				attemptExtractedData[k] = v
-			}
-		}
-
 		currentAttempt := &models.EnrichmentAttempt{
 			AttemptNumber:        input.RetryCount + 1,
 			QueryPatterns:        queryPatterns,
 			LowConfidenceColumns: feedbackOutput.LowConfidenceColumns,
 			MissingColumns:       feedbackOutput.MissingColumns,
 			CrawledURLs:          crawlOutput.CrawlResults.Sources,
-			ExtractedData:        attemptExtractedData,
 		}
 
 		previousAttempts := append(input.PreviousAttempts, currentAttempt)
