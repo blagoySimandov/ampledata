@@ -6,7 +6,7 @@ import type {
 } from "@/api";
 import { useApi, useSourceData, useAllJobsRows } from "@/hooks";
 import { useMemo } from "react";
-import type { RowData, MergedDataResult } from "../types";
+import type { RowData, MergedDataResult, HistoryEntryForField } from "../types";
 import type { UseQueryResult } from "@tanstack/react-query";
 
 // ─── Row building ────────────────────────────────────────────────────────────
@@ -125,6 +125,28 @@ function applyStages(
   for (const col of job.columns_metadata) row.__stages[col.name] = jobRow.stage;
 }
 
+function applyExtractionHistory(row: RowData, jobRow: RowProgressItem) {
+  if (!jobRow.extraction_history || jobRow.extraction_history.length === 0)
+    return;
+  row.__extractionHistory ??= {};
+  for (const entry of jobRow.extraction_history) {
+    const fields = new Set([
+      ...Object.keys(entry.extracted_data ?? {}),
+      ...Object.keys(entry.confidence ?? {}),
+    ]);
+    for (const field of fields) {
+      row.__extractionHistory[field] ??= [];
+      row.__extractionHistory[field].push({
+        attempt_number: entry.attempt_number,
+        value: entry.extracted_data?.[field],
+        confidence: entry.confidence?.[field],
+        sources: entry.sources ?? undefined,
+        reasoning: entry.reasoning ?? undefined,
+      } satisfies HistoryEntryForField);
+    }
+  }
+}
+
 function enrichRowWithJobResult(
   row: RowData,
   jobRow: RowProgressItem,
@@ -135,6 +157,7 @@ function enrichRowWithJobResult(
   applyConfidence(row, jobRow, enrichedCols);
   applySourceLinks(row, jobRow, job);
   applyStages(row, jobRow, job);
+  applyExtractionHistory(row, jobRow);
 }
 
 // ─── Job application ─────────────────────────────────────────────────────────

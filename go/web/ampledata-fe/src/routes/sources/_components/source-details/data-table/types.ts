@@ -10,11 +10,20 @@ export interface ConfidenceConfig {
   borderColor: string;
 }
 
+export interface HistoryEntryForField {
+  attempt_number: number;
+  value: unknown;
+  confidence: ConfidenceEntry | undefined;
+  sources: string[] | undefined;
+  reasoning: string | undefined;
+}
+
 export interface RowData {
   __index: string;
   __confidence?: Record<string, ConfidenceEntry>;
   __stages?: Record<string, string>;
   __sources?: Record<string, string[]>;
+  __extractionHistory?: Record<string, HistoryEntryForField[]>;
   [field: string]: unknown;
 }
 

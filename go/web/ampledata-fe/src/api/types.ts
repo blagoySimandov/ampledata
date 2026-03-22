@@ -85,6 +85,14 @@ export interface FieldConfidenceInfo {
   reason: string;
 }
 
+export interface ExtractionHistoryEntry {
+  attempt_number: number;
+  extracted_data?: Record<string, unknown> | null;
+  confidence?: Record<string, FieldConfidenceInfo> | null;
+  sources?: string[] | null;
+  reasoning?: string | null;
+}
+
 export interface RowProgressItem {
   key: string;
   stage: RowStage;
@@ -93,6 +101,7 @@ export interface RowProgressItem {
   error?: string | null;
   extracted_data?: Record<string, unknown> | null;
   sources?: string[] | null;
+  extraction_history?: ExtractionHistoryEntry[] | null;
 }
 
 export interface PaginationInfo {

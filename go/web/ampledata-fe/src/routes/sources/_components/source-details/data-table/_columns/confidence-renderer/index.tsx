@@ -9,6 +9,7 @@ import { ConfidenceHeader } from "./header";
 import { SourcesList } from "./source-list";
 import { CellContent } from "./cell-content";
 import { StageFooter } from "./stage-footer";
+import { ExtractionHistory } from "./extraction-history";
 
 interface ConfidenceDataRendererParams {
   colDef: { field: string };
@@ -58,6 +59,7 @@ export function ConfidenceDataRenderer(params: ConfidenceDataRendererParams) {
   const confidence = params.data.__confidence?.[field];
   const stage = params.data.__stages?.[field];
   const sources = params.data.__sources?.[field];
+  const extractionHistory = params.data.__extractionHistory?.[field] ?? [];
   const hasValue =
     params.value !== undefined && params.value !== null && params.value !== "";
 
@@ -91,6 +93,9 @@ export function ConfidenceDataRenderer(params: ConfidenceDataRendererParams) {
         <div className="p-4 space-y-4">
           <ConfidenceHeader config={confConfig} confidence={confidence} />
           {sources && sources.length > 0 && <SourcesList sources={sources} />}
+          {extractionHistory.length > 0 && (
+            <ExtractionHistory history={extractionHistory} />
+          )}
           {stage && <StageFooter stage={stage} />}
         </div>
       </PopoverContent>
