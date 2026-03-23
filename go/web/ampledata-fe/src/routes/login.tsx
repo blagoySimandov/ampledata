@@ -6,7 +6,7 @@ import logo from "../../assets/ampledata-logo.png";
 export const Route = createFileRoute("/login")({
   beforeLoad: ({ context }) => {
     if (context.auth.user) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/app" });
     }
   },
   component: LoginPage,

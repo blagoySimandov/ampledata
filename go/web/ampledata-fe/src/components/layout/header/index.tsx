@@ -8,11 +8,11 @@ export function Header() {
   return (
     <header className="sticky top-0 z-10 w-full border-b bg-background border-border shadow-sm">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-        <Link to="/">
+        <Link to="/app">
           <img src={logo} alt="AmpleData" className="h-12 w-auto" />
         </Link>
         <nav className="flex items-center gap-4">
-          <NavLink to="/">Jobs</NavLink>
+          <NavLink to="/app">Jobs</NavLink>
           <CreditsWidget />
           <UserMenu />
         </nav>
