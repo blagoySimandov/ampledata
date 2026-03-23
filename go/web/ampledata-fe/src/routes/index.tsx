@@ -3,13 +3,9 @@ import {
   ArrowRight,
   Bot,
   CheckCircle,
-  Database,
   FileText,
-  Globe,
-  Layers,
   Search,
   Sparkles,
-  Zap,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import logo from "../../assets/ampledata-logo.png";
@@ -207,63 +203,37 @@ function EnrichmentMockHero() {
 const PIPELINE_NODES = [
   {
     icon: FileText,
-    label: "CSV Upload",
-    desc: "Raw dataset",
-    color: "bg-slate-100 text-slate-700",
-  },
-  {
-    icon: Database,
-    label: "Key Columns",
-    desc: "Entity ID",
-    color: "bg-primary/10 text-primary",
+    label: "Upload file",
+    desc: "Drop in CSV or JSON",
+    color: "bg-slate-100 text-slate-700 border-slate-200",
   },
   {
     icon: Search,
-    label: "Web Search",
-    desc: "Serper API",
-    color: "bg-blue-50 text-blue-700",
-  },
-  {
-    icon: Layers,
-    label: "AI Decision",
-    desc: "Rank results",
-    color: "bg-indigo-50 text-indigo-700",
-  },
-  {
-    icon: Globe,
-    label: "Web Crawl",
-    desc: "Extract content",
-    color: "bg-violet-50 text-violet-700",
+    label: "Find sources",
+    desc: "We search the web for each row",
+    color: "bg-blue-50 text-blue-700 border-blue-200",
   },
   {
     icon: Bot,
-    label: "LLM Extract",
-    desc: "Structured data",
-    color: "bg-purple-50 text-purple-700",
+    label: "Extract answers",
+    desc: "AI fills in the missing fields",
+    color: "bg-violet-50 text-violet-700 border-violet-200",
   },
   {
-    icon: Zap,
-    label: "Enriched",
-    desc: "Confidence scores",
-    color: "bg-emerald-50 text-emerald-700",
+    icon: CheckCircle,
+    label: "Quality check",
+    desc: "Confidence scores help you verify",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  {
+    icon: Sparkles,
+    label: "Ready to use",
+    desc: "Export enriched rows instantly",
+    color: "bg-primary/10 text-primary border-primary/30",
   },
 ] as const;
 
-function PipelineConnector({ delay }: { delay: number }) {
-  return (
-    <div className="hidden lg:flex items-center shrink-0 w-10">
-      <div className="relative w-full h-0.5 bg-slate-200 overflow-hidden rounded-full">
-        <div
-          className="absolute inset-y-0 w-full bg-primary/70 rounded-full"
-          style={{
-            animation: "flow-right 1.4s linear infinite",
-            animationDelay: `${delay}s`,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
+const PIPELINE_ANIMATION_INTERVAL_MS = 1100;
 
 function EnrichmentPipelineGraph() {
   const [activeIdx, setActiveIdx] = useState(0);
@@ -271,61 +241,99 @@ function EnrichmentPipelineGraph() {
   useEffect(() => {
     const id = setInterval(
       () => setActiveIdx((prevIndex) => (prevIndex + 1) % PIPELINE_NODES.length),
-      900,
+      PIPELINE_ANIMATION_INTERVAL_MS,
     );
     return () => clearInterval(id);
   }, []);
 
   return (
-    <div className="w-full overflow-x-auto pb-2">
-      <div className="flex items-stretch min-w-max mx-auto gap-0 px-2">
+    <>
+      <div className="md:hidden grid gap-5 max-w-sm mx-auto">
         {PIPELINE_NODES.map((node, i) => {
           const Icon = node.icon;
           const isActive = i === activeIdx;
-          const isPast = i < activeIdx;
-
           return (
-            <div key={node.label} className="flex items-center gap-0">
-              {/* Node card */}
+            <div key={node.label} className="text-center">
               <div
-                className={`flex flex-col items-center gap-2 px-4 py-4 rounded-xl border-2 transition-all duration-300 w-28 text-center ${
+                className={`mx-auto w-full max-w-[280px] rounded-2xl border-2 p-5 bg-card transition-all duration-300 ${
                   isActive
-                    ? "border-primary bg-primary/5 shadow-lg scale-105"
-                    : isPast
-                      ? "border-emerald-200 bg-emerald-50/40"
-                      : "border-border bg-card"
+                    ? "border-primary shadow-lg ring-2 ring-primary/20"
+                    : "border-border shadow-sm"
                 }`}
               >
-                <div
-                  className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${node.color} ${isActive ? "ring-2 ring-primary/30 ring-offset-1" : ""}`}
-                >
+                <div className={`mx-auto w-14 h-14 rounded-2xl border flex items-center justify-center ${node.color}`}>
                   <Icon className="size-5" />
                 </div>
-                <div
-                  className={`text-xs font-black leading-tight ${isActive ? "text-primary" : "text-foreground"}`}
-                >
+                <div className={`mt-3 text-base font-black ${isActive ? "text-primary" : "text-foreground"}`}>
                   {node.label}
                 </div>
-                <div className="text-[10px] text-muted-foreground leading-tight">
-                  {node.desc}
-                </div>
-                {isPast && (
-                  <CheckCircle className="size-4 text-emerald-500 shrink-0" />
-                )}
-                {isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping shrink-0" />
-                )}
               </div>
-
-              {/* Connector */}
-              {i < PIPELINE_NODES.length - 1 && (
-                <PipelineConnector delay={i * 0.2} />
-              )}
+              <p className="mt-2 text-xs text-muted-foreground">{node.desc}</p>
             </div>
           );
         })}
       </div>
-    </div>
+
+      <div className="hidden md:block">
+        <div className="relative mx-auto w-full max-w-5xl h-[460px]">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            {[
+              { d: "M20,22 C28,16 38,16 46,21", delay: "0s" },
+              { d: "M52,24 C56,34 58,44 49,56", delay: "0.2s" },
+              { d: "M51,56 C62,58 70,52 76,45", delay: "0.4s" },
+              { d: "M81,43 C88,34 90,26 87,22", delay: "0.6s" },
+            ].map((line) => (
+              <path
+                key={line.d}
+                d={line.d}
+                fill="none"
+                stroke="hsl(var(--primary))"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeDasharray="4 6"
+                opacity="0.4"
+                style={{
+                  animation: "flow-dash 1.2s linear infinite",
+                  animationDelay: line.delay,
+                }}
+              />
+            ))}
+          </svg>
+          {[
+            { left: "10%", top: "10%" },
+            { left: "42%", top: "8%" },
+            { left: "38%", top: "45%" },
+            { left: "66%", top: "34%" },
+            { left: "74%", top: "10%" },
+          ].map((position, i) => {
+            const node = PIPELINE_NODES[i];
+            const Icon = node.icon;
+            const isActive = i === activeIdx;
+            return (
+              <div key={node.label} className="absolute w-48" style={position}>
+                <div
+                  className={`rounded-2xl border-2 bg-card px-5 py-5 text-center transition-all duration-300 ${
+                    isActive
+                      ? "border-primary shadow-xl scale-105 ring-2 ring-primary/20"
+                      : "border-border shadow-sm"
+                  }`}
+                >
+                  <div className={`mx-auto w-14 h-14 rounded-2xl border flex items-center justify-center ${node.color} ${isActive ? "animate-pulse" : ""}`}>
+                    <Icon className="size-6" />
+                  </div>
+                  <div className={`mt-3 text-lg font-black leading-tight ${isActive ? "text-primary" : "text-foreground"}`}>
+                    {node.label}
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-center text-muted-foreground px-2">
+                  {node.desc}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -433,32 +441,14 @@ function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-black tracking-tight text-foreground mb-4">
-              The enrichment pipeline
+              Your data journey
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Every row in your dataset travels through a multi-stage AI
-              pipeline — from raw search to verified, structured output.
+              A simple visual flow that shows how AmpleData turns raw rows into
+              trusted, ready-to-use data.
             </p>
           </div>
           <EnrichmentPipelineGraph />
-          <div className="grid md:grid-cols-3 gap-8 mt-16">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="bg-card rounded-2xl p-8 border border-border shadow-sm flex flex-col gap-4"
-              >
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <feature.icon className="size-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -525,27 +515,6 @@ function LandingPage() {
     </div>
   );
 }
-
-const features = [
-  {
-    icon: Database,
-    title: "Upload any dataset",
-    description:
-      "Import your CSV or JSON files in seconds. AmpleData automatically detects columns and prepares your data for enrichment.",
-  },
-  {
-    icon: Search,
-    title: "AI-powered web search",
-    description:
-      "Our engine searches the web for each row in your dataset, crawls the top results, and extracts exactly the information you need.",
-  },
-  {
-    icon: Zap,
-    title: "Structured results with confidence",
-    description:
-      "Get enriched columns with confidence scores and source URLs so you always know where the data came from and how reliable it is.",
-  },
-];
 
 const steps = [
   {
