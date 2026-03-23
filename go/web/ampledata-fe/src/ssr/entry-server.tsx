@@ -7,7 +7,13 @@ import {
   createRoute,
   Outlet,
 } from "@tanstack/react-router";
-import { LandingPage } from "./routes/_components/landing-page";
+import { LandingPage } from "@/routes/_components/landing-page";
+
+/*
+ *
+ * File is only used for SSR for the landing page to better the SEO
+ *
+ * **/
 
 function buildSSRRouter() {
   const rootRoute = createRootRoute({ component: Outlet });
