@@ -37,7 +37,7 @@ export function GridToolbar({
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0 overflow-x-auto">
       <Link
-        to="/"
+        to="/app"
         className="flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors uppercase tracking-widest shrink-0"
       >
         <ArrowLeft className="w-3 h-3" />

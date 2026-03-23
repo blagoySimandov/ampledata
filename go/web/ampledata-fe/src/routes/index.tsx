@@ -1,6 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { SourcesList } from "./_components";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { LandingPage } from "./_components/landing-page";
 
 export const Route = createFileRoute("/")({
-  component: SourcesList,
+  beforeLoad: ({ context }) => {
+    if (!context.auth.isLoading && context.auth.user) {
+      throw redirect({ to: "/app" });
+    }
+  },
+  component: LandingPage,
 });

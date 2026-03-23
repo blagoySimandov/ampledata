@@ -16,10 +16,12 @@ interface RouterContext {
   };
 }
 
-const PUBLIC_ROUTES = ["/login", "/auth/callback"];
+const PUBLIC_ROUTES = ["/login", "/auth/callback", "/"];
 
 function isPublicRoute(pathname: string) {
-  return PUBLIC_ROUTES.some((r) => pathname.startsWith(r));
+  return PUBLIC_ROUTES.some((r) =>
+    r === "/" ? pathname === "/" : pathname.startsWith(r)
+  );
 }
 
 export const Route = createRootRouteWithContext<RouterContext>()({
