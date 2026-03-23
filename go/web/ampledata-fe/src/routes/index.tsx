@@ -247,93 +247,54 @@ function EnrichmentPipelineGraph() {
   }, []);
 
   return (
-    <>
-      <div className="md:hidden grid gap-5 max-w-sm mx-auto">
-        {PIPELINE_NODES.map((node, i) => {
-          const Icon = node.icon;
-          const isActive = i === activeIdx;
-          return (
-            <div key={node.label} className="text-center">
-              <div
-                className={`mx-auto w-full max-w-[280px] rounded-2xl border-2 p-5 bg-card transition-all duration-300 ${
-                  isActive
-                    ? "border-primary shadow-lg ring-2 ring-primary/20"
-                    : "border-border shadow-sm"
+    <div className="w-full max-w-[90rem] mx-auto flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-2">
+      {PIPELINE_NODES.map((node, i) => {
+        const Icon = node.icon;
+        const isActive = i === activeIdx;
+        const isPast = i < activeIdx;
+        
+        return [
+          <div key={`${node.label}-node`} className="flex flex-col items-center w-full lg:w-[220px] xl:w-[240px] shrink-0">
+            <div
+              className={`w-full max-w-[320px] lg:max-w-none rounded-3xl border-2 p-8 lg:p-6 bg-card transition-all duration-500 z-10 relative ${
+                isActive
+                  ? "border-primary shadow-2xl scale-105 ring-4 ring-primary/20 lg:-translate-y-2"
+                  : isPast
+                  ? "border-primary/50 shadow-md opacity-90"
+                  : "border-border shadow-sm opacity-60 grayscale-[0.2]"
+              }`}
+            >
+              <div 
+                className={`mx-auto w-20 h-20 lg:w-16 lg:h-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${node.color} ${
+                  isActive ? "shadow-lg scale-110" : ""
                 }`}
               >
-                <div className={`mx-auto w-14 h-14 rounded-2xl border flex items-center justify-center ${node.color}`}>
-                  <Icon className="size-5" />
-                </div>
-                <div className={`mt-3 text-base font-black ${isActive ? "text-primary" : "text-foreground"}`}>
-                  {node.label}
-                </div>
+                <Icon className={`size-10 lg:size-8 transition-transform duration-500 ${isActive ? "scale-110" : ""}`} />
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">{node.desc}</p>
+              <div 
+                className={`mt-5 lg:mt-4 text-center text-xl lg:text-lg font-black leading-tight transition-colors duration-300 ${
+                  isActive ? "text-primary" : "text-foreground"
+                }`}
+              >
+                {node.label}
+              </div>
+              <p className="mt-3 lg:mt-2 text-base lg:text-sm text-center text-muted-foreground leading-relaxed">
+                {node.desc}
+              </p>
             </div>
-          );
-        })}
-      </div>
-
-      <div className="hidden md:block">
-        <div className="relative mx-auto w-full max-w-5xl h-[460px]">
-          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            {[
-              { d: "M20,22 C28,16 38,16 46,21", delay: "0s" },
-              { d: "M52,24 C56,34 58,44 49,56", delay: "0.2s" },
-              { d: "M51,56 C62,58 70,52 76,45", delay: "0.4s" },
-              { d: "M81,43 C88,34 90,26 87,22", delay: "0.6s" },
-            ].map((line) => (
-              <path
-                key={line.d}
-                d={line.d}
-                fill="none"
-                stroke="hsl(var(--primary))"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeDasharray="4 6"
-                opacity="0.4"
-                style={{
-                  animation: "flow-dash 1.2s linear infinite",
-                  animationDelay: line.delay,
-                }}
+          </div>,
+          i < PIPELINE_NODES.length - 1 && (
+            <div key={`${node.label}-connector`} className="flex items-center justify-center py-2 lg:py-0 lg:w-6 xl:w-10 shrink-0 z-0">
+              <ArrowRight 
+                className={`size-10 lg:size-8 transition-all duration-500 rotate-90 lg:rotate-0 ${
+                  isPast ? "text-primary opacity-100" : isActive ? "text-primary/70 animate-pulse translate-y-2 lg:translate-y-0 lg:translate-x-2" : "text-muted opacity-30"
+                }`}
               />
-            ))}
-          </svg>
-          {[
-            { left: "10%", top: "10%" },
-            { left: "42%", top: "8%" },
-            { left: "38%", top: "45%" },
-            { left: "66%", top: "34%" },
-            { left: "74%", top: "10%" },
-          ].map((position, i) => {
-            const node = PIPELINE_NODES[i];
-            const Icon = node.icon;
-            const isActive = i === activeIdx;
-            return (
-              <div key={node.label} className="absolute w-48" style={position}>
-                <div
-                  className={`rounded-2xl border-2 bg-card px-5 py-5 text-center transition-all duration-300 ${
-                    isActive
-                      ? "border-primary shadow-xl scale-105 ring-2 ring-primary/20"
-                      : "border-border shadow-sm"
-                  }`}
-                >
-                  <div className={`mx-auto w-14 h-14 rounded-2xl border flex items-center justify-center ${node.color} ${isActive ? "animate-pulse" : ""}`}>
-                    <Icon className="size-6" />
-                  </div>
-                  <div className={`mt-3 text-lg font-black leading-tight ${isActive ? "text-primary" : "text-foreground"}`}>
-                    {node.label}
-                  </div>
-                </div>
-                <p className="mt-2 text-xs text-center text-muted-foreground px-2">
-                  {node.desc}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </>
+            </div>
+          )
+        ];
+      })}
+    </div>
   );
 }
 
