@@ -6,7 +6,7 @@ import { NavLink } from "./nav-link";
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-10 w-full border-b bg-background border-border shadow-sm">
+    <header className="sticky top-0 z-11 w-full border-b bg-background border-border shadow-sm">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between">
         <Link to="/app">
           <img src={logo} alt="AmpleData" className="h-12 w-auto" />

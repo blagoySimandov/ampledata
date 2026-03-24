@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import logo from "../../../../assets/ampledata-logo.png";
 import { GoogleIcon, MicrosoftIcon, GithubIcon } from "@/components/icons";
+import { Link } from "@tanstack/react-router";
 
 interface LoginLeftSidebarProps {
   onSignInWith: (provider: string) => void;
@@ -14,7 +15,9 @@ export function LoginLeftSidebar({
   return (
     <div className="w-full lg:w-[440px] shrink-0 flex flex-col justify-between px-10 py-12 bg-background">
       <div>
-        <img src={logo} alt="AmpleData" className="h-9 w-auto" />
+        <Link to="/">
+          <img src={logo} alt="AmpleData" className="h-12 w-auto" />
+        </Link>
       </div>
 
       <div className="flex flex-col gap-8">

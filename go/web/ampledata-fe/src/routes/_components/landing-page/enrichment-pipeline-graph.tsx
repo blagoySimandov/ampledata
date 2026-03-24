@@ -7,7 +7,8 @@ export function EnrichmentPipelineGraph() {
 
   useEffect(() => {
     const id = setInterval(
-      () => setActiveIdx((prevIndex) => (prevIndex + 1) % PIPELINE_NODES.length),
+      () =>
+        setActiveIdx((prevIndex) => (prevIndex + 1) % PIPELINE_NODES.length),
       PIPELINE_ANIMATION_INTERVAL_MS,
     );
     return () => clearInterval(id);
@@ -26,7 +27,7 @@ export function EnrichmentPipelineGraph() {
             className="flex flex-col items-center w-full lg:w-[220px] xl:w-[240px] shrink-0"
           >
             <div
-              className={`w-full max-w-[320px] lg:max-w-none rounded-3xl border-2 p-8 lg:p-6 bg-card transition-all duration-500 z-10 relative ${
+              className={`w-full max-w-[320px] lg:max-w-none rounded-3xl border-2 p-8 lg:p-6 bg-card transition-all duration-500 z-1 relative ${
                 isActive
                   ? "border-primary shadow-2xl scale-105 ring-4 ring-primary/20 lg:-translate-y-2"
                   : isPast
