@@ -1,8 +1,10 @@
 import { useState } from "react";
 import {
+  AlertCircle,
   CheckCircle,
   Github,
   Linkedin,
+  Loader2,
   Mail,
   MapPin,
   Phone,
@@ -10,6 +12,16 @@ import {
   Twitter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+/**
+ * Formspree integration
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 1. Sign up for free at https://formspree.io (50 submissions/month free)
+ * 2. Create a new form → copy the form ID from the endpoint URL
+ * 3. Replace "YOUR_FORM_ID" below with your actual ID (looks like "xpwzqabc")
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/YOUR_FORM_ID";
 
 const CONTACT_ITEMS = [
   {
@@ -59,16 +71,37 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: "", email: "", subject: "", message: "" };
 
+type SubmitStatus = "idle" | "loading" | "success" | "error";
+
 export function ContactSection() {
   const [formState, setFormState] = useState<FormState>(EMPTY_FORM);
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<SubmitStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // TODO: wire up to a real API endpoint or email service when ready
-    setSubmitted(true);
-    setFormState(EMPTY_FORM);
-    setTimeout(() => setSubmitted(false), 4000);
+    setStatus("loading");
+    setErrorMessage("");
+
+    try {
+      const res = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(formState),
+      });
+
+      if (res.ok) {
+        setStatus("success");
+        setFormState(EMPTY_FORM);
+      } else {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setErrorMessage(data.error ?? "Something went wrong. Please try again.");
+        setStatus("error");
+      }
+    } catch {
+      setErrorMessage("Network error. Please check your connection and try again.");
+      setStatus("error");
+    }
   }
 
   function field(key: keyof FormState) {
@@ -187,10 +220,10 @@ export function ContactSection() {
 
           {/* Right column: contact form */}
           <div className="bg-card rounded-2xl border border-border shadow-xl p-8 contact-fade-up contact-fade-up-delay-2">
-            {submitted ? (
+            {status === "success" ? (
               <div className="flex flex-col items-center justify-center text-center py-16 gap-5">
-                <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center shadow-lg">
-                  <CheckCircle className="size-10 text-emerald-600" />
+                <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center shadow-lg">
+                  <CheckCircle className="size-10 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
                   <h3 className="text-2xl font-black text-foreground mb-2">
@@ -201,6 +234,9 @@ export function ContactSection() {
                     hours.
                   </p>
                 </div>
+                <Button variant="outline" onClick={() => setStatus("idle")}>
+                  Send another message
+                </Button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
@@ -261,8 +297,29 @@ export function ContactSection() {
                   />
                 </div>
 
-                <Button type="submit" size="lg" className="w-full text-base">
-                  Send message <Send className="ml-2 size-4" />
+                {status === "error" && (
+                  <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                    <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full text-base"
+                  disabled={status === "loading"}
+                >
+                  {status === "loading" ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      Send message <Send className="ml-2 size-4" />
+                    </>
+                  )}
                 </Button>
 
                 <p className="text-xs text-center text-muted-foreground">
