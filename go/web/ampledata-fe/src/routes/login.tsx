@@ -43,10 +43,13 @@ function MicrosoftIcon() {
 }
 
 function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, getSignInUrl } = useAuth();
 
-  function signInWith(provider: string) {
-    signIn({ provider } as Parameters<typeof signIn>[0]);
+  async function signInWith(provider: string) {
+    const url = await getSignInUrl();
+    const parsed = new URL(url);
+    parsed.searchParams.set("provider", provider);
+    window.location.assign(parsed.toString());
   }
 
   return (
