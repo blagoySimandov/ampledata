@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle, Sparkles } from "lucide-react";
 import logo from "../../../../assets/ampledata-logo.png";
 import { Button } from "@/components/ui/button";
 import { BENEFITS, STEPS } from "./constants";
+import { ContactSection } from "./contact-section";
 import { EnrichmentMockHero } from "./enrichment-mock-hero";
 import { EnrichmentPipelineGraph } from "./enrichment-pipeline-graph";
 import { PricingSection } from "./pricing-section";
@@ -25,6 +26,16 @@ export function LandingPage() {
               }
             >
               Pricing
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                document
+                  .getElementById("contact")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+            >
+              Contact
             </Button>
             <Button variant="ghost" asChild>
               <Link to="/login">Sign in</Link>
@@ -151,6 +162,8 @@ export function LandingPage() {
       </section>
 
       <PricingSection />
+
+      <ContactSection />
 
       <section className="bg-primary py-24">
         <div className="container mx-auto px-4 text-center">
