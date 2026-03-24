@@ -138,3 +138,86 @@
 @keyframes flow-dash {
   to { stroke-dashoffset: -20; }
 }
+
+/* Login page illustration */
+.login-hero {
+  background: linear-gradient(135deg, #0d0b1e 0%, #1a1040 40%, #0f1e2e 100%);
+}
+
+.login-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  will-change: transform;
+}
+
+.login-orb-1 {
+  width: 480px;
+  height: 480px;
+  background: oklch(0.553 0.195 38.402 / 0.45);
+  top: -120px;
+  right: -100px;
+  animation: login-float-1 9s ease-in-out infinite;
+}
+
+.login-orb-2 {
+  width: 360px;
+  height: 360px;
+  background: oklch(0.47 0.157 37.304 / 0.35);
+  bottom: 5%;
+  left: 5%;
+  animation: login-float-2 11s ease-in-out infinite;
+}
+
+.login-orb-3 {
+  width: 280px;
+  height: 280px;
+  background: rgba(99, 102, 241, 0.3);
+  top: 35%;
+  left: 25%;
+  animation: login-float-3 13s ease-in-out infinite;
+}
+
+.login-orb-4 {
+  width: 220px;
+  height: 220px;
+  background: rgba(14, 165, 233, 0.25);
+  bottom: 22%;
+  right: 12%;
+  animation: login-float-1 10s ease-in-out infinite reverse;
+}
+
+.login-orb-5 {
+  width: 160px;
+  height: 160px;
+  background: oklch(0.705 0.213 47.604 / 0.4);
+  top: 52%;
+  right: 32%;
+  animation: login-float-2 8s ease-in-out infinite reverse;
+}
+
+.login-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 52px 52px;
+}
+
+@keyframes login-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(28px, -38px) scale(1.05); }
+  66%       { transform: translate(-18px, 22px) scale(0.96); }
+}
+
+@keyframes login-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%       { transform: translate(-38px, -28px) scale(1.07); }
+}
+
+@keyframes login-float-3 {
+  0%, 100% { transform: translate(0, 0); }
+  25%       { transform: translate(22px, -48px); }
+  75%       { transform: translate(-28px, 28px); }
+}
