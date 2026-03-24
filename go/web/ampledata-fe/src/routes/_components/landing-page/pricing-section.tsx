@@ -91,7 +91,7 @@ export function PricingSection() {
             <Card
               key={tier.id}
               className={cn(
-                "relative flex flex-col gap-0",
+                "relative flex flex-col gap-0 overflow-visible",
                 tier.highlighted &&
                   "ring-2 ring-primary shadow-lg shadow-primary/10",
               )}
