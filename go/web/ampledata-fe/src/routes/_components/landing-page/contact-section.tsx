@@ -2,14 +2,10 @@ import { useState } from "react";
 import {
   AlertCircle,
   CheckCircle,
-  Github,
-  Linkedin,
   Loader2,
   Mail,
-  MapPin,
-  Phone,
   Send,
-  Twitter,
+  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -18,43 +14,10 @@ import { Button } from "@/components/ui/button";
  */
 const FORMSPREE_ENDPOINT = "https://formspree.io/f/xeerypze";
 
-const CONTACT_ITEMS = [
-  {
-    icon: Mail,
-    label: "Email",
-    value: "hello@ampledata.io",
-    href: "mailto:hello@ampledata.io",
-  },
-  {
-    icon: Phone,
-    label: "Phone",
-    value: "+1 (555) 000-0000",
-    href: "tel:+15550000000",
-  },
-  {
-    icon: MapPin,
-    label: "Address",
-    value: "123 Data Street, San Francisco, CA 94107",
-    href: null,
-  },
-] as const;
-
-const SOCIAL_LINKS = [
-  {
-    icon: Twitter,
-    label: "Twitter / X",
-    href: "https://twitter.com/ampledata",
-  },
-  {
-    icon: Linkedin,
-    label: "LinkedIn",
-    href: "https://linkedin.com/company/ampledata",
-  },
-  {
-    icon: Github,
-    label: "GitHub",
-    href: "https://github.com/ampledata",
-  },
+const STATS = [
+  { label: "Avg. response time", value: "< 2 hrs" },
+  { label: "Satisfaction rate", value: "98.7%" },
+  { label: "Enterprise clients", value: "50+" },
 ] as const;
 
 interface FormState {
@@ -140,81 +103,68 @@ export function ContactSection() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-12 items-start">
-          {/* Left column: photo + contact details + social */}
-          <div className="space-y-8 contact-fade-up contact-fade-up-delay-1">
-            {/* Hero photo with overlay */}
-            <div className="relative rounded-2xl overflow-hidden shadow-xl border border-border group">
-              <img
-                src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=80"
-                alt="AmpleData team"
-                className="w-full h-64 object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <p className="text-white font-bold text-xl leading-snug drop-shadow-md">
-                  Let's build something great together
-                </p>
-                <p className="text-white/70 text-sm mt-1">
-                  Enterprise? Startup? We work with teams of all sizes.
+        <div className="grid lg:grid-cols-2 gap-12 items-stretch">
+          {/* Left column: animated visual panel */}
+          <div className="relative rounded-2xl overflow-hidden border border-border shadow-xl bg-gradient-to-br from-primary/20 via-card to-primary/5 min-h-[480px] flex flex-col justify-center contact-fade-up contact-fade-up-delay-1">
+            {/* Dot-grid background */}
+            <div
+              className="absolute inset-0 opacity-40"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle, oklch(var(--primary-raw, 0.553 0.195 38.402) / 0.25) 1px, transparent 1px)",
+                backgroundSize: "26px 26px",
+              }}
+            />
+
+            {/* Animated orbs */}
+            <div className="contact-blob absolute -top-16 -right-16 w-64 h-64 rounded-full bg-primary/20 blur-3xl" />
+            <div className="contact-blob-slow absolute -bottom-12 -left-12 w-52 h-52 rounded-full bg-blue-500/15 blur-3xl" />
+            <div
+              className="contact-blob absolute top-1/3 right-1/4 w-28 h-28 rounded-full bg-violet-500/10 blur-2xl"
+              style={{ animationDelay: "3s" }}
+            />
+
+            {/* Center content */}
+            <div className="relative z-10 flex flex-col items-center text-center px-10 py-14 gap-10">
+              {/* Pulsing icon */}
+              <div className="relative flex items-center justify-center w-24 h-24">
+                <span className="contact-pulse-ring absolute inset-0 rounded-full bg-primary/30" />
+                <span
+                  className="contact-pulse-ring absolute inset-0 rounded-full bg-primary/20"
+                  style={{ animationDelay: "0.8s" }}
+                />
+                <div className="relative w-20 h-20 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shadow-lg backdrop-blur-sm">
+                  <Mail className="size-9 text-primary" />
+                </div>
+              </div>
+
+              {/* Headline */}
+              <div>
+                <h3 className="text-2xl font-black text-foreground mb-2 leading-snug">
+                  We're just a message away
+                </h3>
+                <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
+                  Quick questions, enterprise demos, or just saying hi — we read
+                  every message personally.
                 </p>
               </div>
-            </div>
 
-            {/* Contact info cards */}
-            <div className="space-y-3">
-              {CONTACT_ITEMS.map(({ icon: Icon, label, value, href }) => (
-                <div
-                  key={label}
-                  className="flex items-start gap-4 p-4 rounded-xl bg-secondary/40 border border-border hover:border-primary/30 hover:shadow-sm hover:bg-primary/5 transition-all duration-200"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Icon className="size-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
-                      {label}
-                    </p>
-                    {href ? (
-                      <a
-                        href={href}
-                        className="text-foreground font-medium hover:text-primary transition-colors"
-                      >
-                        {value}
-                      </a>
-                    ) : (
-                      <p className="text-foreground font-medium">{value}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Response time badge */}
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_2px_rgba(16,185,129,0.4)] shrink-0" />
-              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-                Typical response time: under 24 hours on business days
-              </p>
-            </div>
-
-            {/* Social links */}
-            <div>
-              <p className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-                Follow us
-              </p>
-              <div className="flex gap-3">
-                {SOCIAL_LINKS.map(({ icon: Icon, label, href }) => (
-                  <a
+              {/* Floating stat chips */}
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                {STATS.map(({ label, value }, i) => (
+                  <div
                     key={label}
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={label}
-                    className="w-10 h-10 rounded-lg bg-secondary/40 border border-border flex items-center justify-center text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/5 hover:shadow-sm transition-all duration-200"
+                    className="contact-blob flex items-center justify-between px-4 py-3 rounded-xl bg-background/60 border border-border backdrop-blur-sm shadow-sm"
+                    style={{ animationDelay: `${i * 1.4}s` }}
                   >
-                    <Icon className="size-4" />
-                  </a>
+                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Zap className="size-3 text-primary shrink-0" />
+                      {label}
+                    </span>
+                    <span className="text-sm font-bold text-primary">
+                      {value}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
