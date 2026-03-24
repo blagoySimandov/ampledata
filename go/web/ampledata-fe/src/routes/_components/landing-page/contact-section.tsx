@@ -14,14 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 
 /**
- * Formspree integration
- * ─────────────────────────────────────────────────────────────────────────────
- * 1. Sign up for free at https://formspree.io (50 submissions/month free)
- * 2. Create a new form → copy the form ID from the endpoint URL
- * 3. Replace "YOUR_FORM_ID" below with your actual ID (looks like "xpwzqabc")
- * ─────────────────────────────────────────────────────────────────────────────
+ * Formspree sends emails to ampledata.io
  */
-const FORMSPREE_ENDPOINT = "https://formspree.io/f/YOUR_FORM_ID";
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/xeerypze";
 
 const CONTACT_ITEMS = [
   {
@@ -86,7 +81,10 @@ export function ContactSection() {
     try {
       const res = await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify(formState),
       });
 
@@ -95,11 +93,15 @@ export function ContactSection() {
         setFormState(EMPTY_FORM);
       } else {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setErrorMessage(data.error ?? "Something went wrong. Please try again.");
+        setErrorMessage(
+          data.error ?? "Something went wrong. Please try again.",
+        );
         setStatus("error");
       }
     } catch {
-      setErrorMessage("Network error. Please check your connection and try again.");
+      setErrorMessage(
+        "Network error. Please check your connection and try again.",
+      );
       setStatus("error");
     }
   }
