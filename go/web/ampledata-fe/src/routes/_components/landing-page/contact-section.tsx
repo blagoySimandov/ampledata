@@ -5,7 +5,6 @@ import {
   Loader2,
   Mail,
   Send,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -13,12 +12,6 @@ import { Button } from "@/components/ui/button";
  * Formspree sends emails to ampledata.io
  */
 const FORMSPREE_ENDPOINT = "https://formspree.io/f/xeerypze";
-
-const STATS = [
-  { label: "Avg. response time", value: "< 2 hrs" },
-  { label: "Satisfaction rate", value: "98.7%" },
-  { label: "Enterprise clients", value: "50+" },
-] as const;
 
 interface FormState {
   name: string;
@@ -104,69 +97,27 @@ export function ContactSection() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-12 items-stretch">
-          {/* Left column: animated visual panel */}
-          <div className="relative rounded-2xl overflow-hidden border border-border shadow-xl bg-gradient-to-br from-primary/20 via-card to-primary/5 min-h-[480px] flex flex-col justify-center contact-fade-up contact-fade-up-delay-1">
-            {/* Dot-grid background */}
-            <div
-              className="absolute inset-0 opacity-40"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle, oklch(var(--primary-raw, 0.553 0.195 38.402) / 0.25) 1px, transparent 1px)",
-                backgroundSize: "26px 26px",
-              }}
+          {/* Left column: Image panel */}
+          <div className="relative rounded-2xl overflow-hidden shadow-xl min-h-[480px] contact-fade-up contact-fade-up-delay-1">
+            <img
+              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1600&auto=format&fit=crop"
+              alt="Data and communication"
+              className="absolute inset-0 w-full h-full object-cover"
             />
-
-            {/* Animated orbs */}
-            <div className="contact-blob absolute -top-16 -right-16 w-64 h-64 rounded-full bg-primary/20 blur-3xl" />
-            <div className="contact-blob-slow absolute -bottom-12 -left-12 w-52 h-52 rounded-full bg-blue-500/15 blur-3xl" />
-            <div
-              className="contact-blob absolute top-1/3 right-1/4 w-28 h-28 rounded-full bg-violet-500/10 blur-2xl"
-              style={{ animationDelay: "3s" }}
-            />
-
-            {/* Center content */}
-            <div className="relative z-10 flex flex-col items-center text-center px-10 py-14 gap-10">
-              {/* Pulsing icon */}
-              <div className="relative flex items-center justify-center w-24 h-24">
-                <span className="contact-pulse-ring absolute inset-0 rounded-full bg-primary/30" />
-                <span
-                  className="contact-pulse-ring absolute inset-0 rounded-full bg-primary/20"
-                  style={{ animationDelay: "0.8s" }}
-                />
-                <div className="relative w-20 h-20 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center shadow-lg backdrop-blur-sm">
-                  <Mail className="size-9 text-primary" />
-                </div>
+            {/* Overlay to ensure contrast if needed or just for aesthetics */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
+            
+            <div className="absolute bottom-0 left-0 p-10">
+              <div className="inline-flex items-center gap-2 bg-primary/90 text-primary-foreground rounded-full px-3 py-1 text-sm font-medium mb-4 backdrop-blur-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                </span>
+                We are online
               </div>
-
-              {/* Headline */}
-              <div>
-                <h3 className="text-2xl font-black text-foreground mb-2 leading-snug">
-                  We're just a message away
-                </h3>
-                <p className="text-muted-foreground text-sm max-w-xs leading-relaxed">
-                  Quick questions, enterprise demos, or just saying hi — we read
-                  every message personally.
-                </p>
-              </div>
-
-              {/* Floating stat chips */}
-              <div className="flex flex-col gap-3 w-full max-w-xs">
-                {STATS.map(({ label, value }, i) => (
-                  <div
-                    key={label}
-                    className="contact-blob flex items-center justify-between px-4 py-3 rounded-xl bg-background/60 border border-border backdrop-blur-sm shadow-sm"
-                    style={{ animationDelay: `${i * 1.4}s` }}
-                  >
-                    <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Zap className="size-3 text-primary shrink-0" />
-                      {label}
-                    </span>
-                    <span className="text-sm font-bold text-primary">
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <h3 className="text-3xl md:text-4xl font-black text-white leading-tight drop-shadow-md">
+                Let's build<br />something great.
+              </h3>
             </div>
           </div>
 
