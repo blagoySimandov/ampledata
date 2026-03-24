@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BENEFITS, STEPS } from "./constants";
 import { EnrichmentMockHero } from "./enrichment-mock-hero";
 import { EnrichmentPipelineGraph } from "./enrichment-pipeline-graph";
+import { PricingSection } from "./pricing-section";
 
 export function LandingPage() {
   return (
@@ -15,6 +16,16 @@ export function LandingPage() {
             <img src={logo} alt="AmpleData" className="h-12 w-auto" />
           </Link>
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={() =>
+                document
+                  .getElementById("pricing")
+                  ?.scrollIntoView({ behavior: "smooth" })
+              }
+            >
+              Pricing
+            </Button>
             <Button variant="ghost" asChild>
               <Link to="/login">Sign in</Link>
             </Button>
@@ -138,6 +149,8 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      <PricingSection />
 
       <section className="bg-primary py-24">
         <div className="container mx-auto px-4 text-center">
