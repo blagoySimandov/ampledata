@@ -8,8 +8,8 @@ import (
 type Config struct {
 	DatabaseURL       string
 	ServerAddr        string
-	SerperAPIKey string
-	Crawl4aiURL  string
+	SerperAPIKey      string
+	Crawl4aiURL       string
 	GeminiAPIKey      string
 	WorkOSAPIKey      string
 	WorkOSClientID    string
@@ -23,8 +23,9 @@ type Config struct {
 	TemporalTaskQueue string
 
 	// Enrichment configuration
-	MaxEnrichmentRetries int
-	MaxOrganicResults    int
+	MaxEnrichmentRetries          int
+	MaxOrganicResults             int
+	ConcurrencyRowEnrichmentLimit int
 
 	CreditsPerCell int
 
@@ -62,8 +63,8 @@ const (
 var cfg Config = Config{
 	DatabaseURL:       getEnv("DATABASE_URL_ENRICH", "postgres://enrichment:enrichment@localhost:5432/enrichment?sslmode=disable"),
 	ServerAddr:        getEnv("SERVER_ADDR", ":8080"),
-	SerperAPIKey: getEnv("SERPER_API_KEY", ""),
-	GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
+	SerperAPIKey:      getEnv("SERPER_API_KEY", ""),
+	GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
 	WorkOSAPIKey:      getEnv("WORKOS_API_KEY", ""),
 	WorkOSClientID:    getEnv("WORKOS_CLIENT_ID", ""),
 	Crawl4aiURL:       getEnv("CRAWL4AI_URL", "http://localhost:8000"),
@@ -77,8 +78,9 @@ var cfg Config = Config{
 	TemporalTaskQueue: getEnv("TEMPORAL_TASK_QUEUE", "ampledata-enrichment"),
 
 	// Enrichment settings
-	MaxEnrichmentRetries: getEnvInt("MAX_ENRICHMENT_RETRIES", 2),
-	MaxOrganicResults:    getEnvInt("MAX_ORGANIC_RESULTS", 4),
+	MaxEnrichmentRetries:          getEnvInt("MAX_ENRICHMENT_RETRIES", 2),
+	MaxOrganicResults:             getEnvInt("MAX_ORGANIC_RESULTS", 4),
+	ConcurrencyRowEnrichmentLimit: getEnvInt("CONCURRENCY_ROW_ENRICHMENT_LIMIT", 10),
 
 	CreditsPerCell: getEnvInt("CREDITS_PER_CELL", 1),
 

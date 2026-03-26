@@ -8,19 +8,20 @@ import (
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
+	"github.com/blagoySimandov/ampledata/go/internal/config"
 	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
 )
 
 type JobWorkflowInput struct {
-	JobID            string
-	UserID           string
-	StripeCustomerID string
-	RowKeys          []string
-	ColumnsMetadata  []*models.ColumnMetadata
-	KeyColumnDescription       *string
-	MaxRetries       int
+	JobID                string
+	UserID               string
+	StripeCustomerID     string
+	RowKeys              []string
+	ColumnsMetadata      []*models.ColumnMetadata
+	KeyColumnDescription *string
+	MaxRetries           int
 }
 
 type JobWorkflowOutput struct {
@@ -49,20 +50,17 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 	activityCtx := workflow.WithActivityOptions(ctx, activityOptions)
 
 	output := &JobWorkflowOutput{
-		JobID:          input.JobID,
-		TotalRows:      len(input.RowKeys),
-		SuccessfulRows: 0,
-		FailedRows:     0,
+		JobID:     input.JobID,
+		TotalRows: len(input.RowKeys),
 	}
 
-	err := workflow.ExecuteActivity(activityCtx, "InitializeJob", input.JobID, input.RowKeys).Get(activityCtx, nil)
-	if err != nil {
+	if err := workflow.ExecuteActivity(activityCtx, "InitializeJob", input.JobID, input.RowKeys).Get(activityCtx, nil); err != nil {
 		event.EmitError(ctx, fmt.Errorf("job initialization failed: %w", err))
 		return nil, fmt.Errorf("job initialization failed: %w", err)
 	}
 
 	var patternsOutput activities.GeneratePatternsOutput
-	err = workflow.ExecuteActivity(activityCtx, "GeneratePatterns", activities.GeneratePatternsInput{
+	err := workflow.ExecuteActivity(activityCtx, "GeneratePatterns", activities.GeneratePatternsInput{
 		JobID:           input.JobID,
 		ColumnsMetadata: input.ColumnsMetadata,
 	}).Get(activityCtx, &patternsOutput)
@@ -71,26 +69,22 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 	}
 	event.SetMetadata("pattern_count", len(patternsOutput.Patterns))
 
-	childWorkflowOptions := workflow.ChildWorkflowOptions{
+	childCtx := workflow.WithChildOptions(ctx, workflow.ChildWorkflowOptions{
 		WorkflowExecutionTimeout: 10 * time.Minute,
 		WorkflowTaskTimeout:      1 * time.Minute,
 		ParentClosePolicy:        *enumspb.PARENT_CLOSE_POLICY_TERMINATE.Enum(),
-	}
-	childCtx := workflow.WithChildOptions(ctx, childWorkflowOptions)
+	})
 
-	childFutures := make([]workflow.ChildWorkflowFuture, 0, len(input.RowKeys))
+	keyColumnDescription := ""
+	if input.KeyColumnDescription != nil {
+		keyColumnDescription = *input.KeyColumnDescription
+	}
+
+	sem := &workflowSemaphore{ctx: ctx, limit: config.Load().ConcurrencyRowEnrichmentLimit}
 
 	for _, rowKey := range input.RowKeys {
-		if workflow.GetInfo(ctx).GetCurrentHistoryLength() > 0 && ctx.Err() != nil {
-			break
-		}
-
-		keyColumnDescription := ""
-		if input.KeyColumnDescription != nil {
-			keyColumnDescription = *input.KeyColumnDescription
-		}
-
-		childInput := EnrichmentWorkflowInput{
+		sem.Acquire()
+		sem.Add(workflow.ExecuteChildWorkflow(childCtx, EnrichmentWorkflow, EnrichmentWorkflowInput{
 			JobID:                input.JobID,
 			UserID:               input.UserID,
 			StripeCustomerID:     input.StripeCustomerID,
@@ -98,20 +92,16 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			ColumnsMetadata:      input.ColumnsMetadata,
 			QueryPatterns:        patternsOutput.Patterns,
 			KeyColumnDescription: keyColumnDescription,
-			RetryCount:       0,
-			PreviousAttempts: []*models.EnrichmentAttempt{},
-			MaxRetries:       input.MaxRetries,
-		}
-
-		childWorkflow := workflow.ExecuteChildWorkflow(childCtx, EnrichmentWorkflow, childInput)
-		childFutures = append(childFutures, childWorkflow)
+			RetryCount:           0,
+			PreviousAttempts:     []*models.EnrichmentAttempt{},
+			MaxRetries:           input.MaxRetries,
+		}))
 	}
 
-	for _, future := range childFutures {
+	for _, future := range sem.Futures() {
 		var rowOutput EnrichmentWorkflowOutput
-		err := future.Get(ctx, &rowOutput)
-
-		if err != nil {
+		if err := future.Get(ctx, &rowOutput); err != nil {
+			workflow.GetLogger(ctx).Error("child workflow failed", "error", err)
 			output.FailedRows++
 		} else if rowOutput.Success {
 			output.SuccessfulRows++
@@ -128,14 +118,12 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 		Credits: output.SuccessfulRows,
 	}).Get(activityCtx, nil)
 
-	err = workflow.ExecuteActivity(activityCtx, "CompleteJob", input.JobID).Get(activityCtx, nil)
-	if err != nil {
+	if err := workflow.ExecuteActivity(activityCtx, "CompleteJob", input.JobID).Get(activityCtx, nil); err != nil {
 		event.EmitError(ctx, err)
 		return nil, err
 	}
 
 	output.CompletedAt = workflow.Now(ctx)
 	event.EmitSuccess(ctx)
-
 	return output, nil
 }

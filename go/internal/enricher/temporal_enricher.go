@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"go.temporal.io/sdk/client"
-
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/workflows"
+	"go.temporal.io/sdk/client"
 )
 
 // TemporalEnricher uses Temporal workflows for enrichment processing
