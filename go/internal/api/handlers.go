@@ -10,6 +10,11 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
 
+var WHITELISTED_CONTENT_TYPES = []SignedURLRequestContentType{
+	Textcsv,
+	Applicationjson,
+}
+
 func (s *Server) UploadFileForEnrichment(ctx context.Context, req UploadFileForEnrichmentRequestObject) (UploadFileForEnrichmentResponseObject, error) {
 	u, ok := auth.GetUserFromContext(ctx)
 	if !ok || u == nil {
@@ -95,4 +100,3 @@ func parseRowsParams(p GetRowsProgressParams) state.RowsQueryParams {
 	}
 	return state.RowsQueryParams{Offset: offset, Limit: limit, Stage: stage, Sort: sort}
 }
-
