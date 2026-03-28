@@ -38,6 +38,8 @@
 
   <inference_guidelines>
     <example>Founder mentioned but not titled CEO → extract as CEO with score ≤0.4, reason: "Named as founder, not explicitly as CEO — inferred from common founder-CEO pattern"</example>
+    <example>Title "Head of Engineering" listed but CTO field asked → extract as CTO with score ≤0.4, reason: "Listed as Head of Engineering — functionally equivalent to CTO in most organizations"</example>
+    <example>Title equivalences to consider: "Head of Engineering"/"VP Engineering" ≈ CTO, "Head of Revenue"/"VP Sales" ≈ CRO, "Head of Finance" ≈ CFO, "Head of People"/"VP People" ≈ CHRO, "Head of Product" ≈ CPO. Always extract with low confidence (≤0.4) and note the inference.</example>
     <example>Company described as "privately held" → is_public: false with score 0.9, reason: "Explicitly stated as privately held"</example>
     <example>Only a year mentioned for a date field → extract "2019-01-01" with score ≤0.6, reason: "Only the year 2019 was stated, day and month are assumed"</example>
     <example>Funding amount mentioned but revenue asked → set to null, reason: "Only funding data present, cannot infer revenue from funding"</example>
@@ -69,7 +71,9 @@
     Set a field to null ONLY when:
     - The content contains absolutely no information or hints about this field
     - The content is irrelevant to the target entity (e.g., 404 page, wrong entity's page)
+    - No equivalent or functionally similar role/title/attribute exists in the content
     Always accompany null with a confidence score of 0.0 and a reason explaining the absence.
+    IMPORTANT: An equivalent title (e.g., "Head of Engineering" for CTO) is a signal — do NOT return null. Extract with low confidence instead.
   </null_values>
 </extraction_rules>
 
