@@ -32,7 +32,17 @@ components:
 
     RowStage:
       type: string
-      enum: [PENDING, SERP_FETCHED, DECISION_MADE, CRAWLED, ENRICHED, COMPLETED, FAILED, CANCELLED]
+      enum:
+        [
+          PENDING,
+          SERP_FETCHED,
+          DECISION_MADE,
+          CRAWLED,
+          ENRICHED,
+          COMPLETED,
+          FAILED,
+          CANCELLED,
+        ]
 
     ColumnMetadata:
       type: object
@@ -413,7 +423,14 @@ components:
 
     TierResponse:
       type: object
-      required: [id, display_name, monthly_price_cents, included_tokens, overage_price_cents_decimal]
+      required:
+        [
+          id,
+          display_name,
+          monthly_price_cents,
+          included_tokens,
+          overage_price_cents_decimal,
+        ]
       properties:
         id:
           type: string

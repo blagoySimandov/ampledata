@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/blagoySimandov/ampledata/go/internal/services"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -165,6 +166,28 @@ func toAPIColumnMetadataSlice(cols []*models.ColumnMetadata) []ColumnMetadata {
 		}
 	}
 	return result
+}
+
+func toAPISourceSummaries(results []*services.SourceWithJobs) []SourceSummary {
+	summaries := make([]SourceSummary, len(results))
+	for i, r := range results {
+		summaries[i] = toAPISourceSummary(r)
+	}
+	return summaries
+}
+
+func toAPISourceSummary(r *services.SourceWithJobs) SourceSummary {
+	summary := SourceSummary{
+		SourceId:  openapi_types.UUID(r.Source.ID),
+		Type:      string(r.Source.Type),
+		CreatedAt: r.Source.CreatedAt,
+		JobCount:  len(r.Jobs),
+	}
+	if len(r.Jobs) > 0 {
+		status := JobStatus(r.Jobs[0].Status)
+		summary.LatestJobStatus = &status
+	}
+	return summary
 }
 
 func toAPISourceDetail(source *models.Source, jobs []*models.Job) SourceDetail {

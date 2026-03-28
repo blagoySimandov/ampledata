@@ -14,3 +14,5 @@ terraform/stripe/terraform.tfvars
 terraform/stripe/terraform.tfstate
 terraform/stripe/terraform.tfstate.backup
 CLAUDE.md
+go/postman
+go/.postman

@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"time"
 
 	"cloud.google.com/go/storage"
 )
@@ -28,6 +29,19 @@ func NewCSVReader(bucketName string) (*CSVReader, error) {
 
 func (r *CSVReader) Close() error {
 	return r.client.Close()
+}
+
+func (r *CSVReader) GenerateSignedURL(ctx context.Context, objectName, contentType string) (string, error) {
+	bucket := r.client.Bucket(r.bucketName)
+	url, err := bucket.SignedURL(objectName, &storage.SignedURLOptions{
+		Expires:     time.Now().Add(90 * time.Second),
+		Method:      "PUT",
+		ContentType: contentType,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to generate signed URL: %w", err)
+	}
+	return url, nil
 }
 
 type CSVResult struct {

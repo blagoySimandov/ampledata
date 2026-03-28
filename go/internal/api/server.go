@@ -9,12 +9,13 @@ import (
 )
 
 type Server struct {
-	enricher    enricher.IEnricher
-	gcsReader   *gcs.CSVReader
-	store       state.Store
-	userRepo    user.Repository
-	billing     services.BillingService
-	keySelector services.KeySelector
+	enricher       enricher.IEnricher
+	gcsReader      *gcs.CSVReader
+	store          state.Store
+	userRepo       user.Repository
+	billing        services.BillingService
+	keySelector    services.KeySelector
+	sourcesService services.ISourcesService
 }
 
 func NewServer(
@@ -24,13 +25,16 @@ func NewServer(
 	userRepo user.Repository,
 	billing services.BillingService,
 	keySelector services.KeySelector,
+	aiclient services.IAIClient,
+	sourcesService services.ISourcesService,
 ) *Server {
 	return &Server{
-		enricher:    enr,
-		gcsReader:   gcsReader,
-		store:       store,
-		userRepo:    userRepo,
-		billing:     billing,
-		keySelector: keySelector,
+		enricher:       enr,
+		gcsReader:      gcsReader,
+		store:          store,
+		userRepo:       userRepo,
+		billing:        billing,
+		keySelector:    keySelector,
+		sourcesService: sourcesService,
 	}
 }

@@ -2,14 +2,15 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
 	"github.com/google/uuid"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 func (s *Server) ListSources(ctx context.Context, req ListSourcesRequestObject) (ListSourcesResponseObject, error) {
@@ -17,45 +18,13 @@ func (s *Server) ListSources(ctx context.Context, req ListSourcesRequestObject) 
 	if !ok {
 		return ListSources401JSONResponse{Message: "Unauthorized"}, nil
 	}
-	offset, limit := 0, 50
-	if req.Params.Offset != nil {
-		offset = *req.Params.Offset
-	}
-	if req.Params.Limit != nil {
-		limit = *req.Params.Limit
-	}
-	sources, err := s.store.GetSourcesByUser(ctx, u.ID, offset, limit)
+	offset, limit := paginationParams(req.Params.Offset, req.Params.Limit, 50)
+	results, err := s.sourcesService.ListSources(ctx, u.ID, offset, limit)
 	if err != nil {
 		log.Printf("Failed to retrieve sources: %v", err)
 		return ListSources500JSONResponse{Message: "Failed to retrieve sources"}, nil
 	}
-	summaries, err := s.buildSourceSummaries(ctx, sources)
-	if err != nil {
-		return ListSources500JSONResponse{Message: "Failed to build source summaries"}, nil
-	}
-	return ListSources200JSONResponse{Sources: summaries, TotalCount: len(summaries)}, nil
-}
-
-func (s *Server) buildSourceSummaries(ctx context.Context, sources []*models.Source) ([]SourceSummary, error) {
-	summaries := make([]SourceSummary, len(sources))
-	for i, src := range sources {
-		jobs, err := s.store.GetJobsBySource(ctx, src.ID)
-		if err != nil {
-			return nil, err
-		}
-		summary := SourceSummary{
-			SourceId:  openapi_types.UUID(src.ID),
-			Type:      string(src.Type),
-			CreatedAt: src.CreatedAt,
-			JobCount:  len(jobs),
-		}
-		if len(jobs) > 0 {
-			status := JobStatus(jobs[0].Status)
-			summary.LatestJobStatus = &status
-		}
-		summaries[i] = summary
-	}
-	return summaries, nil
+	return ListSources200JSONResponse{Sources: toAPISourceSummaries(results), TotalCount: len(results)}, nil
 }
 
 func (s *Server) GetSource(ctx context.Context, req GetSourceRequestObject) (GetSourceResponseObject, error) {
@@ -63,18 +32,11 @@ func (s *Server) GetSource(ctx context.Context, req GetSourceRequestObject) (Get
 	if !ok {
 		return GetSource401JSONResponse{Message: "Unauthorized"}, nil
 	}
-	source, err := s.store.GetSource(ctx, uuid.UUID(req.SourceID))
+	result, err := s.sourcesService.GetSource(ctx, uuid.UUID(req.SourceID), u.ID)
 	if err != nil {
-		return GetSource404JSONResponse{Message: "Source not found"}, nil
+		return toGetSourceError(err), nil
 	}
-	if source.UserID != u.ID {
-		return GetSource403JSONResponse{Message: "Forbidden"}, nil
-	}
-	jobs, err := s.store.GetJobsBySource(ctx, source.ID)
-	if err != nil {
-		return GetSource500JSONResponse{Message: "Failed to retrieve jobs"}, nil
-	}
-	return GetSource200JSONResponse(toAPISourceDetail(source, jobs)), nil
+	return GetSource200JSONResponse(toAPISourceDetail(result.Source, result.Jobs)), nil
 }
 
 func (s *Server) GetSourceData(ctx context.Context, req GetSourceDataRequestObject) (GetSourceDataResponseObject, error) {
@@ -82,28 +44,11 @@ func (s *Server) GetSourceData(ctx context.Context, req GetSourceDataRequestObje
 	if !ok {
 		return GetSourceData401JSONResponse{Message: "Unauthorized"}, nil
 	}
-	source, err := s.store.GetSource(ctx, uuid.UUID(req.SourceID))
+	result, err := s.sourcesService.GetSourceData(ctx, uuid.UUID(req.SourceID), u.ID)
 	if err != nil {
-		return GetSourceData404JSONResponse{Message: "Source not found"}, nil
+		return toGetSourceDataError(err), nil
 	}
-	if source.UserID != u.ID {
-		return GetSourceData403JSONResponse{Message: "Forbidden"}, nil
-	}
-
-	csvMeta, ok := source.Metadata.(*models.CSVSourceMetadata)
-	if !ok {
-		return GetSourceData500JSONResponse{Message: "Source metadata not found"}, nil
-	}
-
-	result, err := s.gcsReader.ReadCSV(ctx, csvMeta.FileURI)
-	if err != nil {
-		return GetSourceData500JSONResponse{Message: fmt.Sprintf("Failed to read CSV: %v", err)}, nil
-	}
-
-	return GetSourceData200JSONResponse{
-		Headers: result.Headers,
-		Rows:    result.Rows,
-	}, nil
+	return GetSourceData200JSONResponse{Headers: result.Headers, Rows: result.Rows}, nil
 }
 
 func (s *Server) EnrichSource(ctx context.Context, req EnrichSourceRequestObject) (EnrichSourceResponseObject, error) {
@@ -111,66 +56,78 @@ func (s *Server) EnrichSource(ctx context.Context, req EnrichSourceRequestObject
 	if !ok {
 		return EnrichSource401JSONResponse{Message: "Unauthorized"}, nil
 	}
-	user, ok := user.GetDBUserFromContext(ctx)
+	dbUser, ok := user.GetDBUserFromContext(ctx)
 	if !ok {
 		return EnrichSource500JSONResponse{Message: "User not found"}, nil
 	}
-	source, err := s.store.GetSource(ctx, uuid.UUID(req.SourceID))
+	input := buildEnrichInput(req, authUser.ID, dbUser)
+	jobID, err := s.sourcesService.EnrichSource(ctx, input)
 	if err != nil {
-		return EnrichSource404JSONResponse{Message: "Source not found"}, nil
+		return toEnrichSourceError(err), nil
 	}
-	if source.UserID != authUser.ID {
-		return EnrichSource403JSONResponse{Message: "Forbidden"}, nil
-	}
-	keyColumns, keyColumnDescription, err := s.resolveKeyColumns(ctx, source.ID, req.Body)
-	if err != nil {
-		return EnrichSource400JSONResponse{Message: err.Error()}, nil
-	}
-	csvMeta, ok := source.Metadata.(*models.CSVSourceMetadata)
-	if !ok {
-		return EnrichSource500JSONResponse{Message: "Source metadata not found"}, nil
-	}
-	cols := toModelColumnMetadataSlice(req.Body.ColumnsMetadata)
-	rowKeys, err := s.readRowKeys(ctx, csvMeta.FileURI, keyColumns, cols)
-	if err != nil {
-		return EnrichSource400JSONResponse{Message: fmt.Sprintf("Failed to read CSV: %v", err)}, nil
-	}
-	if len(rowKeys) == 0 {
-		return EnrichSource400JSONResponse{Message: "No rows found in key column"}, nil
-	}
-	cellsToBeEnriched := int64(len(rowKeys) * len(cols))
-	if !user.CanEnrichCells(cellsToBeEnriched) {
-		return EnrichSource402JSONResponse{Message: "Insufficient credits to run this job"}, nil
-	}
-	jobID := generateJobId(".csv") // TODO: Maybe don't append .csv ? idk
-	if err := s.store.CreatePendingJob(ctx, jobID, authUser.ID, source.ID); err != nil {
-		return EnrichSource500JSONResponse{Message: "Failed to create job"}, nil
-	}
-	if err := s.configureAndStartEnrich(ctx, jobID, keyColumns, keyColumnDescription, cols, len(rowKeys)); err != nil {
-		return EnrichSource500JSONResponse{Message: err.Error()}, nil
-	}
-	go s.enricher.Enrich(context.Background(), jobID, user.ID, stripeCustomerIDOrEmpty(user), rowKeys, cols, keyColumnDescription)
 	return EnrichSource200JSONResponse{JobId: jobID}, nil
 }
 
-func (s *Server) resolveKeyColumns(ctx context.Context, sourceID uuid.UUID, body *EnrichSourceJSONRequestBody) ([]string, *string, error) {
-	if body.KeyColumns != nil && len(*body.KeyColumns) > 0 {
-		return *body.KeyColumns, body.KeyColumnDescription, nil
+func buildEnrichInput(req EnrichSourceRequestObject, authUserID string, dbUser *models.User) services.EnrichSourceInput {
+	var keyColumns []string
+	if req.Body.KeyColumns != nil {
+		keyColumns = *req.Body.KeyColumns
 	}
-	jobs, err := s.store.GetJobsBySource(ctx, sourceID)
-	if err != nil || len(jobs) == 0 {
-		return nil, nil, fmt.Errorf("key_columns required for first enrichment run")
+	return services.EnrichSourceInput{
+		SourceID:             uuid.UUID(req.SourceID),
+		AuthUserID:           authUserID,
+		DBUser:               dbUser,
+		KeyColumns:           keyColumns,
+		KeyColumnDescription: req.Body.KeyColumnDescription,
+		ColumnsMetadata:      toModelColumnMetadataSlice(req.Body.ColumnsMetadata),
 	}
-	mostRecent := jobs[0]
-	return mostRecent.KeyColumns, mostRecent.KeyColumnDescription, nil
 }
 
-func (s *Server) configureAndStartEnrich(ctx context.Context, jobID string, keyColumns []string, keyColumnDescription *string, cols []*models.ColumnMetadata, rowCount int) error {
-	if err := s.store.UpdateJobConfiguration(ctx, jobID, keyColumns, cols, keyColumnDescription); err != nil {
-		return fmt.Errorf("failed to update job configuration")
+func paginationParams(offset, limit *int, defaultLimit int) (int, int) {
+	o, l := 0, defaultLimit
+	if offset != nil {
+		o = *offset
 	}
-	if err := s.store.StartJob(ctx, jobID, rowCount); err != nil {
-		return fmt.Errorf("failed to start job")
+	if limit != nil {
+		l = *limit
 	}
-	return nil
+	return o, l
+}
+
+func toGetSourceError(err error) GetSourceResponseObject {
+	switch {
+	case errors.Is(err, services.ErrSourceNotFound):
+		return GetSource404JSONResponse{Message: "Source not found"}
+	case errors.Is(err, services.ErrSourceForbidden):
+		return GetSource403JSONResponse{Message: "Forbidden"}
+	default:
+		return GetSource500JSONResponse{Message: "Failed to retrieve source"}
+	}
+}
+
+func toGetSourceDataError(err error) GetSourceDataResponseObject {
+	switch {
+	case errors.Is(err, services.ErrSourceNotFound):
+		return GetSourceData404JSONResponse{Message: "Source not found"}
+	case errors.Is(err, services.ErrSourceForbidden):
+		return GetSourceData403JSONResponse{Message: "Forbidden"}
+	default:
+		return GetSourceData500JSONResponse{Message: fmt.Sprintf("Failed to read CSV: %v", err)}
+	}
+}
+
+func toEnrichSourceError(err error) EnrichSourceResponseObject {
+	var validErr services.ValidationError
+	switch {
+	case errors.Is(err, services.ErrSourceNotFound):
+		return EnrichSource404JSONResponse{Message: "Source not found"}
+	case errors.Is(err, services.ErrSourceForbidden):
+		return EnrichSource403JSONResponse{Message: "Forbidden"}
+	case errors.Is(err, services.ErrInsufficientCredits):
+		return EnrichSource402JSONResponse{Message: "Insufficient credits to run this job"}
+	case errors.As(err, &validErr):
+		return EnrichSource400JSONResponse{Message: err.Error()}
+	default:
+		return EnrichSource500JSONResponse{Message: err.Error()}
+	}
 }

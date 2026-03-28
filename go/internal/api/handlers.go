@@ -2,15 +2,11 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"mime"
 	"slices"
-	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
-	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
 
@@ -25,45 +21,12 @@ func (s *Server) UploadFileForEnrichment(ctx context.Context, req UploadFileForE
 	if req.Body.Length <= 0 {
 		return UploadFileForEnrichment400JSONResponse{Message: "invalid length"}, nil
 	}
-	return s.createSourceWithSignedURL(ctx, u.ID, string(req.Body.ContentType))
-}
-
-func (s *Server) createSourceWithSignedURL(ctx context.Context, userID, contentType string) (UploadFileForEnrichmentResponseObject, error) {
-	ext, _ := mime.ExtensionsByType(contentType)
-	extension := ".csv"
-	if len(ext) > 0 {
-		extension = ext[0]
-	}
-	fileID := generateJobId(extension)
-	source, err := s.createCSVSource(ctx, userID, fileID, contentType)
+	sourceID, url, err := s.sourcesService.CreateUploadSource(ctx, u.ID, string(req.Body.ContentType))
 	if err != nil {
-		log.Printf("Failed to create source: %v", err)
+		log.Printf("Failed to create upload source: %v", err)
 		return UploadFileForEnrichment500JSONResponse{Message: "Failed to create source"}, nil
 	}
-	url, err := generateSignedURL(fileID, contentType)
-	if err != nil {
-		return UploadFileForEnrichment500JSONResponse{Message: err.Error()}, nil
-	}
-	return UploadFileForEnrichment200JSONResponse{Url: url, SourceId: source.ID}, nil
-}
-
-func (s *Server) createCSVSource(ctx context.Context, userID, fileURI, contentType string) (*models.SourceDB, error) {
-	metaJSON, err := json.Marshal(&models.CSVSourceMetadata{FileURI: fileURI, ContentType: contentType})
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
-	}
-	now := time.Now()
-	source := &models.SourceDB{
-		UserID:    userID,
-		Type:      models.SourceTypeCSVUpload,
-		Metadata:  json.RawMessage(metaJSON),
-		CreatedAt: now,
-		UpdatedAt: now,
-	}
-	if err := s.store.CreateSource(ctx, source); err != nil {
-		return nil, err
-	}
-	return source, nil
+	return UploadFileForEnrichment200JSONResponse{Url: url, SourceId: sourceID}, nil
 }
 
 func (s *Server) CancelJob(ctx context.Context, req CancelJobRequestObject) (CancelJobResponseObject, error) {
@@ -132,57 +95,4 @@ func parseRowsParams(p GetRowsProgressParams) state.RowsQueryParams {
 	}
 	return state.RowsQueryParams{Offset: offset, Limit: limit, Stage: stage, Sort: sort}
 }
-
-func (s *Server) readRowKeys(ctx context.Context, filePath string, keyColumns []string, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
-	imputationCols := imputationColumnNames(columnsMetadata)
-	var keys []string
-	var err error
-	if len(imputationCols) > 0 {
-		keys, err = s.gcsReader.ReadCompositeKeyFromFileFiltered(ctx, filePath, keyColumns, imputationCols)
-	} else {
-		keys, err = s.gcsReader.ReadCompositeKeyFromFile(ctx, filePath, keyColumns)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return deduplicateKeys(keys), nil
-}
-
-func deduplicateKeys(keys []string) []string {
-	seen := make(map[string]struct{}, len(keys))
-	result := make([]string, 0, len(keys))
-	for _, k := range keys {
-		if _, ok := seen[k]; !ok {
-			seen[k] = struct{}{}
-			result = append(result, k)
-		}
-	}
-	return result
-}
-
-func imputationColumnNames(cols []*models.ColumnMetadata) []string {
-	var names []string
-	for _, col := range cols {
-		if col.JobType == models.JobTypeImputation {
-			names = append(names, col.Name)
-		}
-	}
-	return names
-}
-
-func sourceCSVMeta(job *models.Job) (*models.CSVSourceMetadata, bool) {
-	if job.Source == nil {
-		return nil, false
-	}
-	meta, ok := job.Source.Metadata.(*models.CSVSourceMetadata)
-	return meta, ok
-}
-
-func stripeCustomerIDOrEmpty(u *models.User) string {
-	if u.StripeCustomerID != nil {
-		return *u.StripeCustomerID
-	}
-	return ""
-}
-
 
