@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, CheckCircle, Sparkles } from "lucide-react";
 import logo from "../../../../assets/ampledata-logo.png";
+import { ContactFormWidget } from "@/components/widgets";
 import { Button } from "@/components/ui/button";
 import { BENEFITS, STEPS } from "./constants";
 import { EnrichmentMockHero } from "./enrichment-mock-hero";
@@ -151,6 +152,8 @@ export function LandingPage() {
       </section>
 
       <PricingSection />
+
+      <ContactFormWidget variant="landing" />
 
       <section className="bg-primary py-24">
         <div className="container mx-auto px-4 text-center">
