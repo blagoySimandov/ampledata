@@ -88,7 +88,12 @@ export function ContactFormWidget({ variant, user }: Props) {
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <h3 className={isLanding ? "text-xl font-black text-foreground mb-1" : "text-base font-semibold text-foreground mb-1"}>
+            <h3
+              className={cn(
+                "text-foreground mb-1",
+                isLanding ? "text-xl font-black" : "text-base font-semibold",
+              )}
+            >
               Send us a message
             </h3>
             <p className="text-sm text-muted-foreground">
