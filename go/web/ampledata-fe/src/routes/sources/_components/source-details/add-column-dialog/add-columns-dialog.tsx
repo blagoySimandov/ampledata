@@ -12,7 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useApi, useEnrich, useSourceData } from "@/hooks";
-import { Plus, Settings2, Loader2 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Plus, Settings2, Loader2, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { AddColumnsDialogProps } from "./types";
@@ -35,6 +40,10 @@ export function AddColumnsDialog({
 
   const canStart =
     columnsMetadata.length > 0 && columnsMetadata.every((c) => c.name);
+
+  const hasImputation = columnsMetadata.some((c) => c.job_type === "imputation");
+  const hasEnrichment = columnsMetadata.some((c) => c.job_type === "enrichment");
+  const startLabel = hasImputation && !hasEnrichment ? "START IMPUTATION" : hasImputation ? "START RUN" : "START ENRICHMENT";
 
   const addColumn = () =>
     setColumnsMetadata((prev) => [
@@ -83,7 +92,7 @@ export function AddColumnsDialog({
       setOpen(false);
       resetForm();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to start enrichment");
+      toast.error(e instanceof Error ? e.message : "Failed to start job");
     }
   };
 
@@ -100,7 +109,7 @@ export function AddColumnsDialog({
       >
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-2xl font-black">
-            Add Enrichment Columns
+            Add Columns
           </DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-1 px-6">
@@ -144,24 +153,30 @@ export function AddColumnsDialog({
                     )}
                   </div>
                 </div>
-                <div className="space-y-1 pt-2">
-                  <Label className="text-xs text-slate-500 font-bold">
-                    Key Column Definition (AI Context)
-                  </Label>
-                  <Input
-                    placeholder="Optional rules to locate the key columns in raw text..."
-                    value={keyColumnDescription}
-                    onChange={(e) => setKeyColumnDescription(e.target.value)}
-                    className="text-sm h-9"
-                  />
-                </div>
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-1 text-xs text-slate-400 font-bold hover:text-slate-600 transition-colors pt-2 group">
+                    <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
+                    Advanced
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-1 pt-2">
+                    <Label className="text-xs text-slate-500 font-bold">
+                      Key Column Definition (AI Context)
+                    </Label>
+                    <Input
+                      placeholder="Optional rules to locate the key columns in raw text..."
+                      value={keyColumnDescription}
+                      onChange={(e) => setKeyColumnDescription(e.target.value)}
+                      className="text-sm h-9"
+                    />
+                  </CollapsibleContent>
+                </Collapsible>
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <Settings2 className="w-3 h-3" /> New Fields
+                  <Settings2 className="w-3 h-3" /> Columns
                 </Label>
                 <Button
                   variant="ghost"
@@ -180,6 +195,7 @@ export function AddColumnsDialog({
                     <ColumnEditor
                       key={index}
                       column={col}
+                      sourceColumns={sourceColumns}
                       onUpdate={(updates) => updateColumn(index, updates)}
                       onRemove={() => removeColumn(index)}
                     />
@@ -199,7 +215,7 @@ export function AddColumnsDialog({
                   STARTING...
                 </>
               ) : (
-                "START ENRICHMENT"
+                startLabel
               )}
             </Button>
           </div>

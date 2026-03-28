@@ -12,18 +12,38 @@ import type { ColumnEditorProps } from "./types";
 
 export function ColumnEditor({
   column,
+  sourceColumns,
   onUpdate,
   onRemove,
 }: ColumnEditorProps) {
+  const isImputation = column.job_type === "imputation";
   return (
     <div className="flex flex-col gap-2 p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
       <div className="flex items-center gap-2">
-        <Input
-          placeholder="Field name"
-          value={column.name}
-          onChange={(e) => onUpdate({ name: e.target.value })}
-          className="h-9 text-xs font-medium"
-        />
+        {isImputation ? (
+          <Select
+            value={column.name}
+            onValueChange={(v) => onUpdate({ name: v })}
+          >
+            <SelectTrigger className="h-9 flex-1 text-xs font-medium">
+              <SelectValue placeholder="Select column to impute" />
+            </SelectTrigger>
+            <SelectContent>
+              {sourceColumns.map((col) => (
+                <SelectItem key={col} value={col}>
+                  {col}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            placeholder="Field name"
+            value={column.name}
+            onChange={(e) => onUpdate({ name: e.target.value })}
+            className="h-9 text-xs font-medium"
+          />
+        )}
         <Select
           value={column.job_type}
           onValueChange={(v: "enrichment" | "imputation") =>

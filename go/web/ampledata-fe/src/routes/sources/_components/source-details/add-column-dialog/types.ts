@@ -7,6 +7,7 @@ export interface AddColumnsDialogProps {
 
 export interface ColumnEditorProps {
   column: ColumnMetadata;
+  sourceColumns: string[];
   onUpdate: (updates: Partial<ColumnMetadata>) => void;
   onRemove: () => void;
 }
