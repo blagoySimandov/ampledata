@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useBilling, useMe } from "@/hooks";
 import { ProfileCard } from "./_components/profile-card";
 import { PersonalInfoSection } from "./_components/personal-info-section";
+import { ContactSection } from "./_components/contact-section";
 import { SubscriptionSummary } from "./_components/billing/subscription-summary";
 import { TierSelector } from "./_components/billing/tier-selector";
 import { UpgradeDialog } from "./_components/billing/upgrade-dialog";
@@ -86,6 +87,7 @@ export function AccountPage() {
       />
       <PersonalInfoSection user={me.data} />
       <BillingSection onManagePortal={handleManagePortal} />
+      <ContactSection user={me.data} />
     </div>
   );
 }
