@@ -49,18 +49,23 @@ type ISourcesService interface {
 	GetSource(ctx context.Context, sourceID uuid.UUID, userID string) (*SourceWithJobs, error)
 	GetSourceData(ctx context.Context, sourceID uuid.UUID, userID string) (*gcs.CSVResult, error)
 	EnrichSource(ctx context.Context, input EnrichSourceInput) (string, error)
-	CreateUploadSource(ctx context.Context, userID, contentType string) (uuid.UUID, string, error)
+	CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error)
+}
+
+type ISourceNameGeneratorPromptService interface {
+	GenerateSourceNamePrompt(ctx context.Context, headers []string) string
 }
 
 type sourcesService struct {
-	store    state.Store
-	reader   *gcs.CSVReader
-	enricher IEnricher
-	aiClient IAIClient
+	store         state.Store
+	reader        *gcs.CSVReader
+	enricher      IEnricher
+	aiClient      IAIClient
+	promptService ISourceNameGeneratorPromptService
 }
 
-func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient) ISourcesService {
-	return &sourcesService{store: store, reader: reader, enricher: enr, aiClient: aiclient}
+func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) ISourcesService {
+	return &sourcesService{store: store, reader: reader, enricher: enr, aiClient: aiclient, promptService: promptService}
 }
 
 func (s *sourcesService) ListSources(ctx context.Context, userID string, offset, limit int) ([]*SourceWithJobs, error) {
@@ -113,14 +118,14 @@ func (s *sourcesService) GetSourceData(ctx context.Context, sourceID uuid.UUID, 
 	return s.reader.ReadCSV(ctx, csvMeta.FileURI)
 }
 
-func (s *sourcesService) CreateUploadSource(ctx context.Context, userID, contentType string) (uuid.UUID, string, error) {
+func (s *sourcesService) CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error) {
 	ext, _ := mime.ExtensionsByType(contentType)
 	extension := ".csv"
 	if len(ext) > 0 {
 		extension = ext[0]
 	}
 	fileID := generateJobID(extension)
-	source, err := s.createCSVSource(ctx, userID, fileID, contentType)
+	source, err := s.createCSVSource(ctx, userID, fileID, contentType, headers)
 	if err != nil {
 		return uuid.Nil, "", fmt.Errorf("failed to create source: %w", err)
 	}
@@ -131,8 +136,18 @@ func (s *sourcesService) CreateUploadSource(ctx context.Context, userID, content
 	return source.ID, url, nil
 }
 
-func (s *sourcesService) createCSVSource(ctx context.Context, userID, fileURI, contentType string) (*models.SourceDB, error) {
-	metaJSON, err := json.Marshal(&models.CSVSourceMetadata{FileURI: fileURI, ContentType: contentType})
+func (s *sourcesService) generateSourceName(ctx context.Context, headers []string) string {
+	prompt := s.promptService.GenerateSourceNamePrompt(ctx, headers)
+	name, err := s.aiClient.GenerateContent(ctx, prompt)
+	if err != nil {
+		return "Uploaded File"
+	}
+	return name
+}
+
+func (s *sourcesService) createCSVSource(ctx context.Context, userID, fileURI, contentType string, headers []string) (*models.SourceDB, error) {
+	name := s.generateSourceName(ctx, headers)
+	metaJSON, err := json.Marshal(&models.CSVSourceMetadata{FileURI: fileURI, ContentType: contentType, Name: name})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal metadata: %w", err)
 	}

@@ -78,6 +78,11 @@ components:
         length:
           type: integer
           minimum: 1
+        headers:
+          type: array
+          items:
+            type: string
+          description: CSV column headers, used to generate an AI name for the source
 
     SignedURLResponse:
       type: object
@@ -306,6 +311,9 @@ components:
         source_id:
           type: string
           format: uuid
+        name:
+          type: string
+          nullable: true
         type:
           type: string
         created_at:

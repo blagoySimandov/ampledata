@@ -1,0 +1,6 @@
+You are naming a dataset. Given these CSV column headers, generate a short, descriptive name (2-5 words) that captures what kind of data this dataset contains.
+
+Column headers:
+{{headers}}
+
+Respond with only the dataset name, nothing else. Examples: "Company Contact List", "Product Sales Data", "Customer Account Records"

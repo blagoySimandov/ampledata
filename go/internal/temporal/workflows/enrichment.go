@@ -393,7 +393,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 			var reportErr error
 			workflow.ExecuteActivity(ctx, "ReportUsage", activities.ReportUsageInput{
 				StripeCustomerID: input.StripeCustomerID,
-				Credits:          len(output.ExtractedData),
+				Credits:          len(input.ColumnsMetadata),
 			}).Get(ctx, &reportErr)
 			if reportErr != nil {
 				event.SetMetadata("billing_error", reportErr.Error())
@@ -416,7 +416,7 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		var reportErr error
 		workflow.ExecuteActivity(ctx, "ReportUsage", activities.ReportUsageInput{
 			StripeCustomerID: input.StripeCustomerID,
-			Credits:          len(output.ExtractedData),
+			Credits:          len(input.ColumnsMetadata),
 		}).Get(ctx, &reportErr)
 		if reportErr != nil {
 			event.SetMetadata("billing_error", reportErr.Error())

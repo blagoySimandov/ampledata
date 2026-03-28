@@ -2,37 +2,9 @@ package api
 
 import (
 	"context"
-	"fmt"
-	"log"
-	"slices"
 
-	"github.com/blagoySimandov/ampledata/go/internal/auth"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
-
-var WHITELISTED_CONTENT_TYPES = []SignedURLRequestContentType{
-	Textcsv,
-	Applicationjson,
-}
-
-func (s *Server) UploadFileForEnrichment(ctx context.Context, req UploadFileForEnrichmentRequestObject) (UploadFileForEnrichmentResponseObject, error) {
-	u, ok := auth.GetUserFromContext(ctx)
-	if !ok || u == nil {
-		return UploadFileForEnrichment401JSONResponse{Message: "Unauthorized"}, nil
-	}
-	if !slices.Contains(WHITELISTED_CONTENT_TYPES, req.Body.ContentType) {
-		return UploadFileForEnrichment400JSONResponse{Message: fmt.Sprintf("invalid content type: %s", req.Body.ContentType)}, nil
-	}
-	if req.Body.Length <= 0 {
-		return UploadFileForEnrichment400JSONResponse{Message: "invalid length"}, nil
-	}
-	sourceID, url, err := s.sourcesService.CreateUploadSource(ctx, u.ID, string(req.Body.ContentType))
-	if err != nil {
-		log.Printf("Failed to create upload source: %v", err)
-		return UploadFileForEnrichment500JSONResponse{Message: "Failed to create source"}, nil
-	}
-	return UploadFileForEnrichment200JSONResponse{Url: url, SourceId: sourceID}, nil
-}
 
 func (s *Server) CancelJob(ctx context.Context, req CancelJobRequestObject) (CancelJobResponseObject, error) {
 	if err := s.enricher.Cancel(ctx, req.JobID); err != nil {

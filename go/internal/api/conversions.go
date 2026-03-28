@@ -182,12 +182,20 @@ func toAPISourceSummary(r *services.SourceWithJobs) SourceSummary {
 		Type:      string(r.Source.Type),
 		CreatedAt: r.Source.CreatedAt,
 		JobCount:  len(r.Jobs),
+		Name:      sourceMetaName(r.Source),
 	}
 	if len(r.Jobs) > 0 {
 		status := JobStatus(r.Jobs[0].Status)
 		summary.LatestJobStatus = &status
 	}
 	return summary
+}
+
+func sourceMetaName(s *models.Source) *string {
+	if meta, ok := s.Metadata.(*models.CSVSourceMetadata); ok && meta.Name != "" {
+		return &meta.Name
+	}
+	return nil
 }
 
 func toAPISourceDetail(source *models.Source, jobs []*models.Job) SourceDetail {

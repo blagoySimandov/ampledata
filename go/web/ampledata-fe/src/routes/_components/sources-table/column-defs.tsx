@@ -9,9 +9,9 @@ export function useColumnDefs(): ColDef<SourceSummary>[] {
       field: "source_id",
       headerName: "Source",
       flex: 1,
-      cellRenderer: (params: { value: string }) => (
+      cellRenderer: (params: { value: string; data: SourceSummary }) => (
         <span className="font-semibold text-primary cursor-pointer hover:underline">
-          {params.value}
+          {params.data.name ?? params.value}
         </span>
       ),
       onCellClicked: (params) => {

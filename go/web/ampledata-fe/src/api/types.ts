@@ -39,6 +39,7 @@ export interface SourceJobSummary {
 
 export interface SourceSummary {
   source_id: string;
+  name?: string | null;
   type: string;
   created_at: string;
   job_count: number;
@@ -119,6 +120,7 @@ export interface RowsProgressResponse {
 export interface SignedURLRequest {
   contentType: "text/csv" | "application/json";
   length: number;
+  headers?: string[];
 }
 
 export interface SignedURLResponse {

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -55,6 +56,12 @@ func (p *PromptService) QueryPatternWithFeedbackPrompt(columns []*models.ColumnM
 		"column_count": fmt.Sprintf("%d", len(columns)),
 		"columns":      columnsText(columns),
 		"feedback":     feedbackText(previousAttempts),
+	})
+}
+
+func (p *PromptService) GenerateSourceNamePrompt(_ context.Context, headers []string) string {
+	return renderPrompt(prompts.SourceName, map[string]string{
+		"headers": strings.Join(headers, "\n"),
 	})
 }
 

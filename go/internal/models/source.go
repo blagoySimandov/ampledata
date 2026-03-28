@@ -22,6 +22,7 @@ type SourceMetadata interface {
 type CSVSourceMetadata struct {
 	FileURI     string `json:"file_uri"`
 	ContentType string `json:"content_type"`
+	Name        string `json:"name,omitempty"`
 }
 
 func (m *CSVSourceMetadata) SourceType() SourceType { return SourceTypeCSVUpload }

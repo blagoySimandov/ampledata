@@ -13,3 +13,6 @@ var QueryPattern string
 
 //go:embed key-selector.txt
 var KeySelector string
+
+//go:embed source-name.txt
+var SourceName string
