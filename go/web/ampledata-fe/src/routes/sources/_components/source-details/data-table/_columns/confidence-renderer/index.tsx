@@ -61,7 +61,10 @@ export function ConfidenceDataRenderer(params: ConfidenceDataRendererParams) {
   const sources = params.data.__sources?.[field];
   const extractionHistory = params.data.__extractionHistory?.[field] ?? [];
   const hasValue =
-    params.value !== undefined && params.value !== null && params.value !== "";
+    params.value !== undefined &&
+    params.value !== null &&
+    params.value !== "" &&
+    params.value !== "<nil>";
 
   const confConfig = confidence
     ? getConfidenceConfig(confidence.score)

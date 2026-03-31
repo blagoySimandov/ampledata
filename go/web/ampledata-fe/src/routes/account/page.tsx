@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ContactFormWidget } from "@/components/widgets";
 import { useBilling, useMe } from "@/hooks";
 import { ProfileCard } from "./_components/profile-card";
 import { PersonalInfoSection } from "./_components/personal-info-section";
@@ -86,6 +87,7 @@ export function AccountPage() {
       />
       <PersonalInfoSection user={me.data} />
       <BillingSection onManagePortal={handleManagePortal} />
+      <ContactFormWidget variant="account" user={me.data} />
     </div>
   );
 }

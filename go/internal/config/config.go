@@ -32,7 +32,6 @@ type Config struct {
 	SerperCost              int
 	TknInCost               int
 	TknOutCost              int
-	CreditExchangeRate      int
 	StripeSecretKey         string
 	StripeWebhookSecret     string
 	EnrichmentCostMeterName string
@@ -84,10 +83,17 @@ var cfg Config = Config{
 
 	CreditsPerCell: getEnvInt("CREDITS_PER_CELL", 1),
 
+	// Token costs are stored in nano-dollars per token (billionths of a dollar).
+	// To convert: price_per_million_tokens * 1000 = nano_dollars_per_token
+	// e.g. $0.25/1M input → 250 nano-dollars/token
+	//
+	// Reference pricing (per 1M tokens):
+	//   gemini-2.5-flash-lite-preview-09-2025:  in $0.10  → 100,  out $0.40  → 400
+	//   gemini-3.1-flash-lite-preview:          in $0.25  → 250,  out $1.50  → 1500
+	//   gemini-2.5-flash:                       in 0.30 -> 300,  out $2.50  → 2500
 	SerperCost:              getEnvInt("SERPER_COST", 1),
-	TknInCost:               getEnvInt("TKN_INGESTION_COST", 150),
-	TknOutCost:              getEnvInt("TKN_ENRICHMENT_COST", 1250),
-	CreditExchangeRate:      getEnvInt("CREDIT_EXCHANGE_RATE", 5), // 5 usd per 1 real world dollar
+	TknInCost:               getEnvInt("TKN_INGESTION_COST", 300),
+	TknOutCost:              getEnvInt("TKN_ENRICHMENT_COST", 2500),
 	StripeSecretKey:         getEnv("STRIPE_SECRET", ""),
 	StripeWebhookSecret:     getEnv("STRIPE_WEBHOOK_SECRET", ""),
 	EnrichmentCostMeterName: getEnv("ENRICHMENT_COST_METER_NAME", "enrichment_credits"),

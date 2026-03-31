@@ -44,7 +44,7 @@ func main() {
 	billingService := billing.NewBilling(userRepo)
 	userService := user.NewUserService(userRepo, billingService)
 
-	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, cfg.CreditExchangeRate, services.WithStore(store))
+	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, services.WithStore(store))
 	if err != nil {
 		log.Fatalf("Failed to create cost tracker: %v", err)
 	}

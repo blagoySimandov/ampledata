@@ -23,6 +23,9 @@ func ValidateAndCoerceTypes(
 
 		switch col.Type {
 		case models.ColumnTypeString:
+			if value == nil {
+				continue
+			}
 			validated[col.Name] = coerceToString(value, col.Name, confidence)
 
 		case models.ColumnTypeNumber:

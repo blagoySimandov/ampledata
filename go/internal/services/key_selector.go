@@ -33,7 +33,7 @@ func NewGeminiKeySelector(promptService IPromptService) (*GeminiKeySelector, err
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 	return &GeminiKeySelector{
-		model:         "gemini-2.5-flash-lite",
+		model:         "gemini-3.1-flash-lite-preview",
 		client:        client,
 		promptService: promptService,
 	}, nil
