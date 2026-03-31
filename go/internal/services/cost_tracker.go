@@ -41,18 +41,16 @@ type CostTracker struct {
 	tknInCost       int
 	tknOutCost      int
 	searchQueryCost int
-	creditExchange  int
 	store           CostStore
 }
 
 type CostTrackerOption func(*CostTracker) error
 
-func NewCostTracker(tknInCost, tknOutCost int, searchQueryCost int, creditExchange int, opts ...CostTrackerOption) (*CostTracker, error) {
+func NewCostTracker(tknInCost, tknOutCost, searchQueryCost int, opts ...CostTrackerOption) (*CostTracker, error) {
 	ct := &CostTracker{
 		tknInCost:       tknInCost,
 		tknOutCost:      tknOutCost,
 		searchQueryCost: searchQueryCost,
-		creditExchange:  creditExchange,
 	}
 
 	for _, opt := range opts {
@@ -107,10 +105,4 @@ func (c *CostTracker) CostDollars() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.cost
-}
-
-func (c *CostTracker) CostCredits() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.cost * c.creditExchange
 }

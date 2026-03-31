@@ -28,11 +28,12 @@ export function useJobProgress(
 export function useAllJobsRows(api: ApiClient, jobs: SourceJobSummary[]) {
   return useQueries({
     queries: jobs.map((job) => ({
-      queryKey: ["job-rows", job.job_id, 0, 10000, "all", "updated_at_desc"],
+      queryKey: ["job-rows", job.job_id, 0, 10000, "all", "updated_at_desc", job.status],
       queryFn: () =>
         api.getJobRows(job.job_id, 0, 10000, "all", "updated_at_desc"),
       refetchInterval:
         job.status === "RUNNING" || job.status === "PENDING" ? 5000 : false,
+      placeholderData: keepPreviousData,
     })),
   });
 }

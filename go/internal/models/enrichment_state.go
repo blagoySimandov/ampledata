@@ -106,10 +106,20 @@ type StateUpdate struct {
 
 func (s *RowState) ApplyUpdate(u *StateUpdate) {
 	if u.ExtractedData != nil {
-		s.ExtractedData = u.ExtractedData
+		if s.ExtractedData == nil {
+			s.ExtractedData = make(map[string]interface{})
+		}
+		for k, v := range u.ExtractedData {
+			s.ExtractedData[k] = v
+		}
 	}
 	if u.Confidence != nil {
-		s.Confidence = u.Confidence
+		if s.Confidence == nil {
+			s.Confidence = make(map[string]*FieldConfidenceInfo)
+		}
+		for k, v := range u.Confidence {
+			s.Confidence[k] = v
+		}
 	}
 	if u.Sources != nil {
 		s.Sources = u.Sources
