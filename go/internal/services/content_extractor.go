@@ -32,7 +32,7 @@ func NewAIContentExtractor(client IAIClient, promptService IPromptService) (*AIC
 
 func (g *AIContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*ExtractionResult, error) {
 	prompt := g.promptService.ExtractionPrompt(entityKey, keyColumnDescription, columnsMetadata, content)
-	result, err := g.client.GenerateContent(ctx, prompt)
+	result, err := g.client.GenerateStructuredContent(ctx, prompt, BuildExtractionSchema(columnsMetadata))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}

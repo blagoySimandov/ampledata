@@ -28,7 +28,7 @@ func NewPatternGenerator(aiClient IAIClient, promptService IPromptService) (*Pat
 
 func (g *PatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error) {
 	prompt := g.promptService.QueryPatternPrompt(columnsMetadata)
-	result, err := g.client.GenerateContent(ctx, prompt)
+	result, err := g.client.GenerateStructuredContent(ctx, prompt, BuildQueryPatternSchema())
 	if err != nil {
 		return g.getFallbackPatterns(columnsMetadata), fmt.Errorf("failed to generate content: %w", err)
 	}
@@ -37,7 +37,7 @@ func (g *PatternGenerator) GeneratePatterns(ctx context.Context, columnsMetadata
 
 func (g *PatternGenerator) GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error) {
 	prompt := g.promptService.QueryPatternWithFeedbackPrompt(columnsMetadata, previousAttempts)
-	result, err := g.client.GenerateContent(ctx, prompt)
+	result, err := g.client.GenerateStructuredContent(ctx, prompt, BuildQueryPatternSchema())
 	if err != nil {
 		return g.getFallbackPatterns(columnsMetadata), fmt.Errorf("failed to generate content: %w", err)
 	}

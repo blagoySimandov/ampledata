@@ -1,6 +1,8 @@
 module github.com/blagoySimandov/ampledata/go
 
-go 1.25
+go 1.24.0
+
+toolchain go1.24.7
 
 require (
 	cloud.google.com/go/storage v1.58.0
@@ -122,5 +124,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	mellium.im/sasl v0.3.2 // indirect
 )
-
-tool github.com/air-verse/air

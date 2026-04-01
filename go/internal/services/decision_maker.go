@@ -36,7 +36,7 @@ func NewGeminiDecisionMaker(promptService IPromptService, client IAIClient) (*AI
 
 func (g *AIDecisionMaker) MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string, previousAttempts []*models.EnrichmentAttempt) (*CrawlDecision, error) {
 	prompt := g.promptService.DecisionMakerPrompt(rowKey, keyColumnDescription, columnsMetadata, serp, maxURLs, previousAttempts)
-	result, err := g.client.GenerateContent(ctx, prompt)
+	result, err := g.client.GenerateStructuredContent(ctx, prompt, BuildDecisionMakerSchema(columnsMetadata))
 	if err != nil {
 		return nil, err
 	}
