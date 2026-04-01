@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ampledata-postgres
+    environment:
+      POSTGRES_USER: enrichment
+      POSTGRES_PASSWORD: enrichment
+      POSTGRES_DB: enrichment
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enrichment -d enrichment"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    container_name: ampledata-temporal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=enrichment
+      - POSTGRES_PWD=enrichment
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./go/temporal-config:/etc/temporal/config/dynamicconfig
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "namespace", "describe", "default"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    container_name: ampledata-temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8088:8080"
+
+  crawl4ai:
+    build:
+      context: ./python/crawl4ai_service
+      dockerfile: Dockerfile
+    container_name: ampledata-crawl4ai
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  go-server:
+    build:
+      context: ./go
+      dockerfile: Dockerfile
+    container_name: ampledata-go-server
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_healthy
+      crawl4ai:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL_ENRICH=postgres://enrichment:enrichment@postgres:5432/enrichment?sslmode=disable
+      - SERVER_ADDR=:8080
+      - TEMPORAL_HOST_PORT=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - TEMPORAL_TASK_QUEUE=ampledata-enrichment
+      - CRAWL4AI_URL=http://crawl4ai:8000
+      - STATIC_DIR=/app/static
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SERPER_API_KEY=${SERPER_API_KEY}
+      - WORKOS_API_KEY=${WORKOS_API_KEY}
+      - WORKOS_CLIENT_ID=${WORKOS_CLIENT_ID}
+      - STRIPE_SECRET=${STRIPE_SECRET}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_STARTER_BASE_PRICE_ID=${STRIPE_STARTER_BASE_PRICE_ID}
+      - STRIPE_STARTER_METERED_PRICE_ID=${STRIPE_STARTER_METERED_PRICE_ID}
+      - STRIPE_PRO_BASE_PRICE_ID=${STRIPE_PRO_BASE_PRICE_ID}
+      - STRIPE_PRO_METERED_PRICE_ID=${STRIPE_PRO_METERED_PRICE_ID}
+      - STRIPE_ENTERPRISE_BASE_PRICE_ID=${STRIPE_ENTERPRISE_BASE_PRICE_ID}
+      - STRIPE_ENTERPRISE_METERED_PRICE_ID=${STRIPE_ENTERPRISE_METERED_PRICE_ID}
+      - ENRICHMENT_COST_METER_NAME=${ENRICHMENT_COST_METER_NAME}
+
+volumes:
+  postgres_data:
