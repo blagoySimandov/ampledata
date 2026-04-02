@@ -50,7 +50,9 @@ export function AddColumnsDialog({
   const parsedMaxRows = maxRowsInput ? parseInt(maxRowsInput, 10) : null;
   const effectiveRows =
     parsedMaxRows && parsedMaxRows > 0
-      ? Math.min(parsedMaxRows, totalSourceRows || parsedMaxRows)
+      ? totalSourceRows > 0
+        ? Math.min(parsedMaxRows, totalSourceRows)
+        : parsedMaxRows
       : totalSourceRows;
   const estimatedCells = effectiveRows * columnsMetadata.length;
 
