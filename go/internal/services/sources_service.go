@@ -42,6 +42,7 @@ type EnrichSourceInput struct {
 	KeyColumns           []string
 	KeyColumnDescription *string
 	ColumnsMetadata      []*models.ColumnMetadata
+	MaxRows              *int
 }
 
 type ISourcesService interface {
@@ -185,6 +186,9 @@ func (s *sourcesService) EnrichSource(ctx context.Context, input EnrichSourceInp
 	if len(rowKeys) == 0 {
 		return "", newValidationError("no rows found in key column")
 	}
+	if input.MaxRows != nil && *input.MaxRows > 0 && len(rowKeys) > *input.MaxRows {
+		rowKeys = rowKeys[:*input.MaxRows]
+	}
 	if !input.DBUser.CanEnrichCells(int64(len(rowKeys) * len(input.ColumnsMetadata))) {
 		return "", ErrInsufficientCredits
 	}
@@ -234,15 +238,15 @@ func (s *sourcesService) createAndStartJob(ctx context.Context, input EnrichSour
 	if err := s.store.CreatePendingJob(ctx, jobID, input.AuthUserID, input.SourceID); err != nil {
 		return "", fmt.Errorf("failed to create job")
 	}
-	if err := s.configureAndStartJob(ctx, jobID, keyColumns, keyColumnDesc, input.ColumnsMetadata, len(rowKeys)); err != nil {
+	if err := s.configureAndStartJob(ctx, jobID, keyColumns, keyColumnDesc, input.ColumnsMetadata, input.MaxRows, len(rowKeys)); err != nil {
 		return "", err
 	}
 	go s.enricher.Enrich(context.Background(), jobID, input.DBUser.ID, stripeCustomerIDOrEmpty(input.DBUser), rowKeys, input.ColumnsMetadata, keyColumnDesc)
 	return jobID, nil
 }
 
-func (s *sourcesService) configureAndStartJob(ctx context.Context, jobID string, keyColumns []string, keyColumnDesc *string, cols []*models.ColumnMetadata, rowCount int) error {
-	if err := s.store.UpdateJobConfiguration(ctx, jobID, keyColumns, cols, keyColumnDesc); err != nil {
+func (s *sourcesService) configureAndStartJob(ctx context.Context, jobID string, keyColumns []string, keyColumnDesc *string, cols []*models.ColumnMetadata, maxRows *int, rowCount int) error {
+	if err := s.store.UpdateJobConfiguration(ctx, jobID, keyColumns, cols, keyColumnDesc, maxRows); err != nil {
 		return fmt.Errorf("failed to update job configuration")
 	}
 	if err := s.store.StartJob(ctx, jobID, rowCount); err != nil {
