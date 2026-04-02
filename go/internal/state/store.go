@@ -26,7 +26,7 @@ type Store interface {
 	GetJobsBySource(ctx context.Context, sourceID uuid.UUID) ([]*models.Job, error)
 	CreatePendingJob(ctx context.Context, jobID, userID string, sourceID uuid.UUID) error
 	GetJob(ctx context.Context, jobID string) (*models.Job, error)
-	UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error
+	UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string, maxRows *int) error
 	StartJob(ctx context.Context, jobID string, totalRows int) error
 	GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.Job, error)
 	BulkCreateRows(ctx context.Context, jobID string, rowKeys []string) error

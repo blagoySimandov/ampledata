@@ -124,6 +124,7 @@ type SourceJobSummary struct {
 	JobID                string            `json:"job_id"`
 	Status               JobStatus         `json:"status"`
 	TotalRows            int               `json:"total_rows"`
+	MaxRows              *int              `json:"max_rows,omitempty"`
 	KeyColumns           []string          `json:"key_columns,omitempty"`
 	KeyColumnDescription *string           `json:"key_column_description,omitempty"`
 	ColumnsMetadata      []*ColumnMetadata `json:"columns_metadata,omitempty"`
@@ -151,6 +152,7 @@ func ToSourceJobSummary(job *Job) *SourceJobSummary {
 		JobID:                job.JobID,
 		Status:               job.Status,
 		TotalRows:            job.TotalRows,
+		MaxRows:              job.MaxRows,
 		KeyColumns:           job.KeyColumns,
 		KeyColumnDescription: job.KeyColumnDescription,
 		ColumnsMetadata:      job.ColumnsMetadata,

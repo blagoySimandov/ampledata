@@ -19,6 +19,7 @@ type JobDB struct {
 	ColumnsMetadata      []*ColumnMetadata `bun:"columns_metadata,type:jsonb" json:"columns_metadata"`
 	KeyColumnDescription *string           `bun:"entity_type" json:"key_column_description"`
 	TotalRows            int               `bun:"total_rows,notnull" json:"total_rows"`
+	MaxRows              *int              `bun:"max_rows" json:"max_rows,omitempty"`
 	StartedAt            *time.Time        `bun:"started_at" json:"started_at"`
 	Status               JobStatus         `bun:"status,notnull,default:'PENDING'" json:"status"`
 	CostDollars          int               `bun:"cost_dollars,notnull,default:0" json:"cost_dollars"`
@@ -36,6 +37,7 @@ func (j *JobDB) ToJob() (*Job, error) {
 		ColumnsMetadata:      j.ColumnsMetadata,
 		KeyColumnDescription: j.KeyColumnDescription,
 		TotalRows:            j.TotalRows,
+		MaxRows:              j.MaxRows,
 		StartedAt:            j.StartedAt,
 		Status:               j.Status,
 		CreatedAt:            j.CreatedAt,
@@ -60,6 +62,7 @@ func JobFromDomain(job *Job) *JobDB {
 		ColumnsMetadata:      job.ColumnsMetadata,
 		KeyColumnDescription: job.KeyColumnDescription,
 		TotalRows:            job.TotalRows,
+		MaxRows:              job.MaxRows,
 		StartedAt:            job.StartedAt,
 		Status:               job.Status,
 		CreatedAt:            job.CreatedAt,

@@ -124,6 +124,61 @@ func NewActivityEvent(activityName, jobID string) *WideEvent {
 	}
 }
 
+// NewRequestEvent creates a new wide event for an HTTP request endpoint.
+// The event is designed to be stored in the request context and progressively
+// enriched with data as the request is handled (wide event pattern).
+func NewRequestEvent(endpoint, userID string) *WideEvent {
+	return &WideEvent{
+		Timestamp: time.Now(),
+		EventType: "http.request." + endpoint,
+		UserID:    userID,
+		Status:    "in_progress",
+		Metadata:  make(map[string]interface{}),
+		Stages:    make(map[string]*StageInfo),
+		startTime: time.Now(),
+	}
+}
+
+// StartStageByName begins tracking a named stage without requiring a models.RowStage type.
+func (e *WideEvent) StartStageByName(name string) {
+	if e.Stages == nil {
+		e.Stages = make(map[string]*StageInfo)
+	}
+	e.Stages[name] = &StageInfo{
+		StartTime: time.Now(),
+		Status:    "in_progress",
+	}
+}
+
+// CompleteStageByName marks a named stage as successful with optional data.
+func (e *WideEvent) CompleteStageByName(name string, data map[string]interface{}) {
+	if info, exists := e.Stages[name]; exists {
+		info.DurationMs = time.Since(info.StartTime).Milliseconds()
+		info.Status = "success"
+		info.Data = data
+	}
+}
+
+// FailStageByName marks a named stage as failed.
+func (e *WideEvent) FailStageByName(name string, err error) {
+	if info, exists := e.Stages[name]; exists {
+		info.DurationMs = time.Since(info.StartTime).Milliseconds()
+		info.Status = "error"
+		errMsg := err.Error()
+		info.Error = &errMsg
+	}
+}
+
+// EmitRequestSuccess emits the request event as successful using slog.
+func (e *WideEvent) EmitRequestSuccess(ctx context.Context) {
+	e.EmitActivitySuccess(ctx, nil)
+}
+
+// EmitRequestError emits the request event as failed using slog.
+func (e *WideEvent) EmitRequestError(ctx context.Context, err error) {
+	e.EmitActivityError(ctx, err)
+}
+
 // SetWorkflowInfo adds workflow context to the event
 func (e *WideEvent) SetWorkflowInfo(workflowID, runID string) {
 	e.WorkflowID = workflowID

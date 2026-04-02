@@ -370,6 +370,11 @@ components:
         key_column_description:
           type: string
           nullable: true
+        max_rows:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Optional cap on the number of rows to enrich. Rows are taken from the top of the source file.
 
     EnrichResponse:
       type: object

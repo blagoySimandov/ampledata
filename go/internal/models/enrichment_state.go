@@ -38,6 +38,7 @@ type Job struct {
 	ColumnsMetadata      []*ColumnMetadata `json:"columns_metadata"`
 	KeyColumnDescription *string           `json:"key_column_description"`
 	TotalRows            int               `json:"total_rows"`
+	MaxRows              *int              `json:"max_rows,omitempty"`
 	StartedAt            *time.Time        `json:"started_at"`
 	Status               JobStatus         `json:"status"`
 	CreatedAt            time.Time         `json:"created_at"`

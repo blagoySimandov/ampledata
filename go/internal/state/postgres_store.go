@@ -219,12 +219,13 @@ func (s *PostgresStore) GetJob(ctx context.Context, jobID string) (*models.Job, 
 	return jobDB.ToJob()
 }
 
-func (s *PostgresStore) UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error {
+func (s *PostgresStore) UpdateJobConfiguration(ctx context.Context, jobID string, keyColumns []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string, maxRows *int) error {
 	_, err := s.db.NewUpdate().
 		Model((*models.JobDB)(nil)).
 		Set("key_columns = ?", keyColumns).
 		Set("columns_metadata = ?", columnsMetadata).
 		Set("entity_type = ?", keyColumnDescription).
+		Set("max_rows = ?", maxRows).
 		Set("updated_at = ?", time.Now()).
 		Where("job_id = ?", jobID).
 		Exec(ctx)

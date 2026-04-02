@@ -192,7 +192,7 @@ function applyJobResultsToRows(
     const jobRow = jobRowsByKey.get(key);
 
     if (!jobRow) {
-      markJobColumnsAsPending(row, job);
+      // Row was not included in this job (e.g. excluded by max_rows) — leave it untouched.
       return;
     }
 
@@ -213,7 +213,9 @@ function applyJobToRows(
   collectEnrichedColumnsFromJobMetadata(job, enrichedCols);
 
   if (!query.data) {
-    markAllRowsAsPendingForJob(job, rowMap, sourceData.rows.length);
+    // While loading, mark only the rows that will actually be processed.
+    // job.total_rows reflects the capped count (respecting max_rows).
+    markAllRowsAsPendingForJob(job, rowMap, job.total_rows);
     return;
   }
 

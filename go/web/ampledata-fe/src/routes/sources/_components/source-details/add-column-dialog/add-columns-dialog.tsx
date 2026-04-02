@@ -9,20 +9,16 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useApi, useEnrich, useSourceData } from "@/hooks";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Plus, Settings2, Loader2, ChevronDown } from "lucide-react";
+import { Plus, Settings2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { AddColumnsDialogProps } from "./types";
 import { ColumnEditor } from "./column-editor";
 import { EmptyFieldsPlaceholder } from "./empty-fields-placeholder";
+import { AdvancedSettings } from "./advanced-settings";
+import { CostPreview } from "./cost-preview";
 
 export function AddColumnsDialog({
   sourceId,
@@ -32,11 +28,13 @@ export function AddColumnsDialog({
   const enrich = useEnrich(api, sourceId);
   const { data: sourceData } = useSourceData(api, sourceId);
   const sourceColumns = sourceData?.headers ?? [];
+  const totalSourceRows = sourceData?.rows?.length ?? 0;
 
   const [open, setOpen] = useState(false);
   const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
   const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>([]);
   const [keyColumnDescription, setKeyColumnDescription] = useState("");
+  const [maxRowsInput, setMaxRowsInput] = useState("");
 
   const canStart =
     columnsMetadata.length > 0 && columnsMetadata.every((c) => c.name);
@@ -44,6 +42,14 @@ export function AddColumnsDialog({
   const hasImputation = columnsMetadata.some((c) => c.job_type === "imputation");
   const hasEnrichment = columnsMetadata.some((c) => c.job_type === "enrichment");
   const startLabel = hasImputation && !hasEnrichment ? "START IMPUTATION" : hasImputation ? "START RUN" : "START ENRICHMENT";
+
+  const parsedMaxRows = maxRowsInput ? parseInt(maxRowsInput, 10) : null;
+  const effectiveRows =
+    parsedMaxRows && parsedMaxRows > 0
+      ? totalSourceRows > 0
+        ? Math.min(parsedMaxRows, totalSourceRows)
+        : parsedMaxRows
+      : totalSourceRows;
 
   const addColumn = () =>
     setColumnsMetadata((prev) => [
@@ -68,6 +74,7 @@ export function AddColumnsDialog({
     setColumnsMetadata([]);
     setSelectedKeyColumns([]);
     setKeyColumnDescription("");
+    setMaxRowsInput("");
   };
 
   const handleOpenChange = (val: boolean) => {
@@ -87,6 +94,8 @@ export function AddColumnsDialog({
       const trimmedDescription = keyColumnDescription.trim();
       if (trimmedDescription)
         payload.key_column_description = trimmedDescription;
+      if (parsedMaxRows && parsedMaxRows > 0)
+        payload.max_rows = parsedMaxRows;
 
       await enrich.mutateAsync(payload);
       setOpen(false);
@@ -153,23 +162,12 @@ export function AddColumnsDialog({
                     )}
                   </div>
                 </div>
-                <Collapsible>
-                  <CollapsibleTrigger className="flex items-center gap-1 text-xs text-slate-400 font-bold hover:text-slate-600 transition-colors pt-2 group">
-                    <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
-                    Advanced
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1 pt-2">
-                    <Label className="text-xs text-slate-500 font-bold">
-                      Key Column Definition (AI Context)
-                    </Label>
-                    <Input
-                      placeholder="Optional rules to locate the key columns in raw text..."
-                      value={keyColumnDescription}
-                      onChange={(e) => setKeyColumnDescription(e.target.value)}
-                      className="text-sm h-9"
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
+                <AdvancedSettings
+                  keyColumnDescription={keyColumnDescription}
+                  onKeyColumnDescriptionChange={setKeyColumnDescription}
+                  maxRowsInput={maxRowsInput}
+                  onMaxRowsInputChange={setMaxRowsInput}
+                />
               </div>
             </div>
 
@@ -203,6 +201,11 @@ export function AddColumnsDialog({
                 </div>
               )}
             </div>
+
+            <CostPreview
+              effectiveRows={effectiveRows}
+              columnsCount={columnsMetadata.length}
+            />
 
             <Button
               className="w-full font-black h-12"

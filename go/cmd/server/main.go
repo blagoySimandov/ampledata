@@ -22,6 +22,8 @@ import (
 	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/worker"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
+	"github.com/blagoySimandov/ampledata/go/migrations"
+	"github.com/uptrace/bun/migrate"
 )
 
 func main() {
@@ -30,6 +32,16 @@ func main() {
 	//_ := stripe.NewClient(cfg.StripeSecretKey)
 
 	db := db.NewBunPostgresClient(cfg.DatabaseURL)
+
+	// Run pending migrations before creating the store so every column exists.
+	migrator := migrate.NewMigrator(db, migrations.Migrations)
+	if err := migrator.Init(context.Background()); err != nil {
+		log.Fatalf("Failed to initialize migrator: %v", err)
+	}
+	if _, err := migrator.Migrate(context.Background()); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
 	store, err := state.NewPostgresStore(db)
 	if err != nil {
 		log.Fatalf("Failed to create PostgreSQL store: %v", err)
