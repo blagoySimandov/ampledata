@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
+	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/google/uuid"
@@ -16,6 +17,15 @@ import (
 
 type IEnricher interface {
 	Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error
+}
+
+// ICSVReader abstracts file reading operations so the service can be unit-tested
+// without a real GCS connection.
+type ICSVReader interface {
+	ReadCSV(ctx context.Context, objectName string) (*gcs.CSVResult, error)
+	ReadCompositeKeyFromFile(ctx context.Context, objectName string, columnNames []string) ([]string, error)
+	ReadCompositeKeyFromFileFiltered(ctx context.Context, objectName string, keyColumns []string, filterColumns []string) ([]string, error)
+	GenerateSignedURL(ctx context.Context, objectName, contentType string) (string, error)
 }
 
 var (
@@ -59,13 +69,13 @@ type ISourceNameGeneratorPromptService interface {
 
 type sourcesService struct {
 	store         state.Store
-	reader        *gcs.CSVReader
+	reader        ICSVReader
 	enricher      IEnricher
 	aiClient      IAIClient
 	promptService ISourceNameGeneratorPromptService
 }
 
-func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) ISourcesService {
+func NewSourcesService(store state.Store, reader ICSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) ISourcesService {
 	return &sourcesService{store: store, reader: reader, enricher: enr, aiClient: aiclient, promptService: promptService}
 }
 
@@ -167,22 +177,50 @@ func (s *sourcesService) createCSVSource(ctx context.Context, userID, fileURI, c
 }
 
 func (s *sourcesService) EnrichSource(ctx context.Context, input EnrichSourceInput) (string, error) {
+	event := logger.FromContext(ctx)
+
 	source, err := s.getOwnedSource(ctx, input.SourceID, input.AuthUserID)
 	if err != nil {
 		return "", err
 	}
+
+	if event != nil {
+		event.StartStageByName("resolve_key_columns")
+	}
 	keyColumns, keyColumnDesc, err := s.resolveKeyColumns(ctx, input.SourceID, input.KeyColumns, input.KeyColumnDescription)
 	if err != nil {
+		if event != nil {
+			event.FailStageByName("resolve_key_columns", err)
+		}
 		return "", err
 	}
+	if event != nil {
+		event.CompleteStageByName("resolve_key_columns", map[string]interface{}{
+			"key_columns_count": len(keyColumns),
+		})
+	}
+
 	csvMeta, ok := source.Metadata.(*models.CSVSourceMetadata)
 	if !ok {
 		return "", fmt.Errorf("source metadata not found")
 	}
+
+	if event != nil {
+		event.StartStageByName("read_row_keys")
+	}
 	rowKeys, err := s.readRowKeys(ctx, csvMeta.FileURI, keyColumns, input.ColumnsMetadata)
 	if err != nil {
+		if event != nil {
+			event.FailStageByName("read_row_keys", err)
+		}
 		return "", newValidationError(fmt.Sprintf("failed to read CSV: %v", err))
 	}
+	if event != nil {
+		event.CompleteStageByName("read_row_keys", map[string]interface{}{
+			"row_keys_count": len(rowKeys),
+		})
+	}
+
 	if len(rowKeys) == 0 {
 		return "", newValidationError("no rows found in key column")
 	}
@@ -192,6 +230,12 @@ func (s *sourcesService) EnrichSource(ctx context.Context, input EnrichSourceInp
 	if !input.DBUser.CanEnrichCells(int64(len(rowKeys) * len(input.ColumnsMetadata))) {
 		return "", ErrInsufficientCredits
 	}
+
+	if event != nil {
+		event.SetMetadata("effective_rows", len(rowKeys))
+		event.SetMetadata("total_cells", len(rowKeys)*len(input.ColumnsMetadata))
+	}
+
 	return s.createAndStartJob(ctx, input, keyColumns, keyColumnDesc, rowKeys)
 }
 

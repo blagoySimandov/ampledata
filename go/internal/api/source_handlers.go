@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/blagoySimandov/ampledata/go/internal/auth"
+	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
@@ -89,11 +90,23 @@ func (s *Server) EnrichSource(ctx context.Context, req EnrichSourceRequestObject
 	if !ok {
 		return EnrichSource500JSONResponse{Message: "User not found"}, nil
 	}
+
+	event := logger.NewRequestEvent("EnrichSource", authUser.ID)
+	event.SetMetadata("source_id", req.SourceID.String())
+	event.SetMetadata("columns_count", len(req.Body.ColumnsMetadata))
+	if req.Body.MaxRows != nil {
+		event.SetMetadata("max_rows", *req.Body.MaxRows)
+	}
+	ctx = logger.WithContext(ctx, event)
+
 	input := buildEnrichInput(req, authUser.ID, dbUser)
 	jobID, err := s.sourcesService.EnrichSource(ctx, input)
 	if err != nil {
+		event.EmitRequestError(ctx, err)
 		return toEnrichSourceError(err), nil
 	}
+	event.SetMetadata("job_id", jobID)
+	event.EmitRequestSuccess(ctx)
 	return EnrichSource200JSONResponse{JobId: jobID}, nil
 }
 
