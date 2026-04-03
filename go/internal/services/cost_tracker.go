@@ -32,7 +32,6 @@ type ICostTracker interface {
 	AddTokenCost(ctx context.Context, tknIn, tknOut int)
 	AddSearchQueryCost(ctx context.Context, count int)
 	CostDollars() int
-	CostCredits() int
 }
 
 type CostTracker struct {

@@ -27,7 +27,7 @@ func (p *PromptService) ExtractionPrompt(entity, keyDescription string, columns 
 	return renderPrompt(prompts.Extraction, map[string]string{
 		"entity_context": formatEntityContext(entity, keyDescription),
 		"columns":        columnsText(columns),
-		"content":        truncateContent(content),
+		"content":        content, // TODO: maybe truncate the content and have a fetch tool for the agent ?
 	})
 }
 
@@ -164,13 +164,6 @@ func previousAttemptsMemory(attempts []*models.EnrichmentAttempt) string {
 	}
 	sb.WriteString("\nFocus on finding NEW URLs that may contain the missing or low-confidence data.\n</memory>")
 	return sb.String()
-}
-
-func truncateContent(s string) string {
-	if len(s) > 8000 {
-		return s[:8000]
-	}
-	return s
 }
 
 func feedbackText(previousAttempts []*models.EnrichmentAttempt) string {
