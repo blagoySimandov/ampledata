@@ -11,8 +11,10 @@ type IAIClient interface {
 	GenerateContent(ctx context.Context, prompt string) (string, error)
 }
 
-// ToolCallHandler processes a function call from the model and returns the result.
-type ToolCallHandler func(ctx context.Context, name string, args map[string]any) (map[string]any, error)
+// ToolCallHandler executes a tool call and returns the result.
+// The framework dispatches to the correct handler by name — the handler
+// only needs to act on the args it was registered with.
+type ToolCallHandler func(ctx context.Context, args map[string]any) (map[string]any, error)
 
 // ToolParamType represents the type of a tool parameter.
 type ToolParamType string
@@ -24,7 +26,7 @@ const (
 	ToolParamBoolean ToolParamType = "BOOLEAN"
 )
 
-// ToolDefinition describes a tool that the model can invoke.
+// ToolDefinition describes the schema of a tool the model can invoke.
 type ToolDefinition struct {
 	Name        string
 	Description string
@@ -39,10 +41,16 @@ type ToolParameter struct {
 	Description string
 }
 
+// Tool pairs a definition (what the model sees) with its handler (what runs when called).
+type Tool struct {
+	Definition ToolDefinition
+	Handler    ToolCallHandler
+}
+
 // IToolAIClient extends IAIClient with support for function-calling tools.
 type IToolAIClient interface {
 	IAIClient
-	GenerateContentWithTools(ctx context.Context, prompt string, toolDefs []ToolDefinition, handler ToolCallHandler, maxSteps int) (string, error)
+	GenerateContentWithTools(ctx context.Context, prompt string, tools []Tool, maxSteps int) (string, error)
 }
 
 type GeminiAIClient struct {
@@ -101,10 +109,10 @@ func WithCostTracker(tracker ICostTracker) GeminiAIClientFuncOptions {
 	}
 }
 
-func (g *GeminiAIClient) GenerateContentWithTools(ctx context.Context, prompt string, toolDefs []ToolDefinition, handler ToolCallHandler, maxSteps int) (string, error) {
-	funcDecls := make([]*genai.FunctionDeclaration, len(toolDefs))
-	for i, td := range toolDefs {
-		funcDecls[i] = toFuncDecl(td)
+func (g *GeminiAIClient) GenerateContentWithTools(ctx context.Context, prompt string, tools []Tool, maxSteps int) (string, error) {
+	funcDecls := make([]*genai.FunctionDeclaration, len(tools))
+	for i, t := range tools {
+		funcDecls[i] = toFuncDecl(t.Definition)
 	}
 
 	config := &genai.GenerateContentConfig{
@@ -131,7 +139,7 @@ func (g *GeminiAIClient) GenerateContentWithTools(ctx context.Context, prompt st
 		}
 
 		contents = append(contents, modelContent)
-		contents = append(contents, buildFunctionResponses(ctx, fcs, handler))
+		contents = append(contents, buildFunctionResponses(ctx, fcs, tools))
 	}
 
 	return "", fmt.Errorf("max tool call steps (%d) exceeded", maxSteps)
@@ -159,12 +167,23 @@ func collectFunctionCalls(c *genai.Content) []*genai.FunctionCall {
 	return out
 }
 
-func buildFunctionResponses(ctx context.Context, fcs []*genai.FunctionCall, handler ToolCallHandler) *genai.Content {
+func buildFunctionResponses(ctx context.Context, fcs []*genai.FunctionCall, tools []Tool) *genai.Content {
+	handlers := make(map[string]ToolCallHandler, len(tools))
+	for _, t := range tools {
+		handlers[t.Definition.Name] = t.Handler
+	}
+
 	parts := make([]*genai.Part, len(fcs))
 	for i, fc := range fcs {
-		resp, err := handler(ctx, fc.Name, fc.Args)
-		if err != nil {
-			resp = map[string]any{"error": err.Error()}
+		var resp map[string]any
+		if h, ok := handlers[fc.Name]; ok {
+			var err error
+			resp, err = h(ctx, fc.Args)
+			if err != nil {
+				resp = map[string]any{"error": err.Error()}
+			}
+		} else {
+			resp = map[string]any{"error": fmt.Sprintf("unknown tool: %s", fc.Name)}
 		}
 		parts[i] = &genai.Part{FunctionResponse: &genai.FunctionResponse{ID: fc.ID, Name: fc.Name, Response: resp}}
 	}

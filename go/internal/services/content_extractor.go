@@ -77,8 +77,7 @@ func (g *AIContentExtractor) extractWithTools(ctx context.Context, client IToolA
 	return client.GenerateContentWithTools(
 		ctx,
 		prompt,
-		[]ToolDefinition{FetchPageTool},
-		NewFetchPageHandler(g.crawler),
+		[]Tool{NewFetchPageTool(g.crawler)},
 		maxToolSteps,
 	)
 }
