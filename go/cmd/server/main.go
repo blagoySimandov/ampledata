@@ -71,7 +71,7 @@ func main() {
 		log.Fatalf("Failed to create Gemini decision maker: %v", err)
 	}
 	crawler := services.NewCrawl4aiClient(cfg.Crawl4aiURL)
-	extractor, err := services.NewAIContentExtractor(aiClient, promptService)
+	extractor, err := services.NewAIContentExtractor(aiClient, promptService, services.WithCrawler(crawler))
 	if err != nil {
 		log.Fatalf("Failed to create Gemini content extractor: %v", err)
 	}

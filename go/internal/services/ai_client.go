@@ -11,6 +11,12 @@ type IAIClient interface {
 	GenerateContent(ctx context.Context, prompt string) (string, error)
 }
 
+// IToolAIClient is an IAIClient that runs a tool propmt loop.
+type IToolAIClient interface {
+	IAIClient
+	GenerateContentWithTools(ctx context.Context, prompt string, tools []Tool, maxSteps int) (string, error)
+}
+
 type GeminiAIClient struct {
 	client  *genai.Client
 	tracker ICostTracker
@@ -65,4 +71,85 @@ func WithCostTracker(tracker ICostTracker) GeminiAIClientFuncOptions {
 		client.tracker = tracker
 		return nil
 	}
+}
+
+func (g *GeminiAIClient) GenerateContentWithTools(ctx context.Context, prompt string, tools []Tool, maxSteps int) (string, error) {
+	funcDecls := make([]*genai.FunctionDeclaration, len(tools))
+	for i, t := range tools {
+		funcDecls[i] = toFuncDecl(t.Definition)
+	}
+
+	config := &genai.GenerateContentConfig{
+		Tools: []*genai.Tool{{FunctionDeclarations: funcDecls}},
+	}
+
+	contents := genai.Text(prompt)
+
+	for step := range maxSteps + 1 {
+		result, err := g.client.Models.GenerateContent(ctx, g.model, contents, config)
+		if err != nil {
+			return "", fmt.Errorf("step %d: %w", step, err)
+		}
+		g.TrackCost(ctx, Deref(result.UsageMetadata))
+
+		if len(result.Candidates) == 0 || result.Candidates[0].Content == nil {
+			return result.Text(), nil
+		}
+
+		modelContent := result.Candidates[0].Content
+		fcs := collectFunctionCalls(modelContent)
+		if len(fcs) == 0 {
+			return result.Text(), nil
+		}
+
+		contents = append(contents, modelContent)
+		contents = append(contents, buildFunctionResponses(ctx, fcs, tools))
+	}
+
+	return "", fmt.Errorf("max tool call steps (%d) exceeded", maxSteps)
+}
+
+func toFuncDecl(td ToolDefinition) *genai.FunctionDeclaration {
+	props := make(map[string]*genai.Schema, len(td.Parameters))
+	for _, p := range td.Parameters {
+		props[p.Name] = &genai.Schema{Type: genai.Type(p.Type), Description: p.Description}
+	}
+	return &genai.FunctionDeclaration{
+		Name:        td.Name,
+		Description: td.Description,
+		Parameters:  &genai.Schema{Type: genai.TypeObject, Properties: props, Required: td.Required},
+	}
+}
+
+func collectFunctionCalls(c *genai.Content) []*genai.FunctionCall {
+	var out []*genai.FunctionCall
+	for _, p := range c.Parts {
+		if p.FunctionCall != nil {
+			out = append(out, p.FunctionCall)
+		}
+	}
+	return out
+}
+
+func buildFunctionResponses(ctx context.Context, fcs []*genai.FunctionCall, tools []Tool) *genai.Content {
+	handlers := make(map[string]ToolCallHandler, len(tools))
+	for _, t := range tools {
+		handlers[t.Definition.Name] = t.Handler
+	}
+
+	parts := make([]*genai.Part, len(fcs))
+	for i, fc := range fcs {
+		var resp map[string]any
+		if h, ok := handlers[fc.Name]; ok {
+			var err error
+			resp, err = h(ctx, fc.Args)
+			if err != nil {
+				resp = map[string]any{"error": err.Error()}
+			}
+		} else {
+			resp = map[string]any{"error": fmt.Sprintf("unknown tool: %s", fc.Name)}
+		}
+		parts[i] = &genai.Part{FunctionResponse: &genai.FunctionResponse{ID: fc.ID, Name: fc.Name, Response: resp}}
+	}
+	return &genai.Content{Role: "user", Parts: parts}
 }
