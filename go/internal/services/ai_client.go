@@ -14,6 +14,16 @@ type IAIClient interface {
 // ToolCallHandler processes a function call from the model and returns the result.
 type ToolCallHandler func(ctx context.Context, name string, args map[string]any) (map[string]any, error)
 
+// ToolParamType represents the type of a tool parameter.
+type ToolParamType string
+
+const (
+	ToolParamString  ToolParamType = "STRING"
+	ToolParamNumber  ToolParamType = "NUMBER"
+	ToolParamInteger ToolParamType = "INTEGER"
+	ToolParamBoolean ToolParamType = "BOOLEAN"
+)
+
 // ToolDefinition describes a tool that the model can invoke.
 type ToolDefinition struct {
 	Name        string
@@ -25,7 +35,7 @@ type ToolDefinition struct {
 // ToolParameter describes a single parameter of a tool.
 type ToolParameter struct {
 	Name        string
-	Type        string // genai type string: "STRING", "NUMBER", "BOOLEAN", etc.
+	Type        ToolParamType
 	Description string
 }
 
@@ -92,86 +102,71 @@ func WithCostTracker(tracker ICostTracker) GeminiAIClientFuncOptions {
 }
 
 func (g *GeminiAIClient) GenerateContentWithTools(ctx context.Context, prompt string, toolDefs []ToolDefinition, handler ToolCallHandler, maxSteps int) (string, error) {
-	// Convert ToolDefinitions to genai tool declarations.
-	var funcDecls []*genai.FunctionDeclaration
-	for _, td := range toolDefs {
-		props := make(map[string]*genai.Schema)
-		for _, p := range td.Parameters {
-			props[p.Name] = &genai.Schema{
-				Type:        genai.Type(p.Type),
-				Description: p.Description,
-			}
-		}
-		funcDecls = append(funcDecls, &genai.FunctionDeclaration{
-			Name:        td.Name,
-			Description: td.Description,
-			Parameters: &genai.Schema{
-				Type:       genai.TypeObject,
-				Properties: props,
-				Required:   td.Required,
-			},
-		})
+	funcDecls := make([]*genai.FunctionDeclaration, len(toolDefs))
+	for i, td := range toolDefs {
+		funcDecls[i] = toFuncDecl(td)
 	}
 
 	config := &genai.GenerateContentConfig{
-		Tools: []*genai.Tool{
-			{FunctionDeclarations: funcDecls},
-		},
+		Tools: []*genai.Tool{{FunctionDeclarations: funcDecls}},
 	}
 
 	contents := genai.Text(prompt)
 
-	for step := 0; step <= maxSteps; step++ {
+	for step := range maxSteps + 1 {
 		result, err := g.client.Models.GenerateContent(ctx, g.model, contents, config)
 		if err != nil {
-			return "", fmt.Errorf("failed to generate content (step %d): %w", step, err)
+			return "", fmt.Errorf("step %d: %w", step, err)
 		}
-
-		um := Deref(result.UsageMetadata)
-		g.TrackCost(ctx, um)
+		g.TrackCost(ctx, Deref(result.UsageMetadata))
 
 		if len(result.Candidates) == 0 || result.Candidates[0].Content == nil {
 			return result.Text(), nil
 		}
 
 		modelContent := result.Candidates[0].Content
-
-		// Collect any function calls from the model's response.
-		var functionCalls []*genai.FunctionCall
-		for _, part := range modelContent.Parts {
-			if part.FunctionCall != nil {
-				functionCalls = append(functionCalls, part.FunctionCall)
-			}
-		}
-
-		if len(functionCalls) == 0 {
+		fcs := collectFunctionCalls(modelContent)
+		if len(fcs) == 0 {
 			return result.Text(), nil
 		}
 
-		// Append the model's response to the conversation.
 		contents = append(contents, modelContent)
-
-		// Execute each function call and build response parts.
-		var responseParts []*genai.Part
-		for _, fc := range functionCalls {
-			resp, err := handler(ctx, fc.Name, fc.Args)
-			if err != nil {
-				resp = map[string]any{"error": err.Error()}
-			}
-			responseParts = append(responseParts, &genai.Part{
-				FunctionResponse: &genai.FunctionResponse{
-					ID:       fc.ID,
-					Name:     fc.Name,
-					Response: resp,
-				},
-			})
-		}
-
-		contents = append(contents, &genai.Content{
-			Role:  "user",
-			Parts: responseParts,
-		})
+		contents = append(contents, buildFunctionResponses(ctx, fcs, handler))
 	}
 
 	return "", fmt.Errorf("max tool call steps (%d) exceeded", maxSteps)
+}
+
+func toFuncDecl(td ToolDefinition) *genai.FunctionDeclaration {
+	props := make(map[string]*genai.Schema, len(td.Parameters))
+	for _, p := range td.Parameters {
+		props[p.Name] = &genai.Schema{Type: genai.Type(p.Type), Description: p.Description}
+	}
+	return &genai.FunctionDeclaration{
+		Name:        td.Name,
+		Description: td.Description,
+		Parameters:  &genai.Schema{Type: genai.TypeObject, Properties: props, Required: td.Required},
+	}
+}
+
+func collectFunctionCalls(c *genai.Content) []*genai.FunctionCall {
+	var out []*genai.FunctionCall
+	for _, p := range c.Parts {
+		if p.FunctionCall != nil {
+			out = append(out, p.FunctionCall)
+		}
+	}
+	return out
+}
+
+func buildFunctionResponses(ctx context.Context, fcs []*genai.FunctionCall, handler ToolCallHandler) *genai.Content {
+	parts := make([]*genai.Part, len(fcs))
+	for i, fc := range fcs {
+		resp, err := handler(ctx, fc.Name, fc.Args)
+		if err != nil {
+			resp = map[string]any{"error": err.Error()}
+		}
+		parts[i] = &genai.Part{FunctionResponse: &genai.FunctionResponse{ID: fc.ID, Name: fc.Name, Response: resp}}
+	}
+	return &genai.Content{Role: "user", Parts: parts}
 }
