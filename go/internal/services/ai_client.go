@@ -11,43 +11,7 @@ type IAIClient interface {
 	GenerateContent(ctx context.Context, prompt string) (string, error)
 }
 
-// ToolCallHandler executes a tool call and returns the result.
-// The framework dispatches to the correct handler by name — the handler
-// only needs to act on the args it was registered with.
-type ToolCallHandler func(ctx context.Context, args map[string]any) (map[string]any, error)
-
-// ToolParamType represents the type of a tool parameter.
-type ToolParamType string
-
-const (
-	ToolParamString  ToolParamType = "STRING"
-	ToolParamNumber  ToolParamType = "NUMBER"
-	ToolParamInteger ToolParamType = "INTEGER"
-	ToolParamBoolean ToolParamType = "BOOLEAN"
-)
-
-// ToolDefinition describes the schema of a tool the model can invoke.
-type ToolDefinition struct {
-	Name        string
-	Description string
-	Parameters  []ToolParameter
-	Required    []string
-}
-
-// ToolParameter describes a single parameter of a tool.
-type ToolParameter struct {
-	Name        string
-	Type        ToolParamType
-	Description string
-}
-
-// Tool pairs a definition (what the model sees) with its handler (what runs when called).
-type Tool struct {
-	Definition ToolDefinition
-	Handler    ToolCallHandler
-}
-
-// IToolAIClient extends IAIClient with support for function-calling tools.
+// IToolAIClient is an IAIClient that runs a tool propmt loop.
 type IToolAIClient interface {
 	IAIClient
 	GenerateContentWithTools(ctx context.Context, prompt string, tools []Tool, maxSteps int) (string, error)
