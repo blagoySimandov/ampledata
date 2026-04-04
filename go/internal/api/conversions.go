@@ -139,7 +139,6 @@ func toAPISourceJobSummary(j *models.Job) SourceJobSummary {
 		JobId:       j.JobID,
 		Status:      JobStatus(j.Status),
 		TotalRows:   j.TotalRows,
-		CostCredits: j.CostCredits,
 		CreatedAt:   j.CreatedAt,
 		StartedAt:   j.StartedAt,
 	}
@@ -153,6 +152,8 @@ func toAPISourceJobSummary(j *models.Job) SourceJobSummary {
 		apiCols := toAPIColumnMetadataSlice(j.ColumnsMetadata)
 		summary.ColumnsMetadata = &apiCols
 	}
+	costCredits := j.CostCredits
+	summary.CostCredits = &costCredits
 	return summary
 }
 

@@ -275,7 +275,7 @@ components:
 
     SourceJobSummary:
       type: object
-      required: [job_id, status, total_rows, cost_credits, created_at]
+      required: [job_id, status, total_rows, created_at]
       properties:
         job_id:
           type: string
@@ -285,6 +285,7 @@ components:
           type: integer
         cost_credits:
           type: integer
+          description: Credits charged for this job run.
         key_columns:
           type: array
           items:
