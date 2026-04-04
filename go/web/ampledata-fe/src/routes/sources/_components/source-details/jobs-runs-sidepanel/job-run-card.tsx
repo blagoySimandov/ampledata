@@ -51,6 +51,12 @@ export function JobRunCard({ job, isSelected, onSelect }: JobRunCardProps) {
           >
             {job.total_rows} rows
           </Badge>
+          <Badge
+            variant="outline"
+            className="text-[10px] px-1.5 py-0 h-4 min-h-0 bg-slate-50 text-slate-500"
+          >
+            {job.cost_credits} credits
+          </Badge>
           {job.key_columns && job.key_columns.length > 0 && (
             <span className="truncate">Key: {job.key_columns.join(", ")}</span>
           )}

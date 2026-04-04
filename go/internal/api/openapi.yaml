@@ -275,13 +275,15 @@ components:
 
     SourceJobSummary:
       type: object
-      required: [job_id, status, total_rows, created_at]
+      required: [job_id, status, total_rows, cost_credits, created_at]
       properties:
         job_id:
           type: string
         status:
           $ref: "#/components/schemas/JobStatus"
         total_rows:
+          type: integer
+        cost_credits:
           type: integer
         key_columns:
           type: array

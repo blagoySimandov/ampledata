@@ -136,11 +136,12 @@ func toAPIConfidence(c map[string]*models.FieldConfidenceInfo) *map[string]Field
 
 func toAPISourceJobSummary(j *models.Job) SourceJobSummary {
 	summary := SourceJobSummary{
-		JobId:     j.JobID,
-		Status:    JobStatus(j.Status),
-		TotalRows: j.TotalRows,
-		CreatedAt: j.CreatedAt,
-		StartedAt: j.StartedAt,
+		JobId:       j.JobID,
+		Status:      JobStatus(j.Status),
+		TotalRows:   j.TotalRows,
+		CostCredits: j.CostCredits,
+		CreatedAt:   j.CreatedAt,
+		StartedAt:   j.StartedAt,
 	}
 	if j.KeyColumns != nil {
 		summary.KeyColumns = &j.KeyColumns

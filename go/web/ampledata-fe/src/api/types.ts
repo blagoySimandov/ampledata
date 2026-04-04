@@ -30,6 +30,7 @@ export interface SourceJobSummary {
   job_id: string;
   status: JobStatus;
   total_rows: number;
+  cost_credits: number;
   key_columns?: string[] | null;
   key_column_description?: string | null;
   columns_metadata?: ColumnMetadata[] | null;
