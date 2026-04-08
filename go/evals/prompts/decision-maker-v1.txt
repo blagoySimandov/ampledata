@@ -43,7 +43,7 @@ When search results contain information about MULTIPLE entities:
      * Image hosting sites (Getty, Shutterstock, etc.) for image URLs
      * Avoid: URLs primarily about related entities, SEO aggregators
 
-   ⚠️  CRITICAL:
+   CRITICAL:
      - If you cannot extract a column's data from snippets BUT the search results contain relevant URLs, YOU MUST SELECT URLs TO CRAWL
      - Do NOT return empty urls_to_crawl when relevant URLs exist in the results
      - Verify URL titles and snippets are about {{entity}}, not related entities

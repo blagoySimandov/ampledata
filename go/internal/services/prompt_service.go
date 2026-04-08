@@ -109,8 +109,8 @@ func searchResultsText(serp *models.GoogleSearchResults) string {
 		if r.Position != nil {
 			pos = *r.Position
 		}
-		fmt.Fprintf(&sb, "\nPosition %d: %s\nURL: %s\nSnippet: %s\n---",
-			pos, Deref(r.Title), Deref(r.Link), Deref(r.Snippet))
+		fmt.Fprintf(&sb, "\nPosition %d: %s\nURL: %s\nSnippet: %s\n Date: %s\n---",
+			pos, Deref(r.Title), Deref(r.Link), Deref(r.Snippet), Deref(r.Date))
 	}
 	return sb.String()
 }
