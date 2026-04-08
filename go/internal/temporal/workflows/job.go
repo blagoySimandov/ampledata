@@ -21,6 +21,7 @@ type JobWorkflowInput struct {
 	RowKeys              []string
 	ColumnsMetadata      []*models.ColumnMetadata
 	KeyColumnDescription *string
+	AllowedDomains       []string
 	MaxRetries           int
 }
 
@@ -92,6 +93,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			ColumnsMetadata:      input.ColumnsMetadata,
 			QueryPatterns:        patternsOutput.Patterns,
 			KeyColumnDescription: keyColumnDescription,
+			AllowedDomains:       input.AllowedDomains,
 			RetryCount:           0,
 			PreviousAttempts:     []*models.EnrichmentAttempt{},
 			MaxRetries:           input.MaxRetries,

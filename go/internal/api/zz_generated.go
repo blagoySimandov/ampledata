@@ -95,6 +95,7 @@ type CreateSubscriptionRequest struct {
 
 // EnrichRequest defines model for EnrichRequest.
 type EnrichRequest struct {
+	AllowedDomains       *[]string        `json:"allowed_domains"`
 	ColumnsMetadata      []ColumnMetadata `json:"columns_metadata"`
 	KeyColumnDescription *string          `json:"key_column_description"`
 	KeyColumns           *[]string        `json:"key_columns"`

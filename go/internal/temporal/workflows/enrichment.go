@@ -13,16 +13,17 @@ import (
 )
 
 type EnrichmentWorkflowInput struct {
-	JobID            string
-	UserID           string
-	StripeCustomerID string
-	RowKey           string
-	ColumnsMetadata  []*models.ColumnMetadata
-	QueryPatterns    []string
-	KeyColumnDescription       string
-	RetryCount       int
-	PreviousAttempts []*models.EnrichmentAttempt
-	MaxRetries       int
+	JobID                string
+	UserID               string
+	StripeCustomerID     string
+	RowKey               string
+	ColumnsMetadata      []*models.ColumnMetadata
+	QueryPatterns        []string
+	KeyColumnDescription string
+	AllowedDomains       []string
+	RetryCount           int
+	PreviousAttempts     []*models.EnrichmentAttempt
+	MaxRetries           int
 }
 
 type EnrichmentWorkflowOutput struct {
@@ -129,10 +130,11 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	event.StartStage(models.StageSerpFetched)
 	var serpOutput activities.SerpFetchOutput
 	err := workflow.ExecuteActivity(ctx, "SerpFetch", activities.SerpFetchInput{
-		JobID:           input.JobID,
-		RowKey:          input.RowKey,
+		JobID:          input.JobID,
+		RowKey:         input.RowKey,
 		ColumnsMetadata: input.ColumnsMetadata,
-		QueryPatterns:   queryPatterns,
+		QueryPatterns:  queryPatterns,
+		AllowedDomains: input.AllowedDomains,
 	}).Get(ctx, &serpOutput)
 	if err != nil {
 		output.Error = fmt.Sprintf("SERP fetch failed: %v", err)
@@ -339,16 +341,17 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		}
 
 		retryInput := EnrichmentWorkflowInput{
-			JobID:            input.JobID,
-			UserID:           input.UserID,
-			StripeCustomerID: input.StripeCustomerID,
-			RowKey:           input.RowKey,
-			ColumnsMetadata:  filteredMetadata,
-			QueryPatterns:    input.QueryPatterns,
-			KeyColumnDescription:       input.KeyColumnDescription,
-			RetryCount:       input.RetryCount + 1,
-			PreviousAttempts: previousAttempts,
-			MaxRetries:       input.MaxRetries,
+			JobID:                input.JobID,
+			UserID:               input.UserID,
+			StripeCustomerID:     input.StripeCustomerID,
+			RowKey:               input.RowKey,
+			ColumnsMetadata:      filteredMetadata,
+			QueryPatterns:        input.QueryPatterns,
+			KeyColumnDescription: input.KeyColumnDescription,
+			AllowedDomains:       input.AllowedDomains,
+			RetryCount:           input.RetryCount + 1,
+			PreviousAttempts:     previousAttempts,
+			MaxRetries:           input.MaxRetries,
 		}
 
 		retryOutput, err := EnrichmentWorkflow(ctx, retryInput)

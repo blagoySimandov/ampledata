@@ -15,7 +15,7 @@ import (
 )
 
 type IEnricher interface {
-	Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error
+	Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string, allowedDomains []string) error
 }
 
 var (
@@ -42,6 +42,7 @@ type EnrichSourceInput struct {
 	KeyColumns           []string
 	KeyColumnDescription *string
 	ColumnsMetadata      []*models.ColumnMetadata
+	AllowedDomains       []string
 }
 
 type ISourcesService interface {
@@ -237,7 +238,7 @@ func (s *sourcesService) createAndStartJob(ctx context.Context, input EnrichSour
 	if err := s.configureAndStartJob(ctx, jobID, keyColumns, keyColumnDesc, input.ColumnsMetadata, len(rowKeys)); err != nil {
 		return "", err
 	}
-	go s.enricher.Enrich(context.Background(), jobID, input.DBUser.ID, stripeCustomerIDOrEmpty(input.DBUser), rowKeys, input.ColumnsMetadata, keyColumnDesc)
+	go s.enricher.Enrich(context.Background(), jobID, input.DBUser.ID, stripeCustomerIDOrEmpty(input.DBUser), rowKeys, input.ColumnsMetadata, keyColumnDesc, input.AllowedDomains)
 	return jobID, nil
 }
 

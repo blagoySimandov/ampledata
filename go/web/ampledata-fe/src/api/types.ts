@@ -67,6 +67,7 @@ export interface EnrichRequest {
   columns_metadata: ColumnMetadata[];
   key_columns?: string[] | null;
   key_column_description?: string | null;
+  allowed_domains?: string[] | null;
 }
 
 export interface EnrichResponse {

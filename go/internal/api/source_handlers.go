@@ -102,6 +102,10 @@ func buildEnrichInput(req EnrichSourceRequestObject, authUserID string, dbUser *
 	if req.Body.KeyColumns != nil {
 		keyColumns = *req.Body.KeyColumns
 	}
+	var allowedDomains []string
+	if req.Body.AllowedDomains != nil {
+		allowedDomains = *req.Body.AllowedDomains
+	}
 	return services.EnrichSourceInput{
 		SourceID:             uuid.UUID(req.SourceID),
 		AuthUserID:           authUserID,
@@ -109,6 +113,7 @@ func buildEnrichInput(req EnrichSourceRequestObject, authUserID string, dbUser *
 		KeyColumns:           keyColumns,
 		KeyColumnDescription: req.Body.KeyColumnDescription,
 		ColumnsMetadata:      toModelColumnMetadataSlice(req.Body.ColumnsMetadata),
+		AllowedDomains:       allowedDomains,
 	}
 }
 

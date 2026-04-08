@@ -61,6 +61,7 @@ type SerpFetchInput struct {
 	RowKey          string
 	ColumnsMetadata []*models.ColumnMetadata
 	QueryPatterns   []string
+	AllowedDomains  []string
 }
 
 type SerpFetchOutput struct {
@@ -170,12 +171,34 @@ func (a *Activities) GeneratePatternsWithFeedback(ctx context.Context, input Gen
 	}, nil
 }
 
+func buildSiteFilter(domains []string) string {
+	if len(domains) == 0 {
+		return ""
+	}
+	parts := make([]string, len(domains))
+	for i, d := range domains {
+		parts[i] = "site:" + d
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return "(" + strings.Join(parts, " OR ") + ")"
+}
+
 func (a *Activities) SerpFetch(ctx context.Context, input SerpFetchInput) (*SerpFetchOutput, error) {
 	event := logger.NewActivityEvent("serp_fetch", input.JobID)
 	event.RowKey = input.RowKey
 
 	queryBuilder := services.NewPatternQueryBuilder(input.QueryPatterns, input.ColumnsMetadata)
 	queries := queryBuilder.Build(input.RowKey)
+
+	siteFilter := buildSiteFilter(input.AllowedDomains)
+	if siteFilter != "" {
+		for i, q := range queries {
+			queries[i] = q + " " + siteFilter
+		}
+	}
+
 	event.SetMetadata("query_count", len(queries))
 
 	allResults := []*models.GoogleSearchResults{}

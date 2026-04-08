@@ -24,6 +24,14 @@ import type { AddColumnsDialogProps } from "./types";
 import { ColumnEditor } from "./column-editor";
 import { EmptyFieldsPlaceholder } from "./empty-fields-placeholder";
 
+const COMMON_DOMAINS = [
+  "linkedin.com",
+  "crunchbase.com",
+  "bloomberg.com",
+  "reuters.com",
+  "wikipedia.org",
+];
+
 export function AddColumnsDialog({
   sourceId,
   mostRecentJob,
@@ -37,6 +45,8 @@ export function AddColumnsDialog({
   const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
   const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>([]);
   const [keyColumnDescription, setKeyColumnDescription] = useState("");
+  const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
+  const [customDomain, setCustomDomain] = useState("");
 
   const canStart =
     columnsMetadata.length > 0 && columnsMetadata.every((c) => c.name);
@@ -64,10 +74,28 @@ export function AddColumnsDialog({
       prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col],
     );
 
+  const toggleDomain = (domain: string) =>
+    setAllowedDomains((prev) =>
+      prev.includes(domain) ? prev.filter((d) => d !== domain) : [...prev, domain],
+    );
+
+  const addCustomDomain = () => {
+    const domain = customDomain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (domain && !allowedDomains.includes(domain)) {
+      setAllowedDomains((prev) => [...prev, domain]);
+    }
+    setCustomDomain("");
+  };
+
+  const removeDomain = (domain: string) =>
+    setAllowedDomains((prev) => prev.filter((d) => d !== domain));
+
   const resetForm = () => {
     setColumnsMetadata([]);
     setSelectedKeyColumns([]);
     setKeyColumnDescription("");
+    setAllowedDomains([]);
+    setCustomDomain("");
   };
 
   const handleOpenChange = (val: boolean) => {
@@ -87,6 +115,8 @@ export function AddColumnsDialog({
       const trimmedDescription = keyColumnDescription.trim();
       if (trimmedDescription)
         payload.key_column_description = trimmedDescription;
+      if (allowedDomains.length > 0)
+        payload.allowed_domains = allowedDomains;
 
       await enrich.mutateAsync(payload);
       setOpen(false);
@@ -170,6 +200,68 @@ export function AddColumnsDialog({
                     />
                   </CollapsibleContent>
                 </Collapsible>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                <Settings2 className="w-3 h-3" /> Source Domains
+              </Label>
+              <p className="text-[10px] text-slate-400 leading-tight">
+                Restrict searches to specific websites. Leave empty to search everywhere.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {COMMON_DOMAINS.map((domain) => {
+                  const isSelected = allowedDomains.includes(domain);
+                  return (
+                    <Badge
+                      key={domain}
+                      variant={isSelected ? "default" : "outline"}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected
+                          ? ""
+                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 border-slate-200"
+                      }`}
+                      onClick={() => toggleDomain(domain)}
+                    >
+                      {domain}
+                    </Badge>
+                  );
+                })}
+              </div>
+              {allowedDomains.filter((d) => !COMMON_DOMAINS.includes(d)).length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {allowedDomains
+                    .filter((d) => !COMMON_DOMAINS.includes(d))
+                    .map((domain) => (
+                      <Badge
+                        key={domain}
+                        variant="default"
+                        className="cursor-pointer gap-1"
+                        onClick={() => removeDomain(domain)}
+                      >
+                        {domain} ×
+                      </Badge>
+                    ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add custom domain (e.g. example.com)"
+                  value={customDomain}
+                  onChange={(e) => setCustomDomain(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addCustomDomain()}
+                  className="text-sm h-8 flex-1"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addCustomDomain}
+                  disabled={!customDomain.trim()}
+                  className="h-8 text-xs font-black px-3"
+                >
+                  ADD
+                </Button>
               </div>
             </div>
 

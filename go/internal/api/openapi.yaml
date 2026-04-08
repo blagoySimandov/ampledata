@@ -370,6 +370,11 @@ components:
         key_column_description:
           type: string
           nullable: true
+        allowed_domains:
+          type: array
+          items:
+            type: string
+          nullable: true
 
     EnrichResponse:
       type: object

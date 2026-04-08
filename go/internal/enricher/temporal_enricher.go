@@ -29,7 +29,7 @@ func NewTemporalEnricher(temporalClient client.Client, stateManager *state.State
 }
 
 // Enrich starts a Temporal workflow to process the job
-func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error {
+func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string, allowedDomains []string) error {
 	workflowOptions := client.StartWorkflowOptions{
 		ID:        fmt.Sprintf("job-%s", jobID),
 		TaskQueue: e.taskQueue,
@@ -42,6 +42,7 @@ func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCust
 		RowKeys:              rowKeys,
 		ColumnsMetadata:      columnsMetadata,
 		KeyColumnDescription: keyColumnDescription,
+		AllowedDomains:       allowedDomains,
 		MaxRetries:           e.maxRetries,
 	}
 
