@@ -5,9 +5,11 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"cloud.google.com/go/storage"
+	"google.golang.org/api/option"
 )
 
 type CSVReader struct {
@@ -17,7 +19,7 @@ type CSVReader struct {
 
 func NewCSVReader(bucketName string) (*CSVReader, error) {
 	ctx := context.Background()
-	client, err := storage.NewClient(ctx)
+	client, err := newGCSClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GCS client: %w", err)
 	}
@@ -25,6 +27,13 @@ func NewCSVReader(bucketName string) (*CSVReader, error) {
 		client:     client,
 		bucketName: bucketName,
 	}, nil
+}
+
+func newGCSClient(ctx context.Context) (*storage.Client, error) {
+	if json := os.Getenv("GCP_SERVICE_ACCOUNT_JSON"); json != "" {
+		return storage.NewClient(ctx, option.WithCredentialsJSON([]byte(json)))
+	}
+	return storage.NewClient(ctx)
 }
 
 func (r *CSVReader) Close() error {

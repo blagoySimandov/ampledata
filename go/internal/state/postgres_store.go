@@ -51,6 +51,14 @@ func (s *PostgresStore) createEnumTypes(ctx context.Context) error {
 
 func (s *PostgresStore) createTables(ctx context.Context) error {
 	_, err := s.db.NewCreateTable().
+		Model((*models.UserDB)(nil)).
+		IfNotExists().
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create users table: %w", err)
+	}
+
+	_, err = s.db.NewCreateTable().
 		Model((*models.SourceDB)(nil)).
 		IfNotExists().
 		ForeignKey(`("user_id") REFERENCES "users" ("id")`).
