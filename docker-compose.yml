@@ -97,3 +97,5 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: ampledata_postgres_data
