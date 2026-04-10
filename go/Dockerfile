@@ -1,5 +1,5 @@
 # Stage 1: Build frontend
-FROM node:22-alpine AS frontend-builder
+FROM oven/bun:1 AS frontend-builder
 WORKDIR /frontend
 ARG WORKOS_CLIENT_ID
 ARG WORKOS_REDIRECT_URL
@@ -19,10 +19,10 @@ ENV VITE_FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET
 ENV VITE_FIREBASE_MESSAGING_SENDER_ID=$FIREBASE_MESSAGING_SENDER_ID
 ENV VITE_FIREBASE_APP_ID=$FIREBASE_APP_ID
 ENV VITE_FIREBASE_MEASUREMENT_ID=$FIREBASE_MEASUREMENT_ID
-COPY web/ampledata-fe/package.json web/ampledata-fe/package-lock.json ./
-RUN npm ci
+COPY web/ampledata-fe/package.json web/ampledata-fe/bun.lockb ./
+RUN bun install --frozen-lockfile
 COPY web/ampledata-fe/ .
-RUN npm run build
+RUN bun run build
 
 # Stage 2: Build Go binary
 FROM golang:1.25-alpine AS go-builder
