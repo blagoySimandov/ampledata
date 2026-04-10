@@ -1,6 +1,10 @@
 # Stage 1: Build frontend
 FROM node:22-alpine AS frontend-builder
 WORKDIR /frontend
+ARG WORKOS_CLIENT_ID
+ARG WORKOS_REDIRECT_URL
+ENV VITE_WORKOS_CLIENT_ID=$WORKOS_CLIENT_ID
+ENV VITE_WORKOS_REDIRECT_URI=$WORKOS_REDIRECT_URL
 COPY web/ampledata-fe/package.json web/ampledata-fe/package-lock.json ./
 RUN npm ci
 COPY web/ampledata-fe/ .
