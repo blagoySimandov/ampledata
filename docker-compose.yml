@@ -15,7 +15,9 @@ services:
       retries: 5
 
   temporal:
-    image: temporalio/auto-setup:latest
+    build:
+      context: ./go/temporal-config
+      dockerfile: Dockerfile
     container_name: ampledata-temporal
     depends_on:
       postgres:
@@ -27,8 +29,6 @@ services:
       - POSTGRES_PWD=enrichment
       - POSTGRES_SEEDS=postgres
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
-    volumes:
-      - ./go/temporal-config:/etc/temporal/config/dynamicconfig
 
   temporal-ui:
     image: temporalio/ui:latest
