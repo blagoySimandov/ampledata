@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import logo from "../../../../assets/ampledata-logo.png";
-import { GoogleIcon, MicrosoftIcon, GithubIcon } from "@/components/icons";
+import { GoogleIcon, AppleIcon, GithubIcon } from "@/components/icons";
 import { Link } from "@tanstack/react-router";
 
 interface LoginLeftSidebarProps {
@@ -55,10 +55,10 @@ export function LoginLeftSidebar({
             variant="outline"
             size="lg"
             className="w-full justify-start gap-3 h-11"
-            onClick={() => onSignInWith("MicrosoftOAuth")}
+            onClick={() => onSignInWith("AppleOAuth")}
           >
-            <MicrosoftIcon />
-            Continue with Microsoft
+            <AppleIcon />
+            Continue with Apple
           </Button>
 
           <div className="relative my-1">
