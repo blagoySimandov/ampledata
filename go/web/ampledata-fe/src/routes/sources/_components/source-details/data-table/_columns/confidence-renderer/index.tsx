@@ -93,7 +93,7 @@ export function ConfidenceDataRenderer(params: ConfidenceDataRendererParams) {
       </PopoverTrigger>
       <PopoverContent className="w-80 shadow-2xl border-slate-200 p-0 overflow-hidden z-50">
         <div className={`h-1.5 w-full ${confConfig.bg}`} />
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 max-h-80 overflow-y-auto">
           <ConfidenceHeader config={confConfig} confidence={confidence} />
           {sources && sources.length > 0 && <SourcesList sources={sources} />}
           {extractionHistory.length > 0 && (
