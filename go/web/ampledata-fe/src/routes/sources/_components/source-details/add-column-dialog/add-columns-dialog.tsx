@@ -1,4 +1,5 @@
 import type { ColumnMetadata, EnrichRequest } from "@/api";
+import { logEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -80,6 +81,10 @@ export function AddColumnsDialog({
   };
 
   const handleEnrich = async () => {
+    logEvent("enrichment_started", {
+      column_count: columnsMetadata.length,
+      job_types: [...new Set(columnsMetadata.map((c) => c.job_type))],
+    });
     try {
       const payload: EnrichRequest = { columns_metadata: columnsMetadata };
       if (selectedKeyColumns.length > 0)
@@ -89,9 +94,11 @@ export function AddColumnsDialog({
         payload.key_column_description = trimmedDescription;
 
       await enrich.mutateAsync(payload);
+      logEvent("enrichment_completed", { column_count: columnsMetadata.length });
       setOpen(false);
       resetForm();
     } catch (e) {
+      logEvent("enrichment_error");
       toast.error(e instanceof Error ? e.message : "Failed to start job");
     }
   };

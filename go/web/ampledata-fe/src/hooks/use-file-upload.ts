@@ -1,3 +1,4 @@
+import { logEvent } from "@/lib/analytics";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useApi, useGetSignedUrl, useUploadFile } from "./index";
@@ -29,6 +30,7 @@ export function useFileUpload() {
 
   const handleUpload = async () => {
     if (!file) return;
+    logEvent("upload_started", { file_size: file.size });
     try {
       const headers = await readCsvHeaders(file);
       const { url, sourceId } = await getSignedUrl.mutateAsync({
@@ -37,10 +39,12 @@ export function useFileUpload() {
         headers,
       });
       await uploadFile.mutateAsync({ url, file });
+      logEvent("upload_success", { file_size: file.size });
       setOpen(false);
       reset();
       navigate({ to: "/sources/$sourceId", params: { sourceId } });
     } catch (error) {
+      logEvent("upload_error");
       console.error("Upload failed", error);
     }
   };
