@@ -19,7 +19,7 @@ ENV VITE_FIREBASE_STORAGE_BUCKET=$FIREBASE_STORAGE_BUCKET
 ENV VITE_FIREBASE_MESSAGING_SENDER_ID=$FIREBASE_MESSAGING_SENDER_ID
 ENV VITE_FIREBASE_APP_ID=$FIREBASE_APP_ID
 ENV VITE_FIREBASE_MEASUREMENT_ID=$FIREBASE_MEASUREMENT_ID
-COPY web/ampledata-fe/package.json web/ampledata-fe/bun.lockb ./
+COPY web/ampledata-fe/package.json web/ampledata-fe/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY web/ampledata-fe/ .
 RUN bun run build
