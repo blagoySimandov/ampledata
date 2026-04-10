@@ -20,6 +20,7 @@ createRoot(document.getElementById("root")!).render(
       <AuthKitProvider
         clientId={import.meta.env.VITE_WORKOS_CLIENT_ID}
         redirectUri={import.meta.env.VITE_WORKOS_REDIRECT_URI}
+        devMode // stores refresh token in localStorage (persists across refreshes); not a security concern since auth is JWT-based and tokens are already client-side
       >
         <ApiProvider>
           <AppRouter />
