@@ -13,6 +13,22 @@ import { cn } from "@/lib/utils";
 
 const TIERS = [
   {
+    id: "free",
+    name: "Free",
+    price: 0,
+    tokens: 100,
+    overagePrice: null,
+    description: "Try AmpleData with no commitment.",
+    features: [
+      "100 cells enriched — flat limit",
+      "No overage allowed",
+      "Web search enrichment",
+      "CSV file support",
+    ],
+    highlighted: false,
+    badge: null,
+  },
+  {
     id: "starter",
     name: "Starter",
     price: 29,
@@ -23,7 +39,7 @@ const TIERS = [
       "1,000 cells enriched / month",
       "$0.025 per extra cell",
       "Web search enrichment",
-      "CSV & JSON file support",
+      "CSV file support",
       "Email support",
     ],
     highlighted: false,
@@ -40,7 +56,7 @@ const TIERS = [
       "5,000 cells enriched / month",
       "$0.018 per extra cell",
       "Web search enrichment",
-      "CSV & JSON file support",
+      "CSV file support",
       "Priority support",
       "Bulk operations",
     ],
@@ -58,7 +74,7 @@ const TIERS = [
       "25,000 cells enriched / month",
       "$0.01 per extra cell",
       "Web search enrichment",
-      "CSV & JSON file support",
+      "CSV file support",
       "Dedicated support",
       "Bulk operations",
       "Custom integrations",
@@ -86,7 +102,7 @@ export function PricingSection() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-start">
+        <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto items-start">
           {TIERS.map((tier) => (
             <Card
               key={tier.id}
@@ -114,9 +130,13 @@ export function PricingSection() {
                 </CardTitle>
                 <div className="flex items-baseline gap-1 mt-2">
                   <span className="text-4xl font-black text-foreground">
-                    ${tier.price}
+                    {tier.price === 0 ? "Free" : `$${tier.price}`}
                   </span>
-                  <span className="text-sm text-muted-foreground">/ month</span>
+                  {tier.price > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      / month
+                    </span>
+                  )}
                 </div>
                 <CardDescription className="mt-2 text-sm leading-relaxed">
                   {tier.description}

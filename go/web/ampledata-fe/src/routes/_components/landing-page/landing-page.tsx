@@ -27,12 +27,9 @@ export function LandingPage() {
             >
               Pricing
             </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/login">Sign in</Link>
-            </Button>
             <Button asChild>
               <Link to="/login">
-                Get started <ArrowRight className="ml-2 size-4" />
+                Sign in <ArrowRight className="ml-2 size-4" />
               </Link>
             </Button>
           </div>
