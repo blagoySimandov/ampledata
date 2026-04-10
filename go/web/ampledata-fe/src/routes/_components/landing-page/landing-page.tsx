@@ -53,7 +53,7 @@ export function LandingPage() {
             </span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10">
-            Upload a CSV or JSON file, define what information you need, and let
+            Upload a CSV file, define what information you need, and let
             AmpleData automatically search the web and extract the data for you.
             No coding required.
           </p>
@@ -89,7 +89,9 @@ export function LandingPage() {
                 <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-black text-xl shadow-md">
                   {index + 1}
                 </div>
-                <h3 className="text-xl font-bold text-foreground">{step.title}</h3>
+                <h3 className="text-xl font-bold text-foreground">
+                  {step.title}
+                </h3>
                 <p className="text-muted-foreground leading-relaxed">
                   {step.description}
                 </p>
