@@ -6,8 +6,6 @@ services:
       POSTGRES_USER: enrichment
       POSTGRES_PASSWORD: enrichment
       POSTGRES_DB: enrichment
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,24 +29,23 @@ services:
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
     volumes:
       - ./go/temporal-config:/etc/temporal/config/dynamicconfig
+
   temporal-ui:
     image: temporalio/ui:latest
     container_name: ampledata-temporal-ui
     depends_on:
       - temporal
+    expose:
+      - "8080"
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
-    ports:
-      - "127.0.0.1:8088:8080"
 
   crawl4ai:
     build:
       context: ./python/crawl4ai_service
       dockerfile: Dockerfile
     container_name: ampledata-crawl4ai
-    ports:
-      - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:
@@ -63,6 +60,8 @@ services:
       context: ./go
       dockerfile: Dockerfile
     container_name: ampledata-go-server
+    expose:
+      - "8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,8 +69,6 @@ services:
         condition: service_started
       crawl4ai:
         condition: service_healthy
-    ports:
-      - "8080:8080"
     environment:
       - DATABASE_URL_ENRICH=postgres://enrichment:enrichment@postgres:5432/enrichment?sslmode=disable
       - SERVER_ADDR=:8080
