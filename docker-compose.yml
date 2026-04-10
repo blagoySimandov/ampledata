@@ -29,7 +29,6 @@ services:
       - POSTGRES_PWD=enrichment
       - POSTGRES_SEEDS=postgres
       - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
-    ports:
     volumes:
       - ./go/temporal-config:/etc/temporal/config/dynamicconfig
   temporal-ui:
