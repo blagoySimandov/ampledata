@@ -12,8 +12,11 @@ var ErrToolsNotSupported = errors.New("inner AI client does not support tool cal
 // CavemanAIClient wraps any IAIClient and prepends a terse-response instruction to every
 // prompt, cutting output token usage ~75%. Drop-in replacement: same interfaces, lower cost.
 // Useful when response verbosity doesn't matter (structured JSON extractions, short decisions).
-const cavemanInstruction = `RESPOND TERSE. Drop articles, filler, pleasantries, hedging.
-Fragments OK. Short synonyms. Technical terms exact. No padding.
+const cavemanInstruction = `Respond terse like smart caveman. All technical substance stay. Only fluff die.
+
+Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course/happy to), hedging. Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for"). Technical terms exact. Code blocks unchanged. Errors quoted exact.
+
+Pattern: [thing] [action] [reason]. [next step].
 
 `
 
