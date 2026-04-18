@@ -7,6 +7,7 @@ export const ENDPOINTS = {
   JOBS_ROWS: (jobId: string) => `/jobs/${jobId}/rows`,
   JOBS_RESULTS: (jobId: string) => `/jobs/${jobId}/results`,
   JOBS_CANCEL: (jobId: string) => `/jobs/${jobId}/cancel`,
+  SOURCES_SAMPLE: "/sources/sample",
   ENRICHMENT_SIGNED_URL: "/enrichment-signed-url",
   SELECT_KEY: "/select-key",
   TIERS: "/tiers",

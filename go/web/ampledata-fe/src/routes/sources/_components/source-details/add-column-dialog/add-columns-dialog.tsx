@@ -12,13 +12,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useApi, useEnrich, useSourceData } from "@/hooks";
+import { useApi, useEnrich, useSourceData, useSubscription } from "@/hooks";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Plus, Settings2, Loader2, ChevronDown } from "lucide-react";
+import { Plus, Settings2, Loader2, ChevronDown, Coins, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { AddColumnsDialogProps } from "./types";
@@ -32,15 +32,25 @@ export function AddColumnsDialog({
   const api = useApi();
   const enrich = useEnrich(api, sourceId);
   const { data: sourceData } = useSourceData(api, sourceId);
+  const { data: subscription } = useSubscription(api);
   const sourceColumns = sourceData?.headers ?? [];
+  const rowCount = sourceData?.rows?.length ?? 0;
 
   const [open, setOpen] = useState(false);
   const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
   const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>([]);
   const [keyColumnDescription, setKeyColumnDescription] = useState("");
 
+  const creditCost = rowCount * columnsMetadata.length;
+  const creditsRemaining = subscription
+    ? Math.max(0, subscription.tokens_included - subscription.tokens_used)
+    : null;
+  const hasEnoughCredits = creditsRemaining === null || creditsRemaining >= creditCost;
+
   const canStart =
-    columnsMetadata.length > 0 && columnsMetadata.every((c) => c.name);
+    columnsMetadata.length > 0 &&
+    columnsMetadata.every((c) => c.name) &&
+    hasEnoughCredits;
 
   const hasImputation = columnsMetadata.some((c) => c.job_type === "imputation");
   const hasEnrichment = columnsMetadata.some((c) => c.job_type === "enrichment");
@@ -211,6 +221,32 @@ export function AddColumnsDialog({
               )}
             </div>
 
+            {columnsMetadata.length > 0 && columnsMetadata.every((c) => c.name) && creditCost > 0 && (
+              <div className={`rounded-lg px-4 py-3 text-xs flex items-start gap-2 ${
+                hasEnoughCredits
+                  ? "bg-slate-50 border border-slate-200 text-slate-600"
+                  : "bg-red-50 border border-red-200 text-red-700"
+              }`}>
+                {hasEnoughCredits ? (
+                  <Coins className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
+                ) : (
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-500" />
+                )}
+                <div className="space-y-0.5">
+                  <p className="font-bold">
+                    {hasEnoughCredits
+                      ? `This run will use ${creditCost.toLocaleString()} credit${creditCost !== 1 ? "s" : ""}`
+                      : `Insufficient credits`}
+                  </p>
+                  <p className={hasEnoughCredits ? "text-slate-400" : "text-red-500"}>
+                    {rowCount.toLocaleString()} rows × {columnsMetadata.length} column{columnsMetadata.length !== 1 ? "s" : ""}
+                    {creditsRemaining !== null && hasEnoughCredits && ` · ${creditsRemaining.toLocaleString()} remaining`}
+                    {!hasEnoughCredits && creditsRemaining !== null && ` · ${creditsRemaining.toLocaleString()} remaining, ${creditCost.toLocaleString()} needed`}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <Button
               className="w-full font-black h-12"
               onClick={handleEnrich}
@@ -221,6 +257,8 @@ export function AddColumnsDialog({
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   STARTING...
                 </>
+              ) : !hasEnoughCredits ? (
+                "UPGRADE TO CONTINUE"
               ) : (
                 startLabel
               )}

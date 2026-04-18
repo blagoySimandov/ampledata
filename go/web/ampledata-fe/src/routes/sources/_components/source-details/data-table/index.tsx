@@ -6,6 +6,7 @@ import type { SourceJobSummary } from "@/api";
 import { useMergedData } from "./_hooks/use-merged-data";
 import { agtheme } from "@/lib/ag-theme";
 import { GridToolbar } from "./grid-toolbar";
+import { EnrichmentProgressBanner } from "../enrichment-progress-banner";
 
 interface DataTableProps {
   sourceId: string;
@@ -38,8 +39,11 @@ export function DataTable({
 
   const handleAutoSize = () => getApi()?.autoSizeAllColumns();
 
+  const activeJob = jobs.find((j) => j.status === "RUNNING" || j.status === "PENDING");
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col flex-1 min-h-0">
+      {activeJob && <EnrichmentProgressBanner activeJob={activeJob} />}
       <GridToolbar
         rowCount={mergedData.rows.length}
         isFetching={isFetching}

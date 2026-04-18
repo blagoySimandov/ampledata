@@ -605,6 +605,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /sources/sample:
+    post:
+      operationId: createSampleSource
+      summary: Create a pre-loaded sample source for quick demo
+      tags: [sources]
+      responses:
+        "200":
+          description: Sample source created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SourceDetail"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /sources/{sourceID}:
     get:
       operationId: getSource

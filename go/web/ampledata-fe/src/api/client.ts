@@ -199,6 +199,13 @@ export class ApiClient {
     return this.request<PortalSessionResponse>(endpoint, { method: "POST" });
   }
 
+  public async createSampleSource(): Promise<SourceDetail> {
+    const data = await this.request<SourceDetail>(ENDPOINTS.SOURCES_SAMPLE, {
+      method: "POST",
+    });
+    return decodeSourceDetail(data);
+  }
+
   public async getMe(): Promise<UserResponse> {
     return this.request<UserResponse>(ENDPOINTS.ME);
   }

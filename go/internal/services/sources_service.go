@@ -50,6 +50,7 @@ type ISourcesService interface {
 	GetSourceData(ctx context.Context, sourceID uuid.UUID, userID string) (*gcs.CSVResult, error)
 	EnrichSource(ctx context.Context, input EnrichSourceInput) (string, error)
 	CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error)
+	CreateSampleSource(ctx context.Context, userID string) (*SourceWithJobs, error)
 }
 
 type ISourceNameGeneratorPromptService interface {
@@ -282,4 +283,33 @@ func stripeCustomerIDOrEmpty(u *models.User) string {
 
 func generateJobID(extension string) string {
 	return uuid.New().String() + extension
+}
+
+const sampleCSVContent = `Company Name,Website
+Stripe,https://stripe.com
+Notion,https://notion.so
+Linear,https://linear.app
+Vercel,https://vercel.com
+Supabase,https://supabase.com
+Retool,https://retool.com
+Airtable,https://airtable.com
+Figma,https://figma.com
+Intercom,https://intercom.com
+Rippling,https://rippling.com
+`
+
+func (s *sourcesService) CreateSampleSource(ctx context.Context, userID string) (*SourceWithJobs, error) {
+	fileID := generateJobID(".csv")
+	if err := s.reader.UploadObject(ctx, fileID, "text/csv", []byte(sampleCSVContent)); err != nil {
+		return nil, fmt.Errorf("failed to upload sample CSV: %w", err)
+	}
+	sourceDB, err := s.createCSVSource(ctx, userID, fileID, "text/csv", []string{"Company Name", "Website"})
+	if err != nil {
+		return nil, err
+	}
+	source, err := sourceDB.ToSource()
+	if err != nil {
+		return nil, err
+	}
+	return &SourceWithJobs{Source: source, Jobs: nil}, nil
 }

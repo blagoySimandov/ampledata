@@ -6,6 +6,8 @@ import { useSubscribe } from "./use-subscribe";
 import { useSubscription } from "./use-subscription";
 import { useUpgradeSubscription } from "./use-upgrade-subscription";
 
+export { useSubscription };
+
 export function useBilling() {
   const api = useApi();
   const tiers = useListTiers(api);

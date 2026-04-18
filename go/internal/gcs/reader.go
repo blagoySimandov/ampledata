@@ -58,6 +58,17 @@ type CSVResult struct {
 	Rows    [][]string
 }
 
+func (r *CSVReader) UploadObject(ctx context.Context, objectName, contentType string, data []byte) error {
+	obj := r.client.Bucket(r.bucketName).Object(objectName)
+	w := obj.NewWriter(ctx)
+	w.ContentType = contentType
+	if _, err := w.Write(data); err != nil {
+		w.Close()
+		return fmt.Errorf("failed to write object: %w", err)
+	}
+	return w.Close()
+}
+
 func (r *CSVReader) ReadCSV(ctx context.Context, objectName string) (*CSVResult, error) {
 	bucket := r.client.Bucket(r.bucketName)
 	obj := bucket.Object(objectName)

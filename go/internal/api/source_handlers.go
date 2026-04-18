@@ -42,6 +42,20 @@ func (s *Server) UploadFileForEnrichment(ctx context.Context, req UploadFileForE
 	return UploadFileForEnrichment200JSONResponse{Url: url, SourceId: sourceID}, nil
 }
 
+func (s *Server) CreateSampleSource(ctx context.Context, req CreateSampleSourceRequestObject) (CreateSampleSourceResponseObject, error) {
+	u, ok := auth.GetUserFromContext(ctx)
+	if !ok || u == nil {
+		return CreateSampleSource401JSONResponse{Message: "Unauthorized"}, nil
+	}
+	result, err := s.sourcesService.CreateSampleSource(ctx, u.ID)
+	if err != nil {
+		log.Printf("Failed to create sample source: %v", err)
+		return CreateSampleSource500JSONResponse{Message: "Failed to create sample source"}, nil
+	}
+	detail := toAPISourceDetail(result.Source, result.Jobs)
+	return CreateSampleSource200JSONResponse(detail), nil
+}
+
 func (s *Server) ListSources(ctx context.Context, req ListSourcesRequestObject) (ListSourcesResponseObject, error) {
 	u, ok := auth.GetUserFromContext(ctx)
 	if !ok {
