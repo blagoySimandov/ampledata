@@ -38,13 +38,23 @@ export function AddColumnsDialog({
   const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
   const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>([]);
   const [keyColumnDescription, setKeyColumnDescription] = useState("");
+  const [rowLimit, setRowLimit] = useState<string>("");
 
   const canStart =
     columnsMetadata.length > 0 && columnsMetadata.every((c) => c.name);
 
-  const hasImputation = columnsMetadata.some((c) => c.job_type === "imputation");
-  const hasEnrichment = columnsMetadata.some((c) => c.job_type === "enrichment");
-  const startLabel = hasImputation && !hasEnrichment ? "START IMPUTATION" : hasImputation ? "START RUN" : "START ENRICHMENT";
+  const hasImputation = columnsMetadata.some(
+    (c) => c.job_type === "imputation",
+  );
+  const hasEnrichment = columnsMetadata.some(
+    (c) => c.job_type === "enrichment",
+  );
+  const startLabel =
+    hasImputation && !hasEnrichment
+      ? "START IMPUTATION"
+      : hasImputation
+        ? "START RUN"
+        : "START ENRICHMENT";
 
   const addColumn = () =>
     setColumnsMetadata((prev) => [
@@ -69,6 +79,7 @@ export function AddColumnsDialog({
     setColumnsMetadata([]);
     setSelectedKeyColumns([]);
     setKeyColumnDescription("");
+    setRowLimit("");
   };
 
   const handleOpenChange = (val: boolean) => {
@@ -92,9 +103,14 @@ export function AddColumnsDialog({
       const trimmedDescription = keyColumnDescription.trim();
       if (trimmedDescription)
         payload.key_column_description = trimmedDescription;
+      const parsedLimit = parseInt(rowLimit, 10);
+      if (!isNaN(parsedLimit) && parsedLimit > 0)
+        payload.row_limit = parsedLimit;
 
       await enrich.mutateAsync(payload);
-      logEvent("enrichment_completed", { column_count: columnsMetadata.length });
+      logEvent("enrichment_completed", {
+        column_count: columnsMetadata.length,
+      });
       setOpen(false);
       resetForm();
     } catch (e) {
@@ -115,9 +131,7 @@ export function AddColumnsDialog({
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-6 pb-0">
-          <DialogTitle className="text-2xl font-black">
-            Add Columns
-          </DialogTitle>
+          <DialogTitle className="text-2xl font-black">Add Columns</DialogTitle>
         </DialogHeader>
         <ScrollArea className="flex-1 px-6">
           <div className="py-6 space-y-6">
@@ -165,16 +179,37 @@ export function AddColumnsDialog({
                     <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
                     Advanced
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1 pt-2">
-                    <Label className="text-xs text-slate-500 font-bold">
-                      Key Column Definition (AI Context)
-                    </Label>
-                    <Input
-                      placeholder="Optional rules to locate the key columns in raw text..."
-                      value={keyColumnDescription}
-                      onChange={(e) => setKeyColumnDescription(e.target.value)}
-                      className="text-sm h-9"
-                    />
+                  <CollapsibleContent className="space-y-4 pt-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 font-bold">
+                        Key Column Definition (AI Context)
+                      </Label>
+                      <Input
+                        placeholder="Optional rules to locate the key columns in raw text..."
+                        value={keyColumnDescription}
+                        onChange={(e) =>
+                          setKeyColumnDescription(e.target.value)
+                        }
+                        className="text-sm h-9"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-500 font-bold">
+                        Row Limit
+                      </Label>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        Process only the first N rows. Leave empty to process
+                        all rows.
+                      </p>
+                      <Input
+                        type="number"
+                        min={1}
+                        placeholder="e.g. 100"
+                        value={rowLimit}
+                        onChange={(e) => setRowLimit(e.target.value)}
+                        className="text-sm h-9"
+                      />
+                    </div>
                   </CollapsibleContent>
                 </Collapsible>
               </div>

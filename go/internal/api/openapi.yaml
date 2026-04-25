@@ -370,6 +370,11 @@ components:
         key_column_description:
           type: string
           nullable: true
+        row_limit:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Maximum number of rows to process. Processes all rows if not set.
 
     EnrichResponse:
       type: object

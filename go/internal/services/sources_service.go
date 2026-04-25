@@ -42,6 +42,7 @@ type EnrichSourceInput struct {
 	KeyColumns           []string
 	KeyColumnDescription *string
 	ColumnsMetadata      []*models.ColumnMetadata
+	RowLimit             *int
 }
 
 type ISourcesService interface {
@@ -185,6 +186,7 @@ func (s *sourcesService) EnrichSource(ctx context.Context, input EnrichSourceInp
 	if len(rowKeys) == 0 {
 		return "", newValidationError("no rows found in key column")
 	}
+	rowKeys = applyRowLimit(rowKeys, input.RowLimit)
 	if !input.DBUser.CanEnrichCells(int64(len(rowKeys) * len(input.ColumnsMetadata))) {
 		return "", ErrInsufficientCredits
 	}
@@ -259,6 +261,13 @@ func imputationColumnNames(cols []*models.ColumnMetadata) []string {
 		}
 	}
 	return names
+}
+
+func applyRowLimit(keys []string, limit *int) []string {
+	if limit == nil || *limit >= len(keys) {
+		return keys
+	}
+	return keys[:*limit]
 }
 
 func deduplicateKeys(keys []string) []string {

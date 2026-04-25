@@ -2,10 +2,8 @@
 description: "Extraction prompt — v1 vs v2 on Gemini 2.5 Flash"
 
 prompts:
-  - id: file://prompts/extraction-v2-clear.txt
-    label: v2-clear
-  # - id: file://../internal/services/prompts/extraction.txt
-  #   label: v1-verbose
+  - id: file://../internal/services/prompts/extraction.txt
+    label: v2-production
 
 providers:
   - id: google:gemini-2.5-flash

@@ -109,6 +109,7 @@ func buildEnrichInput(req EnrichSourceRequestObject, authUserID string, dbUser *
 		KeyColumns:           keyColumns,
 		KeyColumnDescription: req.Body.KeyColumnDescription,
 		ColumnsMetadata:      toModelColumnMetadataSlice(req.Body.ColumnsMetadata),
+		RowLimit:             req.Body.RowLimit,
 	}
 }
 
