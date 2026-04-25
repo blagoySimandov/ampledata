@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as AccountRouteImport } from './routes/account'
@@ -17,6 +19,16 @@ import { Route as AccountIndexRouteImport } from './routes/account/index'
 import { Route as SourcesSourceIdRouteImport } from './routes/sources/$sourceId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
+  id: '/privacy-policy',
+  path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -58,6 +70,8 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRouteWithChildren
   '/app': typeof AppRoute
   '/login': typeof LoginRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/terms': typeof TermsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account/': typeof AccountIndexRoute
@@ -66,6 +80,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
   '/login': typeof LoginRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/terms': typeof TermsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account': typeof AccountIndexRoute
@@ -76,6 +92,8 @@ export interface FileRoutesById {
   '/account': typeof AccountRouteWithChildren
   '/app': typeof AppRoute
   '/login': typeof LoginRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/terms': typeof TermsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
   '/account/': typeof AccountIndexRoute
@@ -87,6 +105,8 @@ export interface FileRouteTypes {
     | '/account'
     | '/app'
     | '/login'
+    | '/privacy-policy'
+    | '/terms'
     | '/auth/callback'
     | '/sources/$sourceId'
     | '/account/'
@@ -95,6 +115,8 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/login'
+    | '/privacy-policy'
+    | '/terms'
     | '/auth/callback'
     | '/sources/$sourceId'
     | '/account'
@@ -104,6 +126,8 @@ export interface FileRouteTypes {
     | '/account'
     | '/app'
     | '/login'
+    | '/privacy-policy'
+    | '/terms'
     | '/auth/callback'
     | '/sources/$sourceId'
     | '/account/'
@@ -114,12 +138,28 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRouteWithChildren
   AppRoute: typeof AppRoute
   LoginRoute: typeof LoginRoute
+  PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  TermsRoute: typeof TermsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   SourcesSourceIdRoute: typeof SourcesSourceIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy-policy': {
+      id: '/privacy-policy'
+      path: '/privacy-policy'
+      fullPath: '/privacy-policy'
+      preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -188,6 +228,8 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRouteWithChildren,
   AppRoute: AppRoute,
   LoginRoute: LoginRoute,
+  PrivacyPolicyRoute: PrivacyPolicyRoute,
+  TermsRoute: TermsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   SourcesSourceIdRoute: SourcesSourceIdRoute,
 }

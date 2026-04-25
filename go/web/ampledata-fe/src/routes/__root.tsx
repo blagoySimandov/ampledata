@@ -16,7 +16,7 @@ interface RouterContext {
   };
 }
 
-const PUBLIC_ROUTES = ["/login", "/auth/callback", "/"];
+const PUBLIC_ROUTES = ["/login", "/auth/callback", "/", "/privacy-policy", "/terms"];
 
 function isPublicRoute(pathname: string) {
   return PUBLIC_ROUTES.some((r) =>
