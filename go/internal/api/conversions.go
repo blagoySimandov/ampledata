@@ -192,8 +192,19 @@ func toAPISourceSummary(r *services.SourceWithJobs) SourceSummary {
 }
 
 func sourceMetaName(s *models.Source) *string {
-	if meta, ok := s.Metadata.(*models.CSVSourceMetadata); ok && meta.Name != "" {
-		return &meta.Name
+	switch meta := s.Metadata.(type) {
+	case *models.CSVSourceMetadata:
+		if meta.Name != "" {
+			return &meta.Name
+		}
+	case *models.GoogleSheetsSourceMetadata:
+		if meta.Name != "" {
+			return &meta.Name
+		}
+		if meta.SpreadsheetName != "" {
+			fallback := meta.SpreadsheetName + " › " + meta.SheetName
+			return &fallback
+		}
 	}
 	return nil
 }

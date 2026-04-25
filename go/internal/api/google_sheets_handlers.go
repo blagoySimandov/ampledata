@@ -10,9 +10,10 @@ import (
 )
 
 type createGoogleSheetsSourceRequest struct {
-	SpreadsheetID  string `json:"spreadsheet_id"`
-	SpreadsheetURL string `json:"spreadsheet_url"`
-	SheetName      string `json:"sheet_name"`
+	SpreadsheetID   string `json:"spreadsheet_id"`
+	SpreadsheetURL  string `json:"spreadsheet_url"`
+	SpreadsheetName string `json:"spreadsheet_name"`
+	SheetName       string `json:"sheet_name"`
 }
 
 func (s *Server) HandleCreateGoogleSheetsSource(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +31,7 @@ func (s *Server) HandleCreateGoogleSheetsSource(w http.ResponseWriter, r *http.R
 		http.Error(w, "spreadsheet_id and sheet_name are required", http.StatusBadRequest)
 		return
 	}
-	sourceID, err := s.sourcesService.CreateGoogleSheetsSource(r.Context(), u.ID, req.SpreadsheetID, req.SpreadsheetURL, req.SheetName)
+	sourceID, err := s.sourcesService.CreateGoogleSheetsSource(r.Context(), u.ID, req.SpreadsheetID, req.SpreadsheetURL, req.SpreadsheetName, req.SheetName)
 	if err != nil {
 		log.Printf("Failed to create google sheets source: %v", err)
 		http.Error(w, "Failed to create source", http.StatusInternalServerError)

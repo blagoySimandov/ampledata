@@ -76,7 +76,7 @@ var cfg Config = Config{
 	DebugAuthBypass:   getEnvBool("DEBUG_AUTH_BYPASS", false),
 
 	// Temporal settings
-	TemporalHostPort:  getEnv("TEMPORAL_HOST_PORT", "localhost:7233"),
+	TemporalHostPort:  getEnv("TEMPORAL_HOST_PORT", "127.0.0.1:7233"),
 	TemporalNamespace: getEnv("TEMPORAL_NAMESPACE", "default"),
 	TemporalTaskQueue: getEnv("TEMPORAL_TASK_QUEUE", "ampledata-enrichment"),
 

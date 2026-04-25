@@ -45,6 +45,7 @@ export function GoogleSheetsDialogContent() {
       spreadsheet_id: selectedSheet.id,
       spreadsheet_url: `https://docs.google.com/spreadsheets/d/${selectedSheet.id}`,
       sheet_name: selectedTab,
+      spreadsheet_name: selectedSheet.name,
     });
   };
 

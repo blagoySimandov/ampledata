@@ -17,10 +17,11 @@ const (
 )
 
 type GoogleSheetsSourceMetadata struct {
-	SpreadsheetID  string `json:"spreadsheet_id"`
-	SpreadsheetURL string `json:"spreadsheet_url"`
-	SheetName      string `json:"sheet_name"`
-	Name           string `json:"name,omitempty"`
+	SpreadsheetID   string `json:"spreadsheet_id"`
+	SpreadsheetURL  string `json:"spreadsheet_url"`
+	SpreadsheetName string `json:"spreadsheet_name,omitempty"`
+	SheetName       string `json:"sheet_name"`
+	Name            string `json:"name,omitempty"`
 }
 
 func (m *GoogleSheetsSourceMetadata) SourceType() SourceType { return SourceTypeGoogleSheets }

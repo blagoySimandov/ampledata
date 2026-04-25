@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/blagoySimandov/ampledata/go/internal/logger"
+	"github.com/davecgh/go-spew/spew"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/log"
 )
@@ -27,6 +28,7 @@ func (l *temporalLogger) Error(msg string, keyvals ...interface{}) {
 }
 
 func NewClient(hostPort, namespace string) (client.Client, error) {
+	spew.Dump(hostPort)
 	c, err := client.Dial(client.Options{
 		HostPort:  hostPort,
 		Namespace: namespace,

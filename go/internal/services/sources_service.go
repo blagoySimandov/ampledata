@@ -52,7 +52,7 @@ type ISourcesService interface {
 	GetSourceData(ctx context.Context, sourceID uuid.UUID, userID string) (*gcs.CSVResult, error)
 	EnrichSource(ctx context.Context, input EnrichSourceInput) (string, error)
 	CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error)
-	CreateGoogleSheetsSource(ctx context.Context, userID, spreadsheetID, spreadsheetURL, sheetName string) (uuid.UUID, error)
+	CreateGoogleSheetsSource(ctx context.Context, userID, spreadsheetID, spreadsheetURL, spreadsheetName, sheetName string) (uuid.UUID, error)
 }
 
 type ISourceNameGeneratorPromptService interface {
@@ -222,17 +222,12 @@ func (s *sourcesService) extractRowKeys(data *gcs.CSVResult, keyColumns []string
 	return deduplicateKeys(keys), nil
 }
 
-func (s *sourcesService) CreateGoogleSheetsSource(ctx context.Context, userID, spreadsheetID, spreadsheetURL, sheetName string) (uuid.UUID, error) {
-	data, err := s.sheetsClient.ReadSheetData(ctx, userID, spreadsheetID, sheetName)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("failed to read sheet: %w", err)
-	}
-	name := s.generateSourceName(ctx, data.Headers)
+func (s *sourcesService) CreateGoogleSheetsSource(ctx context.Context, userID, spreadsheetID, spreadsheetURL, spreadsheetName, sheetName string) (uuid.UUID, error) {
 	meta := &models.GoogleSheetsSourceMetadata{
-		SpreadsheetID:  spreadsheetID,
-		SpreadsheetURL: spreadsheetURL,
-		SheetName:      sheetName,
-		Name:           name,
+		SpreadsheetID:   spreadsheetID,
+		SpreadsheetURL:  spreadsheetURL,
+		SpreadsheetName: spreadsheetName,
+		SheetName:       sheetName,
 	}
 	return s.createSheetsSource(ctx, userID, meta)
 }

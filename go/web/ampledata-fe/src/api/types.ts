@@ -194,6 +194,7 @@ export interface CreateGoogleSheetsSourceRequest {
   spreadsheet_id: string;
   spreadsheet_url: string;
   sheet_name: string;
+  spreadsheet_name: string;
 }
 
 export interface CreateGoogleSheetsSourceResponse {
