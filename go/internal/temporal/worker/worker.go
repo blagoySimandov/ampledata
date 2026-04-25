@@ -58,6 +58,9 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 	w.RegisterActivityWithOptions(activities.IncrementJobCredits, activity.RegisterOptions{
 		Name: "IncrementJobCredits",
 	})
+	w.RegisterActivityWithOptions(activities.WriteResultsToSheet, activity.RegisterOptions{
+		Name: "WriteResultsToSheet",
+	})
 
 	return &Worker{
 		temporalWorker: w,

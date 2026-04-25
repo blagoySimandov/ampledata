@@ -10,12 +10,13 @@ import (
 
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
+	"github.com/blagoySimandov/ampledata/go/internal/sheets"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/google/uuid"
 )
 
 type IEnricher interface {
-	Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error
+	Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string, sourceID uuid.UUID, sourceType models.SourceType) error
 }
 
 var (
@@ -51,6 +52,7 @@ type ISourcesService interface {
 	GetSourceData(ctx context.Context, sourceID uuid.UUID, userID string) (*gcs.CSVResult, error)
 	EnrichSource(ctx context.Context, input EnrichSourceInput) (string, error)
 	CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error)
+	CreateGoogleSheetsSource(ctx context.Context, userID, spreadsheetID, spreadsheetURL, sheetName string) (uuid.UUID, error)
 }
 
 type ISourceNameGeneratorPromptService interface {
@@ -60,13 +62,14 @@ type ISourceNameGeneratorPromptService interface {
 type sourcesService struct {
 	store         state.Store
 	reader        *gcs.CSVReader
+	sheetsClient  *sheets.Client
 	enricher      IEnricher
 	aiClient      IAIClient
 	promptService ISourceNameGeneratorPromptService
 }
 
-func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) ISourcesService {
-	return &sourcesService{store: store, reader: reader, enricher: enr, aiClient: aiclient, promptService: promptService}
+func NewSourcesService(store state.Store, reader *gcs.CSVReader, sheetsClient *sheets.Client, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) ISourcesService {
+	return &sourcesService{store: store, reader: reader, sheetsClient: sheetsClient, enricher: enr, aiClient: aiclient, promptService: promptService}
 }
 
 func (s *sourcesService) ListSources(ctx context.Context, userID string, offset, limit int) ([]*SourceWithJobs, error) {
@@ -112,11 +115,18 @@ func (s *sourcesService) GetSourceData(ctx context.Context, sourceID uuid.UUID, 
 	if source.UserID != userID {
 		return nil, ErrSourceForbidden
 	}
-	csvMeta, ok := source.Metadata.(*models.CSVSourceMetadata)
-	if !ok {
-		return nil, fmt.Errorf("source metadata not found")
+	return s.readSourceData(ctx, source, userID)
+}
+
+func (s *sourcesService) readSourceData(ctx context.Context, source *models.Source, userID string) (*gcs.CSVResult, error) {
+	switch meta := source.Metadata.(type) {
+	case *models.CSVSourceMetadata:
+		return s.reader.ReadCSV(ctx, meta.FileURI)
+	case *models.GoogleSheetsSourceMetadata:
+		return s.sheetsClient.ReadSheetData(ctx, userID, meta.SpreadsheetID, meta.SheetName)
+	default:
+		return nil, fmt.Errorf("unsupported source type: %s", source.Type)
 	}
-	return s.reader.ReadCSV(ctx, csvMeta.FileURI)
 }
 
 func (s *sourcesService) CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error) {
@@ -175,13 +185,9 @@ func (s *sourcesService) EnrichSource(ctx context.Context, input EnrichSourceInp
 	if err != nil {
 		return "", err
 	}
-	csvMeta, ok := source.Metadata.(*models.CSVSourceMetadata)
-	if !ok {
-		return "", fmt.Errorf("source metadata not found")
-	}
-	rowKeys, err := s.readRowKeys(ctx, csvMeta.FileURI, keyColumns, input.ColumnsMetadata)
+	rowKeys, err := s.readRowKeysFromSource(ctx, source, input.AuthUserID, keyColumns, input.ColumnsMetadata)
 	if err != nil {
-		return "", newValidationError(fmt.Sprintf("failed to read CSV: %v", err))
+		return "", newValidationError(fmt.Sprintf("failed to read source: %v", err))
 	}
 	if len(rowKeys) == 0 {
 		return "", newValidationError("no rows found in key column")
@@ -190,7 +196,64 @@ func (s *sourcesService) EnrichSource(ctx context.Context, input EnrichSourceInp
 	if !input.DBUser.CanEnrichCells(int64(len(rowKeys) * len(input.ColumnsMetadata))) {
 		return "", ErrInsufficientCredits
 	}
-	return s.createAndStartJob(ctx, input, keyColumns, keyColumnDesc, rowKeys)
+	return s.createAndStartJob(ctx, input, source, keyColumns, keyColumnDesc, rowKeys)
+}
+
+func (s *sourcesService) readRowKeysFromSource(ctx context.Context, source *models.Source, userID string, keyColumns []string, cols []*models.ColumnMetadata) ([]string, error) {
+	data, err := s.readSourceData(ctx, source, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.extractRowKeys(data, keyColumns, cols)
+}
+
+func (s *sourcesService) extractRowKeys(data *gcs.CSVResult, keyColumns []string, cols []*models.ColumnMetadata) ([]string, error) {
+	imputationCols := imputationColumnNames(cols)
+	var keys []string
+	var err error
+	if len(imputationCols) > 0 {
+		keys, err = gcs.ExtractCompositeKeyFiltered(data, keyColumns, imputationCols)
+	} else {
+		keys, err = s.reader.ExtractCompositeKey(data, keyColumns)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return deduplicateKeys(keys), nil
+}
+
+func (s *sourcesService) CreateGoogleSheetsSource(ctx context.Context, userID, spreadsheetID, spreadsheetURL, sheetName string) (uuid.UUID, error) {
+	data, err := s.sheetsClient.ReadSheetData(ctx, userID, spreadsheetID, sheetName)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to read sheet: %w", err)
+	}
+	name := s.generateSourceName(ctx, data.Headers)
+	meta := &models.GoogleSheetsSourceMetadata{
+		SpreadsheetID:  spreadsheetID,
+		SpreadsheetURL: spreadsheetURL,
+		SheetName:      sheetName,
+		Name:           name,
+	}
+	return s.createSheetsSource(ctx, userID, meta)
+}
+
+func (s *sourcesService) createSheetsSource(ctx context.Context, userID string, meta *models.GoogleSheetsSourceMetadata) (uuid.UUID, error) {
+	metaJSON, err := json.Marshal(meta)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+	now := time.Now()
+	source := &models.SourceDB{
+		UserID:    userID,
+		Type:      models.SourceTypeGoogleSheets,
+		Metadata:  metaJSON,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := s.store.CreateSource(ctx, source); err != nil {
+		return uuid.Nil, err
+	}
+	return source.ID, nil
 }
 
 func (s *sourcesService) getOwnedSource(ctx context.Context, sourceID uuid.UUID, userID string) (*models.Source, error) {
@@ -216,22 +279,7 @@ func (s *sourcesService) resolveKeyColumns(ctx context.Context, sourceID uuid.UU
 	return most.KeyColumns, most.KeyColumnDescription, nil
 }
 
-func (s *sourcesService) readRowKeys(ctx context.Context, fileURI string, keyColumns []string, cols []*models.ColumnMetadata) ([]string, error) {
-	imputationCols := imputationColumnNames(cols)
-	var keys []string
-	var err error
-	if len(imputationCols) > 0 {
-		keys, err = s.reader.ReadCompositeKeyFromFileFiltered(ctx, fileURI, keyColumns, imputationCols)
-	} else {
-		keys, err = s.reader.ReadCompositeKeyFromFile(ctx, fileURI, keyColumns)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return deduplicateKeys(keys), nil
-}
-
-func (s *sourcesService) createAndStartJob(ctx context.Context, input EnrichSourceInput, keyColumns []string, keyColumnDesc *string, rowKeys []string) (string, error) {
+func (s *sourcesService) createAndStartJob(ctx context.Context, input EnrichSourceInput, source *models.Source, keyColumns []string, keyColumnDesc *string, rowKeys []string) (string, error) {
 	jobID := generateJobID(".csv")
 	if err := s.store.CreatePendingJob(ctx, jobID, input.AuthUserID, input.SourceID); err != nil {
 		return "", fmt.Errorf("failed to create job")
@@ -239,7 +287,7 @@ func (s *sourcesService) createAndStartJob(ctx context.Context, input EnrichSour
 	if err := s.configureAndStartJob(ctx, jobID, keyColumns, keyColumnDesc, input.ColumnsMetadata, len(rowKeys)); err != nil {
 		return "", err
 	}
-	go s.enricher.Enrich(context.Background(), jobID, input.DBUser.ID, stripeCustomerIDOrEmpty(input.DBUser), rowKeys, input.ColumnsMetadata, keyColumnDesc)
+	go s.enricher.Enrich(context.Background(), jobID, input.DBUser.ID, stripeCustomerIDOrEmpty(input.DBUser), rowKeys, input.ColumnsMetadata, keyColumnDesc, source.ID, source.Type)
 	return jobID, nil
 }
 

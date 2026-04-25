@@ -177,3 +177,33 @@ export interface UserResponse {
   last_name: string;
   email: string;
 }
+
+export interface GoogleSpreadsheet {
+  id: string;
+  name: string;
+  modified_time: string;
+}
+
+export interface GoogleSheetTab {
+  id: number;
+  name: string;
+  row_count: number;
+}
+
+export interface CreateGoogleSheetsSourceRequest {
+  spreadsheet_id: string;
+  spreadsheet_url: string;
+  sheet_name: string;
+}
+
+export interface CreateGoogleSheetsSourceResponse {
+  source_id: string;
+}
+
+export interface OAuthStatusResponse {
+  connected: boolean;
+}
+
+export interface OAuthInitiateResponse {
+  url: string;
+}

@@ -12,8 +12,18 @@ import (
 type SourceType string
 
 const (
-	SourceTypeCSVUpload SourceType = "csv_upload"
+	SourceTypeCSVUpload    SourceType = "csv_upload"
+	SourceTypeGoogleSheets SourceType = "google_sheets"
 )
+
+type GoogleSheetsSourceMetadata struct {
+	SpreadsheetID  string `json:"spreadsheet_id"`
+	SpreadsheetURL string `json:"spreadsheet_url"`
+	SheetName      string `json:"sheet_name"`
+	Name           string `json:"name,omitempty"`
+}
+
+func (m *GoogleSheetsSourceMetadata) SourceType() SourceType { return SourceTypeGoogleSheets }
 
 type SourceMetadata interface {
 	SourceType() SourceType
@@ -51,6 +61,12 @@ func (s *SourceDB) ParseMetadata() (SourceMetadata, error) {
 	switch s.Type {
 	case SourceTypeCSVUpload:
 		var m CSVSourceMetadata
+		if err := json.Unmarshal(s.Metadata, &m); err != nil {
+			return nil, err
+		}
+		return &m, nil
+	case SourceTypeGoogleSheets:
+		var m GoogleSheetsSourceMetadata
 		if err := json.Unmarshal(s.Metadata, &m); err != nil {
 			return nil, err
 		}

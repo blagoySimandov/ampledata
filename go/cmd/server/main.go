@@ -16,7 +16,9 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/db"
 	"github.com/blagoySimandov/ampledata/go/internal/enricher"
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
+	"github.com/blagoySimandov/ampledata/go/internal/googleoauth"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
+	"github.com/blagoySimandov/ampledata/go/internal/sheets"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
 	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
@@ -85,6 +87,14 @@ func main() {
 	}
 	defer tc.Close()
 
+	oauthSvc := googleoauth.NewService(
+		cfg.GoogleOAuthClientID,
+		cfg.GoogleOAuthClientSecret,
+		cfg.AppBaseURL+"/api/v1/oauth/google/callback",
+		db,
+	)
+	sheetsClient := sheets.NewClient(oauthSvc)
+
 	acts := activities.NewActivities(
 		stateManager,
 		webSearcher,
@@ -93,6 +103,7 @@ func main() {
 		extractor,
 		patternGenerator,
 		billingService,
+		sheetsClient,
 	)
 
 	w := worker.NewWorker(tc, cfg.TemporalTaskQueue, acts)
@@ -110,8 +121,8 @@ func main() {
 		log.Fatalf("Failed to create JWT verifier: %v", err)
 	}
 
-	sourcesService := services.NewSourcesService(store, gcsReader, enr, aiClient, promptService)
-	server := api.NewServer(enr, gcsReader, store, userRepo, billingService, keySelector, aiClient, sourcesService)
+	sourcesService := services.NewSourcesService(store, gcsReader, sheetsClient, enr, aiClient, promptService)
+	server := api.NewServer(enr, gcsReader, store, userRepo, billingService, keySelector, aiClient, sourcesService, oauthSvc, sheetsClient)
 	router := api.SetupRoutes(server, jwtVerifier, userService, cfg.StaticDir)
 
 	srv := &http.Server{

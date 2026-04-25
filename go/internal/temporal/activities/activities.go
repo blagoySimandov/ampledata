@@ -8,7 +8,9 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/logger"
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
+	"github.com/blagoySimandov/ampledata/go/internal/sheets"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
+	"github.com/google/uuid"
 )
 
 type Activities struct {
@@ -19,6 +21,7 @@ type Activities struct {
 	contentExtractor services.IContentExtractor
 	patternGenerator services.QueryPatternGenerator
 	billingService   services.BillingService
+	sheetsClient     *sheets.Client
 }
 
 func NewActivities(
@@ -29,6 +32,7 @@ func NewActivities(
 	contentExtractor services.IContentExtractor,
 	patternGenerator services.QueryPatternGenerator,
 	billingService services.BillingService,
+	sheetsClient *sheets.Client,
 ) *Activities {
 	return &Activities{
 		stateManager:     stateManager,
@@ -38,6 +42,7 @@ func NewActivities(
 		contentExtractor: contentExtractor,
 		patternGenerator: patternGenerator,
 		billingService:   billingService,
+		sheetsClient:     sheetsClient,
 	}
 }
 
@@ -519,4 +524,67 @@ type IncrementJobCreditsInput struct {
 
 func (a *Activities) IncrementJobCredits(ctx context.Context, input IncrementJobCreditsInput) error {
 	return a.stateManager.Store().IncrementJobCost(ctx, input.JobID, 0, input.Credits)
+}
+
+type WriteResultsToSheetInput struct {
+	JobID           string
+	SourceID        string
+	UserID          string
+	ColumnsMetadata []*models.ColumnMetadata
+}
+
+func (a *Activities) WriteResultsToSheet(ctx context.Context, input WriteResultsToSheetInput) error {
+	sourceID, err := uuid.Parse(input.SourceID)
+	if err != nil {
+		return fmt.Errorf("invalid source id: %w", err)
+	}
+	source, err := a.stateManager.Store().GetSource(ctx, sourceID)
+	if err != nil {
+		return fmt.Errorf("failed to get source: %w", err)
+	}
+	sheetsMeta, ok := source.Metadata.(*models.GoogleSheetsSourceMetadata)
+	if !ok {
+		return fmt.Errorf("source is not a google sheets source")
+	}
+	job, err := a.stateManager.Store().GetJob(ctx, input.JobID)
+	if err != nil {
+		return fmt.Errorf("failed to get job: %w", err)
+	}
+	existing, err := a.sheetsClient.ReadSheetData(ctx, input.UserID, sheetsMeta.SpreadsheetID, sheetsMeta.SheetName)
+	if err != nil {
+		return fmt.Errorf("failed to read sheet: %w", err)
+	}
+	dataByKey, err := a.buildEnrichedDataMap(ctx, input.JobID)
+	if err != nil {
+		return err
+	}
+	enrichedColNames := columnNames(input.ColumnsMetadata)
+	return a.sheetsClient.WriteResults(ctx, input.UserID, sheetsMeta.SpreadsheetID, sheetsMeta.SheetName, existing, job.KeyColumns, enrichedColNames, dataByKey)
+}
+
+func (a *Activities) buildEnrichedDataMap(ctx context.Context, jobID string) (map[string]map[string]interface{}, error) {
+	result := map[string]map[string]interface{}{}
+	offset := 0
+	for {
+		rows, err := a.stateManager.Store().GetRowsAtStage(ctx, jobID, models.StageCompleted, offset, 500)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get completed rows: %w", err)
+		}
+		for _, row := range rows {
+			result[row.Key] = row.ExtractedData
+		}
+		if len(rows) < 500 {
+			break
+		}
+		offset += 500
+	}
+	return result, nil
+}
+
+func columnNames(cols []*models.ColumnMetadata) []string {
+	names := make([]string, len(cols))
+	for i, c := range cols {
+		names[i] = c.Name
+	}
+	return names
 }

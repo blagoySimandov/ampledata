@@ -22,6 +22,12 @@ import type {
   PortalSessionResponse,
   UserResponse,
   SourceDataResponse,
+  GoogleSpreadsheet,
+  GoogleSheetTab,
+  CreateGoogleSheetsSourceRequest,
+  CreateGoogleSheetsSourceResponse,
+  OAuthStatusResponse,
+  OAuthInitiateResponse,
 } from "./types";
 import { ENDPOINTS } from "./endpoints";
 
@@ -201,5 +207,30 @@ export class ApiClient {
 
   public async getMe(): Promise<UserResponse> {
     return this.request<UserResponse>(ENDPOINTS.ME);
+  }
+
+  public async getOAuthStatus(): Promise<OAuthStatusResponse> {
+    return this.request<OAuthStatusResponse>(ENDPOINTS.OAUTH_GOOGLE_STATUS);
+  }
+
+  public async initiateGoogleOAuth(): Promise<OAuthInitiateResponse> {
+    return this.request<OAuthInitiateResponse>(ENDPOINTS.OAUTH_GOOGLE_INITIATE);
+  }
+
+  public async listSpreadsheets(): Promise<GoogleSpreadsheet[]> {
+    return this.request<GoogleSpreadsheet[]>(ENDPOINTS.GOOGLE_SHEETS_SPREADSHEETS);
+  }
+
+  public async listSheetTabs(spreadsheetId: string): Promise<GoogleSheetTab[]> {
+    return this.request<GoogleSheetTab[]>(ENDPOINTS.GOOGLE_SHEETS_TABS(spreadsheetId));
+  }
+
+  public async createGoogleSheetsSource(
+    req: CreateGoogleSheetsSourceRequest,
+  ): Promise<CreateGoogleSheetsSourceResponse> {
+    return this.request<CreateGoogleSheetsSourceResponse>(
+      ENDPOINTS.SOURCES_GOOGLE_SHEETS,
+      { method: "POST", body: JSON.stringify(req) },
+    );
   }
 }

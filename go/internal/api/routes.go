@@ -24,6 +24,7 @@ func SetupRoutes(server *Server, jwtVerifier *auth.JWTVerifier, userService user
 		},
 	}
 	mainRouter.HandleFunc("/api/v1/webhooks/stripe", webhookWrapper.HandleStripeWebhook).Methods("POST")
+	mainRouter.HandleFunc("/api/v1/oauth/google/callback", server.HandleOAuthCallback).Methods("GET")
 	mainRouter.HandleFunc("/openapi.json", serveOpenAPISpec).Methods("GET")
 	mainRouter.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerUIHandler()))
 
@@ -31,6 +32,12 @@ func SetupRoutes(server *Server, jwtVerifier *auth.JWTVerifier, userService user
 	protectedRouter.Use(auth.Middleware(jwtVerifier))
 	protectedRouter.Use(user.UserMiddleware(userService))
 	HandlerFromMuxWithBaseURL(strictHandler, protectedRouter, "/api/v1")
+
+	protectedRouter.HandleFunc("/api/v1/oauth/google/initiate", server.HandleOAuthInitiate).Methods("GET")
+	protectedRouter.HandleFunc("/api/v1/oauth/google/status", server.HandleOAuthStatus).Methods("GET")
+	protectedRouter.HandleFunc("/api/v1/sources/google-sheets", server.HandleCreateGoogleSheetsSource).Methods("POST")
+	protectedRouter.HandleFunc("/api/v1/google-sheets/spreadsheets", server.HandleListSpreadsheets).Methods("GET")
+	protectedRouter.HandleFunc("/api/v1/google-sheets/{spreadsheetId}/sheets", server.HandleListSheetTabs).Methods("GET")
 
 	mainRouter.PathPrefix("/api/v1").Handler(protectedRouter)
 	mainRouter.PathPrefix("/").Handler(newSPAHandler(staticDir))

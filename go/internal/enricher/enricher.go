@@ -5,10 +5,11 @@ import (
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
+	"github.com/google/uuid"
 )
 
 type IEnricher interface {
-	Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error
+	Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string, sourceID uuid.UUID, sourceType models.SourceType) error
 	GetProgress(ctx context.Context, jobID string) (*models.JobProgress, error)
 	Cancel(ctx context.Context, jobID string) error
 	GetResults(ctx context.Context, jobID string, offset, limit int) ([]*models.EnrichmentResult, error)

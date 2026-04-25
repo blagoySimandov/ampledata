@@ -16,4 +16,10 @@ export const ENDPOINTS = {
   SUBSCRIPTION_PORTAL: "/subscription/portal",
   SUBSCRIBE: "/subscribe",
   ME: "/me",
+  OAUTH_GOOGLE_INITIATE: "/oauth/google/initiate",
+  OAUTH_GOOGLE_STATUS: "/oauth/google/status",
+  SOURCES_GOOGLE_SHEETS: "/sources/google-sheets",
+  GOOGLE_SHEETS_SPREADSHEETS: "/google-sheets/spreadsheets",
+  GOOGLE_SHEETS_TABS: (spreadsheetId: string) =>
+    `/google-sheets/${spreadsheetId}/sheets`,
 } as const;

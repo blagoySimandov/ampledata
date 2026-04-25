@@ -48,6 +48,10 @@ type Config struct {
 	EnterpriseMeteredPriceID string
 
 	FreeTierCredits int64
+
+	GoogleOAuthClientID     string
+	GoogleOAuthClientSecret string
+	AppBaseURL              string
 }
 
 const (
@@ -108,6 +112,10 @@ var cfg Config = Config{
 	EnterpriseMeteredPriceID: getEnv("STRIPE_ENTERPRISE_METERED_PRICE_ID", ""),
 
 	FreeTierCredits: int64(getEnvInt("FREE_TIER_CREDITS", 100)),
+
+	GoogleOAuthClientID:     getEnv("GOOGLE_OAUTH_CLIENT_ID", ""),
+	GoogleOAuthClientSecret: getEnv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
+	AppBaseURL:              getEnv("APP_BASE_URL", "http://localhost:8080"),
 }
 
 func Load() *Config {

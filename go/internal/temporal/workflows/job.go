@@ -22,6 +22,8 @@ type JobWorkflowInput struct {
 	ColumnsMetadata      []*models.ColumnMetadata
 	KeyColumnDescription *string
 	MaxRetries           int
+	SourceID             string
+	SourceType           string
 }
 
 type JobWorkflowOutput struct {
@@ -121,6 +123,15 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 	if err := workflow.ExecuteActivity(activityCtx, "CompleteJob", input.JobID).Get(activityCtx, nil); err != nil {
 		event.EmitError(ctx, err)
 		return nil, err
+	}
+
+	if models.SourceType(input.SourceType) == models.SourceTypeGoogleSheets {
+		workflow.ExecuteActivity(activityCtx, "WriteResultsToSheet", activities.WriteResultsToSheetInput{
+			JobID:           input.JobID,
+			SourceID:        input.SourceID,
+			UserID:          input.UserID,
+			ColumnsMetadata: input.ColumnsMetadata,
+		}).Get(activityCtx, nil)
 	}
 
 	output.CompletedAt = workflow.Now(ctx)

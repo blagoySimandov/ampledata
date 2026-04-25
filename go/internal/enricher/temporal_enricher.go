@@ -7,6 +7,7 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/workflows"
+	"github.com/google/uuid"
 	"go.temporal.io/sdk/client"
 )
 
@@ -29,7 +30,7 @@ func NewTemporalEnricher(temporalClient client.Client, stateManager *state.State
 }
 
 // Enrich starts a Temporal workflow to process the job
-func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string) error {
+func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCustomerID string, rowKeys []string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription *string, sourceID uuid.UUID, sourceType models.SourceType) error {
 	workflowOptions := client.StartWorkflowOptions{
 		ID:        fmt.Sprintf("job-%s", jobID),
 		TaskQueue: e.taskQueue,
@@ -43,6 +44,8 @@ func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCust
 		ColumnsMetadata:      columnsMetadata,
 		KeyColumnDescription: keyColumnDescription,
 		MaxRetries:           e.maxRetries,
+		SourceID:             sourceID.String(),
+		SourceType:           string(sourceType),
 	}
 
 	workflowRun, err := e.temporalClient.ExecuteWorkflow(ctx, workflowOptions, workflows.JobWorkflow, input)

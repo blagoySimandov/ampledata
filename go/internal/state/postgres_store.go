@@ -39,9 +39,10 @@ func (s *PostgresStore) InitializeDatabase(ctx context.Context) error {
 func (s *PostgresStore) createEnumTypes(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `
 		DO $$ BEGIN
-			CREATE TYPE source_type AS ENUM ('csv_upload');
+			CREATE TYPE source_type AS ENUM ('csv_upload', 'google_sheets');
 		EXCEPTION WHEN duplicate_object THEN null;
 		END $$;
+		ALTER TYPE source_type ADD VALUE IF NOT EXISTS 'google_sheets';
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create enum types: %w", err)
