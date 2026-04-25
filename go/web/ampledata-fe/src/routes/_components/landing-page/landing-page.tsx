@@ -182,6 +182,14 @@ export function LandingPage() {
           <p className="text-muted-foreground text-sm">
             © {new Date().getFullYear()} AmpleData. All rights reserved.
           </p>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link to="/privacy-policy" className="hover:text-foreground transition-colors">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">
+              Terms of Service
+            </Link>
+          </div>
         </div>
       </footer>
     </div>
