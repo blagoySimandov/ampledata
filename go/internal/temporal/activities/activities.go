@@ -494,6 +494,10 @@ func (a *Activities) InitializeJob(ctx context.Context, jobID string, rowKeys []
 	return nil
 }
 
+func (a *Activities) InitializeJobRow(ctx context.Context, jobID, rowKey string) error {
+	return a.stateManager.Store().BulkCreateRows(ctx, jobID, []string{rowKey})
+}
+
 func (a *Activities) CompleteJob(ctx context.Context, jobID string) error {
 	event := logger.NewActivityEvent("complete_job", jobID)
 

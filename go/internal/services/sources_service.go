@@ -193,6 +193,7 @@ func (s *sourcesService) EnrichSource(ctx context.Context, input EnrichSourceInp
 		return "", newValidationError("no rows found in key column")
 	}
 	rowKeys = applyRowLimit(rowKeys, input.RowLimit)
+	println(len(rowKeys))
 	if !input.DBUser.CanEnrichCells(int64(len(rowKeys) * len(input.ColumnsMetadata))) {
 		return "", ErrInsufficientCredits
 	}

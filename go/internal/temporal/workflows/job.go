@@ -1,7 +1,6 @@
 package workflows
 
 import (
-	"fmt"
 	"time"
 
 	enumspb "go.temporal.io/api/enums/v1"
@@ -56,11 +55,6 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 		TotalRows: len(input.RowKeys),
 	}
 
-	if err := workflow.ExecuteActivity(activityCtx, "InitializeJob", input.JobID, input.RowKeys).Get(activityCtx, nil); err != nil {
-		event.EmitError(ctx, fmt.Errorf("job initialization failed: %w", err))
-		return nil, fmt.Errorf("job initialization failed: %w", err)
-	}
-
 	var patternsOutput activities.GeneratePatternsOutput
 	err := workflow.ExecuteActivity(activityCtx, "GeneratePatterns", activities.GeneratePatternsInput{
 		JobID:           input.JobID,
@@ -86,6 +80,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 
 	for _, rowKey := range input.RowKeys {
 		sem.Acquire()
+		workflow.ExecuteActivity(activityCtx, "InitializeJobRow", input.JobID, rowKey).Get(ctx, nil)
 		sem.Add(workflow.ExecuteChildWorkflow(childCtx, EnrichmentWorkflow, EnrichmentWorkflowInput{
 			JobID:                input.JobID,
 			UserID:               input.UserID,

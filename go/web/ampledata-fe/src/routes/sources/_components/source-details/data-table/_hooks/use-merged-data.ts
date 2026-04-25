@@ -191,10 +191,7 @@ function applyJobResultsToRows(
     const key = buildCompositeKey(csvRow, keyIndices);
     const jobRow = jobRowsByKey.get(key);
 
-    if (!jobRow) {
-      markJobColumnsAsPending(row, job);
-      return;
-    }
+    if (!jobRow) return;
 
     enrichRowWithJobResult(row, jobRow, job, enrichedCols);
   });

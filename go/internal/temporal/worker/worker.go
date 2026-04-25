@@ -49,6 +49,9 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 	w.RegisterActivityWithOptions(activities.InitializeJob, activity.RegisterOptions{
 		Name: "InitializeJob",
 	})
+	w.RegisterActivityWithOptions(activities.InitializeJobRow, activity.RegisterOptions{
+		Name: "InitializeJobRow",
+	})
 	w.RegisterActivityWithOptions(activities.CompleteJob, activity.RegisterOptions{
 		Name: "CompleteJob",
 	})
