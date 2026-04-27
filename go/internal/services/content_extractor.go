@@ -48,15 +48,11 @@ const maxToolSteps = 3
 func (g *AIContentExtractor) Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*ExtractionResult, error) {
 	prompt := g.promptService.ExtractionPrompt(entityKey, keyColumnDescription, columnsMetadata, content)
 
-	var result string
-	var err error
-
-	toolClient, hasTools := g.client.(IToolAIClient)
-	if g.crawler != nil && hasTools {
-		result, err = g.extractWithTools(ctx, toolClient, prompt)
-	} else {
-		result, err = g.client.GenerateContent(ctx, prompt)
+	var opts []GenerateOption
+	if g.crawler != nil {
+		opts = append(opts, WithTools([]Tool{NewFetchPageTool(g.crawler)}, maxToolSteps))
 	}
+	result, err := g.client.GenerateContent(ctx, prompt, opts...)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content: %w", err)
@@ -71,15 +67,6 @@ func (g *AIContentExtractor) Extract(ctx context.Context, content string, entity
 	coercedData := ValidateAndCoerceTypes(er.ExtractedData, columnsMetadata, er.Confidence)
 	er.ExtractedData = coercedData
 	return er, nil
-}
-
-func (g *AIContentExtractor) extractWithTools(ctx context.Context, client IToolAIClient, prompt string) (string, error) {
-	return client.GenerateContentWithTools(
-		ctx,
-		prompt,
-		[]Tool{NewFetchPageTool(g.crawler)},
-		maxToolSteps,
-	)
 }
 
 func parseResponse(content string) (*ExtractionResult, error) {

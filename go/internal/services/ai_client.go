@@ -8,20 +8,30 @@ import (
 )
 
 type IAIClient interface {
-	GenerateContent(ctx context.Context, prompt string) (string, error)
+	GenerateContent(ctx context.Context, prompt string, opts ...GenerateOption) (string, error)
 }
 
-// IToolAIClient is an IAIClient that runs a tool propmt loop.
-type IToolAIClient interface {
-	IAIClient
-	GenerateContentWithTools(ctx context.Context, prompt string, tools []Tool, maxSteps int) (string, error)
+type generateConfig struct {
+	tools    []Tool
+	maxSteps int
+}
+
+type GenerateOption func(*generateConfig)
+
+func WithTools(tools []Tool, maxSteps int) GenerateOption {
+	return func(c *generateConfig) {
+		c.tools = tools
+		c.maxSteps = maxSteps
+	}
 }
 
 type GeminiAIClient struct {
-	client  *genai.Client
-	tracker ICostTracker
-	model   string
+	client       *genai.Client
+	tracker      ICostTracker
+	systemPrompt string
+	model        string
 }
+
 type GeminiAIClientFuncOptions = func(client *GeminiAIClient) error
 
 func NewGeminiAIClient(opts ...GeminiAIClientFuncOptions) (*GeminiAIClient, error) {
@@ -34,8 +44,7 @@ func NewGeminiAIClient(opts ...GeminiAIClientFuncOptions) (*GeminiAIClient, erro
 		client: client,
 		model:  "gemini-2.5-flash",
 	}
-	err = applyFuncOptions(&geminiai, opts...)
-	if err != nil {
+	if err = applyFuncOptions(&geminiai, opts...); err != nil {
 		return nil, fmt.Errorf("failed to apply options: %w", err)
 	}
 	return &geminiai, nil
@@ -48,22 +57,17 @@ func WithModel(model string) GeminiAIClientFuncOptions {
 	}
 }
 
-func (g *GeminiAIClient) GenerateContent(ctx context.Context, prompt string) (string, error) {
-	result, err := g.client.Models.GenerateContent(ctx, g.model, genai.Text(prompt), nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate content: %w", err)
+func WithCaveman() GeminiAIClientFuncOptions {
+	const cavemanInstruction = `Respond terse like smart caveman. All technical substance stay. Only fluff die.
+
+Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course/happy to), hedging. Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for"). Technical terms exact. Code blocks unchanged. Errors quoted exact.
+
+Pattern: [thing] [action] [reason]. [next step].
+`
+	return func(client *GeminiAIClient) error {
+		client.systemPrompt += cavemanInstruction
+		return nil
 	}
-	um := Deref(result.UsageMetadata)
-	g.TrackCost(ctx, um)
-
-	return result.Text(), nil
-}
-
-func (g *GeminiAIClient) TrackCost(ctx context.Context, um genai.GenerateContentResponseUsageMetadata) {
-	tknIn := um.PromptTokenCount
-	totalTknCount := um.TotalTokenCount
-	tknOut := totalTknCount - tknIn
-	g.tracker.AddTokenCost(ctx, int(tknIn), int(tknOut))
 }
 
 func WithCostTracker(tracker ICostTracker) GeminiAIClientFuncOptions {
@@ -73,40 +77,79 @@ func WithCostTracker(tracker ICostTracker) GeminiAIClientFuncOptions {
 	}
 }
 
-func (g *GeminiAIClient) GenerateContentWithTools(ctx context.Context, prompt string, tools []Tool, maxSteps int) (string, error) {
-	funcDecls := make([]*genai.FunctionDeclaration, len(tools))
-	for i, t := range tools {
-		funcDecls[i] = toFuncDecl(t.Definition)
+func (g *GeminiAIClient) GenerateContent(ctx context.Context, prompt string, opts ...GenerateOption) (string, error) {
+	cfg := &generateConfig{}
+	for _, o := range opts {
+		o(cfg)
 	}
 
-	config := &genai.GenerateContentConfig{
-		Tools: []*genai.Tool{{FunctionDeclarations: funcDecls}},
-	}
-
+	config := g.baseConfig()
 	contents := genai.Text(prompt)
 
-	for step := range maxSteps + 1 {
-		result, err := g.client.Models.GenerateContent(ctx, g.model, contents, config)
+	if len(cfg.tools) == 0 {
+		result, err := g.generateOnce(ctx, contents, config)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate content: %w", err)
+		}
+		return result.Text(), nil
+	}
+
+	config.Tools = []*genai.Tool{{FunctionDeclarations: toFuncDecls(cfg.tools)}}
+	for step := range cfg.maxSteps + 1 {
+		result, err := g.generateOnce(ctx, contents, config)
 		if err != nil {
 			return "", fmt.Errorf("step %d: %w", step, err)
 		}
-		g.TrackCost(ctx, Deref(result.UsageMetadata))
-
 		if len(result.Candidates) == 0 || result.Candidates[0].Content == nil {
 			return result.Text(), nil
 		}
-
 		modelContent := result.Candidates[0].Content
 		fcs := collectFunctionCalls(modelContent)
 		if len(fcs) == 0 {
 			return result.Text(), nil
 		}
-
 		contents = append(contents, modelContent)
-		contents = append(contents, buildFunctionResponses(ctx, fcs, tools))
+		contents = append(contents, buildFunctionResponses(ctx, fcs, cfg.tools))
 	}
 
-	return "", fmt.Errorf("max tool call steps (%d) exceeded", maxSteps)
+	return "", fmt.Errorf("max tool call steps (%d) exceeded", cfg.maxSteps)
+}
+
+func (g *GeminiAIClient) TrackCost(ctx context.Context, um genai.GenerateContentResponseUsageMetadata) {
+	if g.tracker == nil {
+		return
+	}
+	tknIn := um.PromptTokenCount
+	tknOut := um.TotalTokenCount - tknIn
+	g.tracker.AddTokenCost(ctx, int(tknIn), int(tknOut))
+}
+
+func (g *GeminiAIClient) baseConfig() *genai.GenerateContentConfig {
+	cfg := &genai.GenerateContentConfig{}
+	if g.systemPrompt != "" {
+		cfg.SystemInstruction = &genai.Content{
+			Role:  "system",
+			Parts: []*genai.Part{{Text: g.systemPrompt}},
+		}
+	}
+	return cfg
+}
+
+func (g *GeminiAIClient) generateOnce(ctx context.Context, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
+	result, err := g.client.Models.GenerateContent(ctx, g.model, contents, config)
+	if err != nil {
+		return nil, err
+	}
+	g.TrackCost(ctx, Deref(result.UsageMetadata))
+	return result, nil
+}
+
+func toFuncDecls(tools []Tool) []*genai.FunctionDeclaration {
+	decls := make([]*genai.FunctionDeclaration, len(tools))
+	for i, t := range tools {
+		decls[i] = toFuncDecl(t.Definition)
+	}
+	return decls
 }
 
 func toFuncDecl(td ToolDefinition) *genai.FunctionDeclaration {
@@ -136,7 +179,6 @@ func buildFunctionResponses(ctx context.Context, fcs []*genai.FunctionCall, tool
 	for _, t := range tools {
 		handlers[t.Definition.Name] = t.Handler
 	}
-
 	parts := make([]*genai.Part, len(fcs))
 	for i, fc := range fcs {
 		var resp map[string]any
