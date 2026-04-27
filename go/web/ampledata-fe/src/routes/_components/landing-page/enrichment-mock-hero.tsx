@@ -63,7 +63,7 @@ function LoadingCells({ active }: { active: boolean }) {
   return (
     <>
       {[80, 50, 55].map((w, j) => (
-        <div key={j} className="px-2.5 py-2">
+        <div key={j} className="px-2.5">
           <div
             className={`h-2.5 rounded-sm ${active ? "bg-primary/15 animate-pulse" : "bg-secondary"}`}
             style={{ width: w }}
@@ -77,12 +77,12 @@ function LoadingCells({ active }: { active: boolean }) {
 function EnrichedCells({ row, i }: { row: HeroRow; i: number }) {
   return (
     <>
-      <div className="px-2.5 py-2 flex items-start gap-1.5 animate-cell-pop">
-        <span className="text-[11px] text-foreground leading-snug">{row.founderStmt}</span>
+      <div className="px-2.5 flex items-center gap-1.5 animate-cell-pop min-w-0">
+        <span className="text-[11px] text-foreground truncate min-w-0 flex-1">{row.founderStmt}</span>
         <ConfidenceBadge value={HERO_CONFIDENCES[i]} />
       </div>
-      <div className="px-2.5 py-2 text-[11px] text-muted-foreground">{row.retracted}</div>
-      <div className="px-2.5 py-2 flex items-center gap-1">
+      <div className="px-2.5 text-[11px] text-muted-foreground">{row.retracted}</div>
+      <div className="px-2.5 flex items-center gap-1">
         <span className="text-[11px] text-foreground">{row.remote}</span>
         <ConfidenceBadge value={95} />
       </div>
@@ -129,9 +129,9 @@ function HeroRow({
       className={`border-b border-border last:border-0 ${done ? "cursor-pointer" : ""} ${active ? "bg-primary/[0.03]" : citationRow === i ? "bg-primary/5" : "bg-card"} transition-colors duration-300`}
       onClick={() => done && onToggle(i)}
     >
-      <div className="grid" style={GRID_STYLE}>
-        <div className="px-2.5 py-2 text-[11px] font-bold text-foreground">{row.name}</div>
-        <div className="px-2.5 py-2 text-[11px] text-muted-foreground">{row.industry}</div>
+      <div className="grid h-10 items-center" style={GRID_STYLE}>
+        <div className="px-2.5 text-[11px] font-bold text-foreground">{row.name}</div>
+        <div className="px-2.5 text-[11px] text-muted-foreground">{row.industry}</div>
         {done ? <EnrichedCells row={row} i={i} /> : <LoadingCells active={active} />}
       </div>
       {citationRow === i && <CitationDrawer row={row} i={i} />}
