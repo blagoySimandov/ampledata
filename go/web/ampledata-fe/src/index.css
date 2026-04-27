@@ -128,6 +128,27 @@
     }
 }
 
+@keyframes cell-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-cell-pop { animation: cell-pop 0.3s ease-out; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.2s ease-out; }
+.landing-page {
+  font-size: 17px;
+}
+@media (min-width: 1280px) {
+  .landing-page { font-size: 18px; }
+}
+@media (min-width: 1600px) {
+  .landing-page { font-size: 20px; }
+}
+
 @keyframes flow-right {
   0%   { transform: translateX(-100%); opacity: 0; }
   30%  { opacity: 1; }
