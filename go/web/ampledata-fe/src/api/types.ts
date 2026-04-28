@@ -177,3 +177,11 @@ export interface UserResponse {
   last_name: string;
   email: string;
 }
+
+export interface Template {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  columns_metadata: ColumnMetadata[];
+}
