@@ -43,6 +43,7 @@ type EnrichSourceInput struct {
 	KeyColumnDescription *string
 	ColumnsMetadata      []*models.ColumnMetadata
 	RowLimit             *int
+	TemplateID           *uuid.UUID
 }
 
 type ISourcesService interface {
@@ -233,7 +234,7 @@ func (s *sourcesService) readRowKeys(ctx context.Context, fileURI string, keyCol
 
 func (s *sourcesService) createAndStartJob(ctx context.Context, input EnrichSourceInput, keyColumns []string, keyColumnDesc *string, rowKeys []string) (string, error) {
 	jobID := generateJobID(".csv")
-	if err := s.store.CreatePendingJob(ctx, jobID, input.AuthUserID, input.SourceID); err != nil {
+	if err := s.store.CreatePendingJob(ctx, jobID, input.AuthUserID, input.SourceID, input.TemplateID); err != nil {
 		return "", fmt.Errorf("failed to create job")
 	}
 	if err := s.configureAndStartJob(ctx, jobID, keyColumns, keyColumnDesc, input.ColumnsMetadata, len(rowKeys)); err != nil {

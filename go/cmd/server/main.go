@@ -18,6 +18,7 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/gcs"
 	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"github.com/blagoySimandov/ampledata/go/internal/state"
+	"github.com/blagoySimandov/ampledata/go/internal/templates"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/activities"
 	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/worker"
@@ -111,7 +112,8 @@ func main() {
 	}
 
 	sourcesService := services.NewSourcesService(store, gcsReader, enr, aiClient, promptService)
-	server := api.NewServer(enr, gcsReader, store, userRepo, billingService, keySelector, aiClient, sourcesService)
+	templatesRepo := templates.NewTemplatesRepo(db)
+	server := api.NewServer(enr, gcsReader, store, userRepo, billingService, keySelector, sourcesService, templatesRepo)
 	router := api.SetupRoutes(server, jwtVerifier, userService, cfg.StaticDir)
 
 	srv := &http.Server{
