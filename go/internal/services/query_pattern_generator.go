@@ -9,11 +9,6 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 )
 
-type QueryPatternGenerator interface {
-	GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error)
-	GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error)
-}
-
 type PatternGenerator struct {
 	client        IAIClient
 	promptService IPromptService

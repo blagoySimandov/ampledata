@@ -6,14 +6,6 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 )
 
-type IQueryBuilderFactory interface {
-	Create(columnsMetadata []*models.ColumnMetadata, entityType *string) IQueryBuilder
-}
-
-type IQueryBuilder interface {
-	Build(entity string) []string
-}
-
 type PatternQueryBuilder struct {
 	patterns        []string
 	columnsMetadata []*models.ColumnMetadata

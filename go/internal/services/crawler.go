@@ -10,10 +10,6 @@ import (
 	"time"
 )
 
-type WebCrawler interface {
-	Crawl(ctx context.Context, urls []string, query string) (string, error)
-}
-
 type Crawl4aiClient struct {
 	httpClient *http.Client
 	baseURL    string

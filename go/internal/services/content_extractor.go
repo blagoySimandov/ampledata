@@ -14,8 +14,8 @@ type ExtractionResult struct {
 	Reasoning     string                                 `json:"reasoning"`
 }
 
-type IContentExtractor interface {
-	Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*ExtractionResult, error)
+type WebCrawler interface {
+	Crawl(ctx context.Context, urls []string, query string) (string, error)
 }
 
 type AIContentExtractor struct {

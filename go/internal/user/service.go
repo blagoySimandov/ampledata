@@ -3,8 +3,9 @@ package user
 import (
 	"context"
 
+	stripe "github.com/stripe/stripe-go/v84"
+
 	"github.com/blagoySimandov/ampledata/go/internal/models"
-	"github.com/blagoySimandov/ampledata/go/internal/services"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -12,13 +13,17 @@ type Service interface {
 	GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error)
 }
 
+type billingClient interface {
+	GetOrCreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error)
+}
+
 type UserService struct {
 	repo    Repository
-	billing services.BillingService
+	billing billingClient
 	sf      singleflight.Group
 }
 
-func NewUserService(repo Repository, billing services.BillingService) *UserService {
+func NewUserService(repo Repository, billing billingClient) *UserService {
 	return &UserService{
 		repo:    repo,
 		billing: billing,

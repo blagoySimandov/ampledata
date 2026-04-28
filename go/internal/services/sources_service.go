@@ -46,14 +46,6 @@ type EnrichSourceInput struct {
 	TemplateID           *uuid.UUID
 }
 
-type ISourcesService interface {
-	ListSources(ctx context.Context, userID string, offset, limit int) ([]*SourceWithJobs, error)
-	GetSource(ctx context.Context, sourceID uuid.UUID, userID string) (*SourceWithJobs, error)
-	GetSourceData(ctx context.Context, sourceID uuid.UUID, userID string) (*gcs.CSVResult, error)
-	EnrichSource(ctx context.Context, input EnrichSourceInput) (string, error)
-	CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error)
-}
-
 type ISourceNameGeneratorPromptService interface {
 	GenerateSourceNamePrompt(ctx context.Context, headers []string) string
 }
@@ -66,7 +58,7 @@ type sourcesService struct {
 	promptService ISourceNameGeneratorPromptService
 }
 
-func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) ISourcesService {
+func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) *sourcesService {
 	return &sourcesService{store: store, reader: reader, enricher: enr, aiClient: aiclient, promptService: promptService}
 }
 

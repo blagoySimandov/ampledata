@@ -16,10 +16,6 @@ type KeySelectorResult struct {
 	Reasoning   string
 }
 
-type KeySelector interface {
-	SelectBestKey(ctx context.Context, headers []string, columnsMetadata []*models.ColumnMetadata) (*KeySelectorResult, error)
-}
-
 type GeminiKeySelector struct {
 	model         string
 	client        *genai.Client
