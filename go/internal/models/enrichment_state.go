@@ -40,6 +40,7 @@ type Job struct {
 	TotalRows            int               `json:"total_rows"`
 	StartedAt            *time.Time        `json:"started_at"`
 	Status               JobStatus         `json:"status"`
+	TemplateID           *uuid.UUID        `json:"template_id"`
 	CreatedAt            time.Time         `json:"created_at"`
 	UpdatedAt            time.Time         `json:"updated_at"`
 }

@@ -11,24 +11,49 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/state"
 )
 
+type webSearcher interface {
+	Search(ctx context.Context, query string) (*models.GoogleSearchResults, error)
+}
+
+type decisionMaker interface {
+	MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string, previousAttempts []*models.EnrichmentAttempt) (*services.CrawlDecision, error)
+}
+
+type webCrawler interface {
+	Crawl(ctx context.Context, urls []string, query string) (string, error)
+}
+
+type contentExtractor interface {
+	Extract(ctx context.Context, content string, entityKey string, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string) (*services.ExtractionResult, error)
+}
+
+type patternGenerator interface {
+	GeneratePatterns(ctx context.Context, columnsMetadata []*models.ColumnMetadata) ([]string, error)
+	GeneratePatternsWithFeedback(ctx context.Context, columnsMetadata []*models.ColumnMetadata, previousAttempts []*models.EnrichmentAttempt) ([]string, error)
+}
+
+type billingService interface {
+	ReportUsage(ctx context.Context, stripeCustomerID string, credits int) error
+}
+
 type Activities struct {
 	stateManager     *state.StateManager
-	webSearcher      services.WebSearcher
-	decisionMaker    services.DecisionMaker
-	crawler          services.WebCrawler
-	contentExtractor services.IContentExtractor
-	patternGenerator services.QueryPatternGenerator
-	billingService   services.BillingService
+	webSearcher      webSearcher
+	decisionMaker    decisionMaker
+	crawler          webCrawler
+	contentExtractor contentExtractor
+	patternGenerator patternGenerator
+	billingService   billingService
 }
 
 func NewActivities(
 	stateManager *state.StateManager,
-	webSearcher services.WebSearcher,
-	decisionMaker services.DecisionMaker,
-	crawler services.WebCrawler,
-	contentExtractor services.IContentExtractor,
-	patternGenerator services.QueryPatternGenerator,
-	billingService services.BillingService,
+	webSearcher webSearcher,
+	decisionMaker decisionMaker,
+	crawler webCrawler,
+	contentExtractor contentExtractor,
+	patternGenerator patternGenerator,
+	billingService billingService,
 ) *Activities {
 	return &Activities{
 		stateManager:     stateManager,

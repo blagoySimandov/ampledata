@@ -102,6 +102,13 @@ func buildEnrichInput(req EnrichSourceRequestObject, authUserID string, dbUser *
 	if req.Body.KeyColumns != nil {
 		keyColumns = *req.Body.KeyColumns
 	}
+	var templateID *uuid.UUID
+	if req.Body.FromTemplateId != nil {
+		if parsed, err := uuid.Parse(*req.Body.FromTemplateId); err == nil {
+			templateID = &parsed
+		}
+	}
+
 	return services.EnrichSourceInput{
 		SourceID:             uuid.UUID(req.SourceID),
 		AuthUserID:           authUserID,
@@ -110,6 +117,7 @@ func buildEnrichInput(req EnrichSourceRequestObject, authUserID string, dbUser *
 		KeyColumnDescription: req.Body.KeyColumnDescription,
 		ColumnsMetadata:      toModelColumnMetadataSlice(req.Body.ColumnsMetadata),
 		RowLimit:             req.Body.RowLimit,
+		TemplateID:           templateID,
 	}
 }
 

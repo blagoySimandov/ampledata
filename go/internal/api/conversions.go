@@ -8,6 +8,40 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+func toAPITemplate(t *models.TemplateDB) Template {
+	cols := make([]TemplateColumnMetadata, 0, len(t.ColumnsMetadata))
+	for _, c := range t.ColumnsMetadata {
+		col := TemplateColumnMetadata{
+			Name:      c.Name,
+			Type:      ColumnType(c.Type),
+			Operation: c.Operation,
+		}
+		if c.Description != nil {
+			desc := *c.Description
+			col.Description = &desc
+		}
+		cols = append(cols, col)
+	}
+	return Template{
+		Id:              openapi_types.UUID(t.ID),
+		Name:            t.Name,
+		Description:     t.Description,
+		EntityType:      t.EntityType,
+		Type:            TemplateType(t.Type),
+		KeyColumns:      t.KeyColumns,
+		ColumnsMetadata: cols,
+		OwnedBy:         t.OwnedBy,
+	}
+}
+
+func toAPITemplateList(templates []*models.TemplateDB) TemplateListResponse {
+	result := make([]Template, 0, len(templates))
+	for _, t := range templates {
+		result = append(result, toAPITemplate(t))
+	}
+	return TemplateListResponse{Templates: result, TotalCount: len(result)}
+}
+
 func toModelColumnMetadataSlice(cols []ColumnMetadata) []*models.ColumnMetadata {
 	result := make([]*models.ColumnMetadata, len(cols))
 	for i, c := range cols {

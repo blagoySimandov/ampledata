@@ -69,6 +69,12 @@ const (
 	Textcsv         SignedURLRequestContentType = "text/csv"
 )
 
+// Defines values for TemplateType.
+const (
+	SystemTemplate      TemplateType = "system_template"
+	UserDefinedTemplate TemplateType = "user_defined_template"
+)
+
 // ColumnMetadata defines model for ColumnMetadata.
 type ColumnMetadata struct {
 	Description *string    `json:"description"`
@@ -95,9 +101,15 @@ type CreateSubscriptionRequest struct {
 
 // EnrichRequest defines model for EnrichRequest.
 type EnrichRequest struct {
-	ColumnsMetadata      []ColumnMetadata `json:"columns_metadata"`
-	KeyColumnDescription *string          `json:"key_column_description"`
-	KeyColumns           *[]string        `json:"key_columns"`
+	ColumnsMetadata []ColumnMetadata `json:"columns_metadata"`
+
+	// FromTemplateId Optional. ID of the template this job was launched from, for
+	// attribution/analytics only. The actual config is taken from
+	// key_columns and columns_metadata in this request - this field
+	// does not affect execution.
+	FromTemplateId       *string   `json:"from_template_id"`
+	KeyColumnDescription *string   `json:"key_column_description"`
+	KeyColumns           *[]string `json:"key_columns"`
 
 	// RowLimit Maximum number of rows to process. Processes all rows if not set.
 	RowLimit *int `json:"row_limit"`
@@ -259,6 +271,35 @@ type SubscriptionStatusResponse struct {
 	TokensUsed         int64      `json:"tokens_used"`
 }
 
+// Template defines model for Template.
+type Template struct {
+	ColumnsMetadata []TemplateColumnMetadata `json:"columns_metadata"`
+	Description     string                   `json:"description"`
+	EntityType      string                   `json:"entity_type"`
+	Id              openapi_types.UUID       `json:"id"`
+	KeyColumns      []string                 `json:"key_columns"`
+	Name            string                   `json:"name"`
+	OwnedBy         *string                  `json:"owned_by"`
+	Type            TemplateType             `json:"type"`
+}
+
+// TemplateColumnMetadata defines model for TemplateColumnMetadata.
+type TemplateColumnMetadata struct {
+	Description *string    `json:"description"`
+	Name        string     `json:"name"`
+	Operation   string     `json:"operation"`
+	Type        ColumnType `json:"type"`
+}
+
+// TemplateListResponse defines model for TemplateListResponse.
+type TemplateListResponse struct {
+	Templates  []Template `json:"templates"`
+	TotalCount int        `json:"total_count"`
+}
+
+// TemplateType defines model for TemplateType.
+type TemplateType string
+
 // TierResponse defines model for TierResponse.
 type TierResponse struct {
 	DisplayName              string `json:"display_name"`
@@ -375,6 +416,9 @@ type ServerInterface interface {
 	// Upgrade the current user's subscription to a higher tier
 	// (POST /subscription/upgrade)
 	UpgradeSubscription(w http.ResponseWriter, r *http.Request)
+	// List all templates (system + user-defined)
+	// (GET /templates)
+	ListTemplates(w http.ResponseWriter, r *http.Request)
 	// List available subscription tiers
 	// (GET /tiers)
 	ListTiers(w http.ResponseWriter, r *http.Request)
@@ -836,6 +880,23 @@ func (siw *ServerInterfaceWrapper) UpgradeSubscription(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// ListTemplates operation middleware
+func (siw *ServerInterfaceWrapper) ListTemplates(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTemplates(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // ListTiers operation middleware
 func (siw *ServerInterfaceWrapper) ListTiers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -1042,6 +1103,8 @@ func HandlerWithOptions(si ServerInterface, options GorillaServerOptions) http.H
 	r.HandleFunc(options.BaseURL+"/subscription/portal", wrapper.CreatePortalSession).Methods("POST")
 
 	r.HandleFunc(options.BaseURL+"/subscription/upgrade", wrapper.UpgradeSubscription).Methods("POST")
+
+	r.HandleFunc(options.BaseURL+"/templates", wrapper.ListTemplates).Methods("GET")
 
 	r.HandleFunc(options.BaseURL+"/tiers", wrapper.ListTiers).Methods("GET")
 
@@ -1693,6 +1756,40 @@ func (response UpgradeSubscription500JSONResponse) VisitUpgradeSubscriptionRespo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListTemplatesRequestObject struct {
+}
+
+type ListTemplatesResponseObject interface {
+	VisitListTemplatesResponse(w http.ResponseWriter) error
+}
+
+type ListTemplates200JSONResponse TemplateListResponse
+
+func (response ListTemplates200JSONResponse) VisitListTemplatesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListTemplates401JSONResponse ErrorResponse
+
+func (response ListTemplates401JSONResponse) VisitListTemplatesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListTemplates500JSONResponse ErrorResponse
+
+func (response ListTemplates500JSONResponse) VisitListTemplatesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListTiersRequestObject struct {
 }
 
@@ -1803,6 +1900,9 @@ type StrictServerInterface interface {
 	// Upgrade the current user's subscription to a higher tier
 	// (POST /subscription/upgrade)
 	UpgradeSubscription(ctx context.Context, request UpgradeSubscriptionRequestObject) (UpgradeSubscriptionResponseObject, error)
+	// List all templates (system + user-defined)
+	// (GET /templates)
+	ListTemplates(ctx context.Context, request ListTemplatesRequestObject) (ListTemplatesResponseObject, error)
 	// List available subscription tiers
 	// (GET /tiers)
 	ListTiers(ctx context.Context, request ListTiersRequestObject) (ListTiersResponseObject, error)
@@ -2279,6 +2379,30 @@ func (sh *strictHandler) UpgradeSubscription(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// ListTemplates operation middleware
+func (sh *strictHandler) ListTemplates(w http.ResponseWriter, r *http.Request) {
+	var request ListTemplatesRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTemplates(ctx, request.(ListTemplatesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTemplates")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTemplatesResponseObject); ok {
+		if err := validResponse.VisitListTemplatesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListTiers operation middleware
 func (sh *strictHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
 	var request ListTiersRequestObject
@@ -2334,55 +2458,60 @@ func (sh *strictHandler) HandleStripeWebhook(w http.ResponseWriter, r *http.Requ
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
-	"8O7T7r8BAAD//8cLyPhBUgAA",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

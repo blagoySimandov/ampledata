@@ -1,32 +1,27 @@
 package api
 
-import (
-	"github.com/blagoySimandov/ampledata/go/internal/enricher"
-	"github.com/blagoySimandov/ampledata/go/internal/gcs"
-	"github.com/blagoySimandov/ampledata/go/internal/services"
-	"github.com/blagoySimandov/ampledata/go/internal/state"
-	"github.com/blagoySimandov/ampledata/go/internal/user"
-)
+import "github.com/blagoySimandov/ampledata/go/internal/gcs"
 
 type Server struct {
-	enricher       enricher.IEnricher
+	enricher       IEnricher
 	gcsReader      *gcs.CSVReader
-	store          state.Store
-	userRepo       user.Repository
-	billing        services.BillingService
-	keySelector    services.KeySelector
-	sourcesService services.ISourcesService
+	store          Store
+	userRepo       UserRepo
+	templatesRepo  ITemplateRepo
+	billing        BillingService
+	keySelector    KeySelector
+	sourcesService SourcesService
 }
 
 func NewServer(
-	enr enricher.IEnricher,
+	enr IEnricher,
 	gcsReader *gcs.CSVReader,
-	store state.Store,
-	userRepo user.Repository,
-	billing services.BillingService,
-	keySelector services.KeySelector,
-	aiclient services.IAIClient,
-	sourcesService services.ISourcesService,
+	store Store,
+	userRepo UserRepo,
+	billing BillingService,
+	keySelector KeySelector,
+	sourcesService SourcesService,
+	templatesRepo ITemplateRepo,
 ) *Server {
 	return &Server{
 		enricher:       enr,
@@ -36,5 +31,6 @@ func NewServer(
 		billing:        billing,
 		keySelector:    keySelector,
 		sourcesService: sourcesService,
+		templatesRepo:  templatesRepo,
 	}
 }

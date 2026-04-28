@@ -43,14 +43,7 @@ type EnrichSourceInput struct {
 	KeyColumnDescription *string
 	ColumnsMetadata      []*models.ColumnMetadata
 	RowLimit             *int
-}
-
-type ISourcesService interface {
-	ListSources(ctx context.Context, userID string, offset, limit int) ([]*SourceWithJobs, error)
-	GetSource(ctx context.Context, sourceID uuid.UUID, userID string) (*SourceWithJobs, error)
-	GetSourceData(ctx context.Context, sourceID uuid.UUID, userID string) (*gcs.CSVResult, error)
-	EnrichSource(ctx context.Context, input EnrichSourceInput) (string, error)
-	CreateUploadSource(ctx context.Context, userID, contentType string, headers []string) (uuid.UUID, string, error)
+	TemplateID           *uuid.UUID
 }
 
 type ISourceNameGeneratorPromptService interface {
@@ -65,7 +58,7 @@ type sourcesService struct {
 	promptService ISourceNameGeneratorPromptService
 }
 
-func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) ISourcesService {
+func NewSourcesService(store state.Store, reader *gcs.CSVReader, enr IEnricher, aiclient IAIClient, promptService ISourceNameGeneratorPromptService) *sourcesService {
 	return &sourcesService{store: store, reader: reader, enricher: enr, aiClient: aiclient, promptService: promptService}
 }
 
@@ -233,7 +226,7 @@ func (s *sourcesService) readRowKeys(ctx context.Context, fileURI string, keyCol
 
 func (s *sourcesService) createAndStartJob(ctx context.Context, input EnrichSourceInput, keyColumns []string, keyColumnDesc *string, rowKeys []string) (string, error) {
 	jobID := generateJobID(".csv")
-	if err := s.store.CreatePendingJob(ctx, jobID, input.AuthUserID, input.SourceID); err != nil {
+	if err := s.store.CreatePendingJob(ctx, jobID, input.AuthUserID, input.SourceID, input.TemplateID); err != nil {
 		return "", fmt.Errorf("failed to create job")
 	}
 	if err := s.configureAndStartJob(ctx, jobID, keyColumns, keyColumnDesc, input.ColumnsMetadata, len(rowKeys)); err != nil {

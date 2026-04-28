@@ -8,6 +8,26 @@ import (
 	"github.com/uptrace/bun"
 )
 
+type TemplateType string
+
+const (
+	TemplateTypeSystem      TemplateType = "system_template"
+	TemplateTypeUserDefined TemplateType = "user_defined_template"
+)
+
+type TemplateDB struct {
+	bun.BaseModel `bun:"table:templates,alias:t"`
+
+	ID              uuid.UUID                 `bun:"id,pk,type:uuid,default:gen_random_uuid()" json:"id"`
+	Name            string                    `bun:"name,notnull" json:"name"`
+	Description     string                    `bun:"description,notnull" json:"description"`
+	EntityType      string                    `bun:"entity_type,notnull" json:"entity_type"`
+	Type            TemplateType              `bun:"type,notnull" json:"type"`
+	KeyColumns      []string                  `bun:"key_columns,array" json:"key_columns"`
+	ColumnsMetadata []*TemplateColumnMetadata `bun:"columns_metadata,type:jsonb" json:"columns_metadata"`
+	OwnedBy         *string                   `bun:"owned_by" json:"owned_by"`
+}
+
 type JobDB struct {
 	bun.BaseModel `bun:"table:jobs,alias:j"`
 
@@ -23,8 +43,10 @@ type JobDB struct {
 	Status               JobStatus         `bun:"status,notnull,default:'PENDING'" json:"status"`
 	CostDollars          int               `bun:"cost_dollars,notnull,default:0" json:"cost_dollars"`
 	CostCredits          int               `bun:"cost_credits,notnull,default:0" json:"cost_credits"`
-	CreatedAt            time.Time         `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt            time.Time         `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+	TemplateID           *uuid.UUID        `bun:"template_id,type:uuid" json:"template_id"`
+
+	CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt time.Time `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
 }
 
 func (j *JobDB) ToJob() (*Job, error) {
@@ -38,6 +60,7 @@ func (j *JobDB) ToJob() (*Job, error) {
 		TotalRows:            j.TotalRows,
 		StartedAt:            j.StartedAt,
 		Status:               j.Status,
+		TemplateID:           j.TemplateID,
 		CreatedAt:            j.CreatedAt,
 		UpdatedAt:            j.UpdatedAt,
 	}

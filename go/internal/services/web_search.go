@@ -12,10 +12,6 @@ import (
 	"github.com/blagoySimandov/ampledata/go/internal/models"
 )
 
-type WebSearcher interface {
-	Search(ctx context.Context, query string) (*models.GoogleSearchResults, error)
-}
-
 type SerperClient struct {
 	apiKey     string
 	httpClient *http.Client

@@ -195,16 +195,17 @@ func (s *PostgresStore) GetJobsBySource(ctx context.Context, sourceID uuid.UUID)
 	return jobs, nil
 }
 
-func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID string, sourceID uuid.UUID) error {
+func (s *PostgresStore) CreatePendingJob(ctx context.Context, jobID, userID string, sourceID uuid.UUID, templateID *uuid.UUID) error {
 	now := time.Now()
 	job := &models.JobDB{
-		JobID:     jobID,
-		UserID:    userID,
-		SourceID:  sourceID,
-		TotalRows: 0,
-		Status:    models.JobStatusPending,
-		CreatedAt: now,
-		UpdatedAt: now,
+		JobID:      jobID,
+		UserID:     userID,
+		SourceID:   sourceID,
+		TemplateID: templateID,
+		TotalRows:  0,
+		Status:     models.JobStatusPending,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	_, err := s.db.NewInsert().Model(job).Exec(ctx)

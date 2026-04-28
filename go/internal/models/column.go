@@ -23,3 +23,10 @@ type ColumnMetadata struct {
 	JobType     JobType    `json:"job_type"`
 	Description *string    `json:"description,omitempty"`
 }
+
+type TemplateColumnMetadata struct {
+	Name        string     `json:"name"`
+	Type        ColumnType `json:"type"`
+	Operation   string     `json:"operation"`
+	Description *string    `json:"description,omitempty"`
+}

@@ -18,10 +18,6 @@ type CrawlDecision struct {
 	MissingColumns []string                               `json:"-"`
 }
 
-type DecisionMaker interface {
-	MakeDecision(ctx context.Context, serp *models.GoogleSearchResults, rowKey string, maxURLs int, columnsMetadata []*models.ColumnMetadata, keyColumnDescription string, previousAttempts []*models.EnrichmentAttempt) (*CrawlDecision, error)
-}
-
 type AIDecisionMaker struct {
 	client        IAIClient
 	promptService IPromptService
