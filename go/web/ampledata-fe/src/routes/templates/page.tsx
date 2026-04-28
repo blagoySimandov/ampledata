@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import {
   LayoutGrid,
   LayoutList,
-  Plus,
   Search,
   Sparkles,
   Bookmark,
@@ -266,10 +265,12 @@ function GalleryHeader() {
           enriching in one click.
         </p>
       </div>
+      {/* TODO: implement new template creation flow
       <button className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-xs font-black tracking-widest text-primary-foreground transition-colors hover:bg-primary/90">
         <Plus className="size-3.5" />
         NEW TEMPLATE
       </button>
+      */}
     </div>
   );
 }
