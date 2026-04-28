@@ -13,6 +13,7 @@ import {
   Bookmark,
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { SourcePickerModal } from "./_components/source-picker-modal";
 //TODO: Split into multiple files
 
 const ALL_FILTER = "All";
@@ -287,8 +288,10 @@ export function TemplatesPage() {
     (t) => t.type === "user_defined_template",
   );
 
+  const [pendingTemplate, setPendingTemplate] = useState<Template | null>(null);
+
   function handleApply(template: Template) {
-    console.log("Apply template", template.id);
+    setPendingTemplate(template);
   }
 
   if (isLoading) {
@@ -334,6 +337,13 @@ export function TemplatesPage() {
         onApply={handleApply}
       />
       {filtered.length === 0 && <EmptyState />}
+      {pendingTemplate && (
+        <SourcePickerModal
+          template={pendingTemplate}
+          open
+          onClose={() => setPendingTemplate(null)}
+        />
+      )}
     </div>
   );
 }

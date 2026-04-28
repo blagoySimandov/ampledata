@@ -1,9 +1,19 @@
+import type { Template } from "@/api/types";
+import { useApi } from "@/hooks";
+import { useListTemplates } from "@/hooks/templates";
 import { JobRunsSidebarPanel } from "./_components/source-details/jobs-runs-sidepanel";
 import { LoadingState, ErrorState } from "./_components/source-details/state";
 import { DataTable } from "./_components/source-details/data-table";
 import { useSourceDetail } from "./_hooks";
 
-export function SourceDetail({ sourceId }: { sourceId: string }) {
+interface SourceDetailProps {
+  sourceId: string;
+  templateId?: string;
+}
+
+export function SourceDetail({ sourceId, templateId }: SourceDetailProps) {
+  const api = useApi();
+  const { data: templateData } = useListTemplates(api);
   const {
     source,
     isLoading,
@@ -15,6 +25,10 @@ export function SourceDetail({ sourceId }: { sourceId: string }) {
     activeJobId,
     activeJob,
   } = useSourceDetail(sourceId);
+
+  const initialTemplate: Template | undefined = templateId
+    ? templateData?.templates.find((t) => t.id === templateId)
+    : undefined;
 
   if (isLoading) return <LoadingState />;
   if (isError || !source) return <ErrorState />;
@@ -28,6 +42,7 @@ export function SourceDetail({ sourceId }: { sourceId: string }) {
           mostRecentJob={mostRecentJob}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
+          initialTemplate={initialTemplate}
         />
       </div>
 

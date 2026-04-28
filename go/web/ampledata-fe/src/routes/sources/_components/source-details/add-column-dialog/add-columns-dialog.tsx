@@ -1,4 +1,4 @@
-import type { ColumnMetadata, EnrichRequest } from "@/api";
+import type { ColumnMetadata, EnrichRequest, TemplateColumnMetadata } from "@/api";
 import { logEvent } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +8,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,25 +17,39 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Plus, Settings2, Loader2, ChevronDown } from "lucide-react";
+import { Plus, Settings2, Loader2, ChevronDown, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { AddColumnsDialogProps } from "./types";
 import { ColumnEditor } from "./column-editor";
 import { EmptyFieldsPlaceholder } from "./empty-fields-placeholder";
 
+function toColumnMetadata(cols: TemplateColumnMetadata[]): ColumnMetadata[] {
+  return cols.map((c) => ({
+    name: c.name,
+    type: c.type,
+    job_type: "enrichment",
+    description: c.description ?? undefined,
+  }));
+}
+
 export function AddColumnsDialog({
   sourceId,
   mostRecentJob,
+  initialTemplate,
 }: AddColumnsDialogProps) {
   const api = useApi();
   const enrich = useEnrich(api, sourceId);
   const { data: sourceData } = useSourceData(api, sourceId);
   const sourceColumns = sourceData?.headers ?? [];
 
-  const [open, setOpen] = useState(false);
-  const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>([]);
-  const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>([]);
+  const [open, setOpen] = useState(() => !!initialTemplate);
+  const [columnsMetadata, setColumnsMetadata] = useState<ColumnMetadata[]>(() =>
+    initialTemplate ? toColumnMetadata(initialTemplate.columns_metadata) : [],
+  );
+  const [selectedKeyColumns, setSelectedKeyColumns] = useState<string[]>(() =>
+    initialTemplate?.key_columns ?? [],
+  );
   const [keyColumnDescription, setKeyColumnDescription] = useState("");
   const [rowLimit, setRowLimit] = useState<string>("");
 
@@ -132,11 +145,20 @@ export function AddColumnsDialog({
       >
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="text-2xl font-black">Add Columns</DialogTitle>
+          {initialTemplate && (
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/8 px-3 py-2">
+              <Sparkles className="size-3.5 shrink-0 text-primary" />
+              <span className="text-xs text-foreground">
+                From template:{" "}
+                <span className="font-black">{initialTemplate.name}</span>
+              </span>
+            </div>
+          )}
         </DialogHeader>
-        <ScrollArea className="flex-1 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
           <div className="py-6 space-y-6">
             <div className="space-y-4">
-              <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+              <Label className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                 <Settings2 className="w-3 h-3" /> Key Column Settings
               </Label>
               <div className="space-y-4">
@@ -156,7 +178,7 @@ export function AddColumnsDialog({
                           <Badge
                             key={col}
                             variant={isSelected ? "default" : "outline"}
-                            className={`cursor-pointer transition-colors ${
+                            className={`cursor-pointer text-[11px] transition-colors ${
                               isSelected
                                 ? ""
                                 : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 border-slate-200"
@@ -175,13 +197,13 @@ export function AddColumnsDialog({
                   </div>
                 </div>
                 <Collapsible>
-                  <CollapsibleTrigger className="flex items-center gap-1 text-xs text-slate-400 font-bold hover:text-slate-600 transition-colors pt-2 group">
+                  <CollapsibleTrigger className="flex items-center gap-1 text-[11px] text-slate-400 font-bold hover:text-slate-600 transition-colors pt-2 group">
                     <ChevronDown className="w-3 h-3 transition-transform group-data-[state=open]:rotate-180" />
                     Advanced
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-4 pt-2">
                     <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 font-bold">
+                      <Label className="text-[11px] text-slate-500 font-bold">
                         Key Column Definition (AI Context)
                       </Label>
                       <Input
@@ -190,14 +212,14 @@ export function AddColumnsDialog({
                         onChange={(e) =>
                           setKeyColumnDescription(e.target.value)
                         }
-                        className="text-sm h-9"
+                        className="text-xs h-8"
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-slate-500 font-bold">
+                      <Label className="text-[11px] text-slate-500 font-bold">
                         Row Limit
                       </Label>
-                      <p className="text-[10px] text-slate-400 leading-tight">
+                      <p className="text-[9px] text-slate-400 leading-tight">
                         Process only the first N rows. Leave empty to process
                         all rows.
                       </p>
@@ -207,7 +229,7 @@ export function AddColumnsDialog({
                         placeholder="e.g. 100"
                         value={rowLimit}
                         onChange={(e) => setRowLimit(e.target.value)}
-                        className="text-sm h-9"
+                        className="text-xs h-8"
                       />
                     </div>
                   </CollapsibleContent>
@@ -217,14 +239,14 @@ export function AddColumnsDialog({
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                <Label className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                   <Settings2 className="w-3 h-3" /> Columns
                 </Label>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={addColumn}
-                  className="h-7 text-xs font-black px-2 hover:bg-slate-100"
+                  className="h-7 text-[11px] font-black px-2 hover:bg-slate-100"
                 >
                   <Plus className="w-3 h-3 mr-1" /> ADD FIELD
                 </Button>
@@ -246,22 +268,24 @@ export function AddColumnsDialog({
               )}
             </div>
 
-            <Button
-              className="w-full font-black h-12"
-              onClick={handleEnrich}
-              disabled={!canStart || enrich.isPending}
-            >
-              {enrich.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  STARTING...
-                </>
-              ) : (
-                startLabel
-              )}
-            </Button>
           </div>
-        </ScrollArea>
+        </div>
+        <div className="shrink-0 border-t border-border px-6 py-4">
+          <Button
+            className="w-full font-black h-12"
+            onClick={handleEnrich}
+            disabled={!canStart || enrich.isPending}
+          >
+            {enrich.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                STARTING...
+              </>
+            ) : (
+              startLabel
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import type { SourceJobSummary } from "@/api";
+import type { SourceJobSummary, Template } from "@/api";
 import { AddColumnsDialog } from "../add-column-dialog";
 
 interface GridToolbarProps {
@@ -21,6 +21,7 @@ interface GridToolbarProps {
   mostRecentJob?: SourceJobSummary;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  initialTemplate?: Template;
 }
 
 export function GridToolbar({
@@ -33,6 +34,7 @@ export function GridToolbar({
   mostRecentJob,
   sidebarOpen,
   onToggleSidebar,
+  initialTemplate,
 }: GridToolbarProps) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 bg-slate-50 shrink-0 overflow-x-auto">
@@ -74,7 +76,12 @@ export function GridToolbar({
         <Download className="w-3.5 h-3.5" />
         <span className="hidden sm:inline">Export CSV</span>
       </button>
-      <AddColumnsDialog sourceId={sourceId} mostRecentJob={mostRecentJob} />
+      <AddColumnsDialog
+        key={initialTemplate?.id ?? "no-template"}
+        sourceId={sourceId}
+        mostRecentJob={mostRecentJob}
+        initialTemplate={initialTemplate}
+      />
       <button
         onClick={onToggleSidebar}
         title={sidebarOpen ? "Close jobs panel" : "Open jobs panel"}
