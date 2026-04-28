@@ -31,13 +31,17 @@ RUN apk add --no-cache git
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o /bin/server ./cmd/server
+RUN go build -o /bin/server ./cmd/server && \
+    go build -o /bin/migrate ./cmd/migrate
 
 # Stage 3: Final minimal image
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=go-builder /bin/server /bin/server
+COPY --from=go-builder /bin/migrate /bin/migrate
 COPY --from=frontend-builder /frontend/dist /app/static
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 EXPOSE 8080
-CMD ["/bin/server"]
+ENTRYPOINT ["/entrypoint.sh"]
