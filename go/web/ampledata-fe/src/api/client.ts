@@ -22,6 +22,7 @@ import type {
   PortalSessionResponse,
   UserResponse,
   SourceDataResponse,
+  TemplateListResponse,
 } from "./types";
 import { ENDPOINTS } from "./endpoints";
 
@@ -201,5 +202,9 @@ export class ApiClient {
 
   public async getMe(): Promise<UserResponse> {
     return this.request<UserResponse>(ENDPOINTS.ME);
+  }
+
+  public async listTemplates(): Promise<TemplateListResponse> {
+    return this.request<TemplateListResponse>(ENDPOINTS.TEMPLATES);
   }
 }

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/app'
@@ -22,6 +23,11 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRoute
   '/login': typeof LoginRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppRoute
   '/login': typeof LoginRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/app': typeof AppRoute
   '/login': typeof LoginRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/sources/$sourceId': typeof SourcesSourceIdRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/privacy-policy'
+    | '/templates'
     | '/terms'
     | '/auth/callback'
     | '/sources/$sourceId'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/privacy-policy'
+    | '/templates'
     | '/terms'
     | '/auth/callback'
     | '/sources/$sourceId'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/app'
     | '/login'
     | '/privacy-policy'
+    | '/templates'
     | '/terms'
     | '/auth/callback'
     | '/sources/$sourceId'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRoute
   LoginRoute: typeof LoginRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  TemplatesRoute: typeof TemplatesRoute
   TermsRoute: typeof TermsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   SourcesSourceIdRoute: typeof SourcesSourceIdRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy-policy': {
@@ -229,6 +249,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRoute,
   LoginRoute: LoginRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
+  TemplatesRoute: TemplatesRoute,
   TermsRoute: TermsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   SourcesSourceIdRoute: SourcesSourceIdRoute,

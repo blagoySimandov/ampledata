@@ -14,7 +14,7 @@ export function Header() {
           </Link>
           <nav className="flex h-full items-center gap-0.5">
             <NavLink to="/app" exact>Sources</NavLink>
-            <NavLink to="/app/templates">Templates</NavLink>
+            <NavLink to="/templates">Templates</NavLink>
           </nav>
         </div>
         <div className="flex items-center gap-3">

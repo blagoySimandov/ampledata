@@ -178,10 +178,27 @@ export interface UserResponse {
   email: string;
 }
 
+export type TemplateType = "system_template" | "user_defined_template";
+
+export interface TemplateColumnMetadata {
+  name: string;
+  type: ColumnType;
+  operation: string;
+  description?: string | null;
+}
+
 export interface Template {
   id: string;
   name: string;
   description: string;
-  category: string;
-  columns_metadata: ColumnMetadata[];
+  entity_type: string;
+  type: TemplateType;
+  key_columns: string[];
+  columns_metadata: TemplateColumnMetadata[];
+  owned_by?: string | null;
+}
+
+export interface TemplateListResponse {
+  templates: Template[];
+  total_count: number;
 }
