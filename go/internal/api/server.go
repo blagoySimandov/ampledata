@@ -13,6 +13,7 @@ type Server struct {
 	gcsReader      *gcs.CSVReader
 	store          state.Store
 	userRepo       user.Repository
+	templatesRepo  ITemplateRepo
 	billing        services.BillingService
 	keySelector    services.KeySelector
 	sourcesService services.ISourcesService

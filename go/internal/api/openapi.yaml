@@ -375,6 +375,14 @@ components:
           minimum: 1
           nullable: true
           description: Maximum number of rows to process. Processes all rows if not set.
+        from_template_id:
+          type: string
+          nullable: true
+          description: |
+            Optional. ID of the template this job was launched from, for
+            attribution/analytics only. The actual config is taken from
+            key_columns and columns_metadata in this request - this field
+            does not affect execution.
 
     EnrichResponse:
       type: object
@@ -468,6 +476,62 @@ components:
           type: string
         email:
           type: string
+
+    TemplateType:
+      type: string
+      enum: [system_template, user_defined_template]
+
+    TemplateColumnMetadata:
+      type: object
+      required: [name, type, operation]
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/ColumnType"
+        operation:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    Template:
+      type: object
+      required: [id, name, description, entity_type, type, key_columns, columns_metadata]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        entity_type:
+          type: string
+        type:
+          $ref: "#/components/schemas/TemplateType"
+        key_columns:
+          type: array
+          items:
+            type: string
+        columns_metadata:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateColumnMetadata"
+        owned_by:
+          type: string
+          nullable: true
+
+    TemplateListResponse:
+      type: object
+      required: [templates, total_count]
+      properties:
+        templates:
+          type: array
+          items:
+            $ref: "#/components/schemas/Template"
+        total_count:
+          type: integer
 
     ErrorResponse:
       type: object
@@ -1108,6 +1172,31 @@ paths:
                     type: string
         "400":
           description: User not found or missing Stripe customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /templates:
+    get:
+      operationId: listTemplates
+      summary: List all templates (system + user-defined)
+      tags: [templates]
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateListResponse"
+        "401":
+          description: Unauthorized
           content:
             application/json:
               schema:
