@@ -110,7 +110,7 @@ function ColumnsSection({ columns }: { columns: TemplateColumnMetadata[] }) {
 
 export function TemplateCard({ template, onApply }: TemplateCardProps) {
   return (
-    <Card className="rounded-xl pb-0">
+    <Card className="rounded-xl pb-0 transition-shadow duration-200 hover:shadow-lg cursor-pointer" onClick={() => onApply(template)}>
       <CardHeader>
         <CardTitle className="text-base font-black tracking-tight">
           {template.name}
@@ -125,8 +125,9 @@ export function TemplateCard({ template, onApply }: TemplateCardProps) {
       </CardContent>
       <div className="mt-auto flex justify-end border-t border-border px-4 py-3">
         <Button
-          onClick={() => onApply(template)}
-          className="text-xs font-black tracking-widest"
+          onClick={(e) => { e.stopPropagation(); onApply(template); }}
+          variant="outline"
+          className="h-9 px-5 text-xs font-black tracking-widest text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary group-hover/card:bg-primary group-hover/card:text-primary-foreground group-hover/card:border-primary"
         >
           APPLY
         </Button>

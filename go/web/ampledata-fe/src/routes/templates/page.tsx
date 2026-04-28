@@ -7,12 +7,12 @@ import { cn } from "@/lib/utils";
 import {
   LayoutGrid,
   LayoutList,
-  Plus,
   Search,
   Sparkles,
   Bookmark,
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { SourcePickerModal } from "./_components/source-picker-modal";
 //TODO: Split into multiple files
 
 const ALL_FILTER = "All";
@@ -265,10 +265,12 @@ function GalleryHeader() {
           enriching in one click.
         </p>
       </div>
+      {/* TODO: implement new template creation flow
       <button className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-xs font-black tracking-widest text-primary-foreground transition-colors hover:bg-primary/90">
         <Plus className="size-3.5" />
         NEW TEMPLATE
       </button>
+      */}
     </div>
   );
 }
@@ -287,8 +289,10 @@ export function TemplatesPage() {
     (t) => t.type === "user_defined_template",
   );
 
+  const [pendingTemplate, setPendingTemplate] = useState<Template | null>(null);
+
   function handleApply(template: Template) {
-    console.log("Apply template", template.id);
+    setPendingTemplate(template);
   }
 
   if (isLoading) {
@@ -334,6 +338,13 @@ export function TemplatesPage() {
         onApply={handleApply}
       />
       {filtered.length === 0 && <EmptyState />}
+      {pendingTemplate && (
+        <SourcePickerModal
+          template={pendingTemplate}
+          open
+          onClose={() => setPendingTemplate(null)}
+        />
+      )}
     </div>
   );
 }

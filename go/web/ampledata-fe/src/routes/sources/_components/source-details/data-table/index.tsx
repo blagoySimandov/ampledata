@@ -2,7 +2,7 @@ import type { GridApi } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { useRef } from "react";
 import { useColumnDefs } from "./_columns";
-import type { SourceJobSummary } from "@/api";
+import type { SourceJobSummary, Template } from "@/api";
 import { useMergedData } from "./_hooks/use-merged-data";
 import { agtheme } from "@/lib/ag-theme";
 import { GridToolbar } from "./grid-toolbar";
@@ -13,6 +13,7 @@ interface DataTableProps {
   mostRecentJob?: SourceJobSummary;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  initialTemplate?: Template;
 }
 
 export function DataTable({
@@ -21,6 +22,7 @@ export function DataTable({
   mostRecentJob,
   sidebarOpen,
   onToggleSidebar,
+  initialTemplate,
 }: DataTableProps) {
   const { data: mergedData, isFetching } = useMergedData(sourceId, jobs);
   const gridRef = useRef<AgGridReact>(null);
@@ -50,6 +52,7 @@ export function DataTable({
         mostRecentJob={mostRecentJob}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={onToggleSidebar}
+        initialTemplate={initialTemplate}
       />
       <div className="w-full flex-1 min-h-0">
         <AgGridReact
