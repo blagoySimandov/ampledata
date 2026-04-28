@@ -117,14 +117,6 @@ func (r *CSVReader) ExtractColumn(result *CSVResult, columnName string) ([]strin
 	return values, nil
 }
 
-func (r *CSVReader) ReadColumnFromFile(ctx context.Context, objectName string, columnName string) ([]string, error) {
-	result, err := r.ReadCSV(ctx, objectName)
-	if err != nil {
-		return nil, err
-	}
-	return r.ExtractColumn(result, columnName)
-}
-
 const CompositeKeyDelimiter = "||"
 
 func (r *CSVReader) ExtractCompositeKey(result *CSVResult, columnNames []string) ([]string, error) {
