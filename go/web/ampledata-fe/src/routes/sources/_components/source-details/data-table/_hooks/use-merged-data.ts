@@ -56,27 +56,6 @@ function indexJobRowsByKey(
   return map;
 }
 
-// ─── Pending state ───────────────────────────────────────────────────────────
-
-function markJobColumnsAsPending(row: RowData, job: SourceJobSummary) {
-  if (!job.columns_metadata) return;
-  row.__stages ??= {};
-  for (const col of job.columns_metadata) {
-    row.__stages[col.name] ??= "PENDING";
-  }
-}
-
-function markAllRowsAsPendingForJob(
-  job: SourceJobSummary,
-  rowMap: Map<string, RowData>,
-  totalRows: number,
-) {
-  for (let i = 0; i < totalRows; i++) {
-    const row = rowMap.get(i.toString());
-    if (row) markJobColumnsAsPending(row, job);
-  }
-}
-
 // ─── Enriching rows ──────────────────────────────────────────────────────────
 
 function applyExtractedData(
@@ -191,10 +170,7 @@ function applyJobResultsToRows(
     const key = buildCompositeKey(csvRow, keyIndices);
     const jobRow = jobRowsByKey.get(key);
 
-    if (!jobRow) {
-      markJobColumnsAsPending(row, job);
-      return;
-    }
+    if (!jobRow) return;
 
     enrichRowWithJobResult(row, jobRow, job, enrichedCols);
   });
@@ -212,10 +188,7 @@ function applyJobToRows(
 
   collectEnrichedColumnsFromJobMetadata(job, enrichedCols);
 
-  if (!query.data) {
-    markAllRowsAsPendingForJob(job, rowMap, sourceData.rows.length);
-    return;
-  }
+  if (!query.data) return;
 
   applyJobResultsToRows(job, query.data.rows, sourceData, rowMap, enrichedCols);
 }
