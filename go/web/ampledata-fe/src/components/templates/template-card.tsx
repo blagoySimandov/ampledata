@@ -1,17 +1,16 @@
-import type { ColumnMetadata, Template } from "@/api/types";
+import type { Template, TemplateColumnMetadata } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-const CATEGORY_STYLES: Record<
+const ENTITY_TYPE_STYLES: Record<
   string,
   { bg: string; text: string; dot: string }
 > = {
@@ -47,7 +46,7 @@ const CATEGORY_STYLES: Record<
   },
 };
 
-const DEFAULT_CATEGORY_STYLE = {
+const DEFAULT_STYLE = {
   bg: "bg-muted",
   text: "text-muted-foreground",
   dot: "bg-muted-foreground",
@@ -60,8 +59,8 @@ interface TemplateCardProps {
   onApply: (template: Template) => void;
 }
 
-function CategoryBadge({ category }: { category: string }) {
-  const style = CATEGORY_STYLES[category] ?? DEFAULT_CATEGORY_STYLE;
+function EntityTypeBadge({ entityType }: { entityType: string }) {
+  const style = ENTITY_TYPE_STYLES[entityType] ?? DEFAULT_STYLE;
   return (
     <span
       className={cn(
@@ -71,12 +70,12 @@ function CategoryBadge({ category }: { category: string }) {
       )}
     >
       <span className={cn("size-1.5 shrink-0 rounded-full", style.dot)} />
-      {category}
+      {entityType}
     </span>
   );
 }
 
-function ColumnPills({ columns }: { columns: ColumnMetadata[] }) {
+function ColumnPills({ columns }: { columns: TemplateColumnMetadata[] }) {
   const visible = columns.slice(0, VISIBLE_COLUMN_COUNT);
   const overflow = columns.length - VISIBLE_COLUMN_COUNT;
   return (
@@ -98,7 +97,7 @@ function ColumnPills({ columns }: { columns: ColumnMetadata[] }) {
   );
 }
 
-function ColumnsSection({ columns }: { columns: ColumnMetadata[] }) {
+function ColumnsSection({ columns }: { columns: TemplateColumnMetadata[] }) {
   return (
     <div className="space-y-2">
       <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
@@ -111,27 +110,27 @@ function ColumnsSection({ columns }: { columns: ColumnMetadata[] }) {
 
 export function TemplateCard({ template, onApply }: TemplateCardProps) {
   return (
-    <Card className="rounded-xl">
+    <Card className="rounded-xl pb-0">
       <CardHeader>
         <CardTitle className="text-base font-black tracking-tight">
           {template.name}
         </CardTitle>
         <CardAction>
-          <CategoryBadge category={template.category} />
+          <EntityTypeBadge entityType={template.entity_type} />
         </CardAction>
-        <CardDescription>{template.description}</CardDescription>
+        <CardDescription className="line-clamp-2">{template.description}</CardDescription>
       </CardHeader>
       <CardContent>
         <ColumnsSection columns={template.columns_metadata} />
       </CardContent>
-      <CardFooter className="border-t justify-end">
+      <div className="mt-auto flex justify-end border-t border-border px-4 py-3">
         <Button
           onClick={() => onApply(template)}
           className="text-xs font-black tracking-widest"
         >
           APPLY
         </Button>
-      </CardFooter>
+      </div>
     </Card>
   );
 }

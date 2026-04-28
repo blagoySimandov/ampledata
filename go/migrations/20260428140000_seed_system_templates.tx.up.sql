@@ -1,6 +1,7 @@
-INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) VALUES
+INSERT INTO templates (name, description, entity_type, type, key_columns, columns_metadata) VALUES
 (
     'Company Profile',
+    'Key executives, HQ address, employee count, and latest funding stage for any company.',
     'Company Intel',
     'system_template',
     ARRAY['company_name', 'website'],
@@ -14,6 +15,7 @@ INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) V
 ),
 (
     'Tech Stack Audit',
+    'Programming languages, frameworks, cloud provider, and data tooling for any software company.',
     'Company Intel',
     'system_template',
     ARRAY['company_name', 'website'],
@@ -26,6 +28,7 @@ INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) V
 ),
 (
     'Startup Intelligence',
+    'Founded year, investor names, MRR range, and recent news for early-stage companies.',
     'Company Intel',
     'system_template',
     ARRAY['company_name', 'website'],
@@ -38,6 +41,7 @@ INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) V
 ),
 (
     'Professional Profile',
+    'Current job title, employer, LinkedIn URL, and location for a list of contacts.',
     'People',
     'system_template',
     ARRAY['full_name'],
@@ -50,6 +54,7 @@ INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) V
 ),
 (
     'Academic Researcher',
+    'Institution, department, h-index, and recent publication for academics and scientists.',
     'Research',
     'system_template',
     ARRAY['author_name'],
@@ -63,6 +68,7 @@ INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) V
 ),
 (
     'Property Details',
+    'Listing price, square footage, year built, zoning class, and school district for any address.',
     'Real Estate',
     'system_template',
     ARRAY['address'],
@@ -76,6 +82,7 @@ INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) V
 ),
 (
     'Product Catalog',
+    'Retail price, star rating, review count, and stock availability for a product list.',
     'E-commerce',
     'system_template',
     ARRAY['product_name', 'brand'],
@@ -88,6 +95,7 @@ INSERT INTO templates (name, entity_type, type, key_columns, columns_metadata) V
 ),
 (
     'Clinical Trial Tracker',
+    'Phase, enrollment count, sponsor, and current status for clinical trials.',
     'Healthcare',
     'system_template',
     ARRAY['trial_id', 'drug_name'],

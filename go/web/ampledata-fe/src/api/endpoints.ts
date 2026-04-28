@@ -16,4 +16,5 @@ export const ENDPOINTS = {
   SUBSCRIPTION_PORTAL: "/subscription/portal",
   SUBSCRIBE: "/subscribe",
   ME: "/me",
+  TEMPLATES: "/templates",
 } as const;
