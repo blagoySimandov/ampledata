@@ -105,7 +105,7 @@ func JobWorkflow(ctx workflow.Context, input JobWorkflowInput) (*JobWorkflowOutp
 			output.FailedRows++
 		} else if rowOutput.Success {
 			output.SuccessfulRows++
-		} else {
+		} else if !rowOutput.Cancelled {
 			output.FailedRows++
 		}
 	}

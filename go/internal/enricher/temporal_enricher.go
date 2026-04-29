@@ -2,6 +2,7 @@ package enricher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -60,10 +61,14 @@ func (e *TemporalEnricher) GetProgress(ctx context.Context, jobID string) (*mode
 
 func (e *TemporalEnricher) Cancel(ctx context.Context, jobID string) error {
 	workflowID := fmt.Sprintf("job-%s", jobID)
+	var errs []error
 	if err := e.temporalClient.CancelWorkflow(ctx, workflowID, ""); err != nil {
-		return fmt.Errorf("failed to cancel workflow: %w", err)
+		errs = append(errs, fmt.Errorf("failed to cancel workflow: %w", err))
 	}
-	return e.stateManager.Cancel(ctx, jobID)
+	if err := e.stateManager.Cancel(ctx, jobID); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 func (e *TemporalEnricher) GetResults(ctx context.Context, jobID string, offset, limit int) ([]*models.EnrichmentResult, error) {

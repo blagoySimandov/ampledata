@@ -32,6 +32,7 @@ type EnrichmentWorkflowOutput struct {
 	Sources           []string
 	ExtractionHistory []*models.ExtractionHistoryEntry
 	Success           bool
+	Cancelled         bool
 	Error             string
 	IterationCount    int
 }
@@ -106,7 +107,11 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 	}
 
 	var cancelled bool
-	if err := workflow.ExecuteActivity(ctx, "CheckCancelled", input.JobID).Get(ctx, &cancelled); err == nil && cancelled {
+	if err := workflow.ExecuteActivity(ctx, "CheckCancelled", input.JobID).Get(ctx, &cancelled); err != nil {
+		return nil, fmt.Errorf("cancellation check failed: %w", err)
+	}
+	if cancelled {
+		output.Cancelled = true
 		return output, nil
 	}
 
