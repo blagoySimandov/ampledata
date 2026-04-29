@@ -58,6 +58,9 @@ func NewWorker(temporalClient client.Client, taskQueue string, activities *activ
 	w.RegisterActivityWithOptions(activities.IncrementJobCredits, activity.RegisterOptions{
 		Name: "IncrementJobCredits",
 	})
+	w.RegisterActivityWithOptions(activities.CheckCancelled, activity.RegisterOptions{
+		Name: "CheckCancelled",
+	})
 
 	return &Worker{
 		temporalWorker: w,
