@@ -426,6 +426,20 @@ func (s *PostgresStore) GetRowsAtStage(ctx context.Context, jobID string, stage 
 	return states, nil
 }
 
+func (s *PostgresStore) BulkCancelPendingRows(ctx context.Context, jobID string) error {
+	_, err := s.db.NewUpdate().
+		Model((*models.RowStateDB)(nil)).
+		Set("stage = ?", models.StageCancelled).
+		Set("updated_at = ?", time.Now()).
+		Where("job_id = ?", jobID).
+		Where("stage = ?", models.StagePending).
+		Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to bulk cancel pending rows: %w", err)
+	}
+	return nil
+}
+
 func (s *PostgresStore) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) error {
 	_, err := s.db.NewUpdate().
 		Model((*models.JobDB)(nil)).

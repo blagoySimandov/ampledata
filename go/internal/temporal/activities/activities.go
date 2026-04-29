@@ -450,6 +450,10 @@ func (a *Activities) Extract(ctx context.Context, input ExtractInput) (*ExtractO
 	}, nil
 }
 
+func (a *Activities) CheckCancelled(ctx context.Context, jobID string) (bool, error) {
+	return a.stateManager.CheckCancelled(ctx, jobID)
+}
+
 func (a *Activities) UpdateState(ctx context.Context, input StateUpdateInput) error {
 	err := a.stateManager.Transition(ctx, input.JobID, input.RowKey, input.Stage, input.Data)
 	if err != nil {

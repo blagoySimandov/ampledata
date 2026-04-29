@@ -105,6 +105,11 @@ func EnrichmentWorkflow(ctx workflow.Context, input EnrichmentWorkflowInput) (*E
 		IterationCount: input.RetryCount + 1,
 	}
 
+	var cancelled bool
+	if err := workflow.ExecuteActivity(ctx, "CheckCancelled", input.JobID).Get(ctx, &cancelled); err == nil && cancelled {
+		return output, nil
+	}
+
 	// Generate patterns if this is a retry with feedback
 	queryPatterns := input.QueryPatterns
 	if input.RetryCount > 0 && len(input.PreviousAttempts) > 0 {

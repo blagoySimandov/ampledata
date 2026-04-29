@@ -30,6 +30,7 @@ type Store interface {
 	StartJob(ctx context.Context, jobID string, totalRows int) error
 	GetJobsByUser(ctx context.Context, userID string, offset, limit int) ([]*models.Job, error)
 	BulkCreateRows(ctx context.Context, jobID string, rowKeys []string) error
+	BulkCancelPendingRows(ctx context.Context, jobID string) error
 
 	SaveRowState(ctx context.Context, jobID string, state *models.RowState) error
 	GetRowState(ctx context.Context, jobID string, key string) (*models.RowState, error)
