@@ -115,7 +115,7 @@ func (m *StateManager) CheckCancelled(ctx context.Context, jobID string) (bool, 
 }
 
 func (m *StateManager) Cancel(ctx context.Context, jobID string) error {
-	if err := m.store.BulkCancelPendingRows(ctx, jobID); err != nil {
+	if err := m.store.BulkCancelActiveRows(ctx, jobID); err != nil {
 		return err
 	}
 	return m.store.SetJobStatus(ctx, jobID, models.JobStatusCancelled)

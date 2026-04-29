@@ -426,16 +426,20 @@ func (s *PostgresStore) GetRowsAtStage(ctx context.Context, jobID string, stage 
 	return states, nil
 }
 
-func (s *PostgresStore) BulkCancelPendingRows(ctx context.Context, jobID string) error {
+func (s *PostgresStore) BulkCancelActiveRows(ctx context.Context, jobID string) error {
 	_, err := s.db.NewUpdate().
 		Model((*models.RowStateDB)(nil)).
 		Set("stage = ?", models.StageCancelled).
 		Set("updated_at = ?", time.Now()).
 		Where("job_id = ?", jobID).
-		Where("stage = ?", models.StagePending).
+		Where("stage NOT IN (?)", bun.In([]models.RowStage{
+			models.StageCompleted,
+			models.StageFailed,
+			models.StageCancelled,
+		})).
 		Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to bulk cancel pending rows: %w", err)
+		return fmt.Errorf("failed to bulk cancel active rows: %w", err)
 	}
 	return nil
 }
