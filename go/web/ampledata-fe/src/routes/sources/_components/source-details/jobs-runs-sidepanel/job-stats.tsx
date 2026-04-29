@@ -1,4 +1,4 @@
-import { useApi, useJobProgress } from "@/hooks";
+import { useApi, useJobProgress, useCancelJob } from "@/hooks";
 import {
   type LucideIcon,
   CheckCircle2,
@@ -6,9 +6,11 @@ import {
   StopCircle,
   PlayCircle,
   Loader2,
+  Ban,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 const STATUS_ICON_MAP: Record<string, { icon: LucideIcon; color: string }> = {
   COMPLETED: { icon: CheckCircle2, color: "text-emerald-500" },
@@ -18,9 +20,12 @@ const STATUS_ICON_MAP: Record<string, { icon: LucideIcon; color: string }> = {
 
 const DEFAULT_STATUS_ICON = { icon: PlayCircle, color: "text-blue-500" };
 
+const CANCELLABLE_STATUSES = new Set(["RUNNING", "PENDING"]);
+
 export function JobStats({ jobId }: { jobId: string }) {
   const api = useApi();
   const { data: progress } = useJobProgress(api, jobId);
+  const { mutate: cancelJob, isPending: isCancelling } = useCancelJob(api);
 
   if (!progress) {
     return (
@@ -41,6 +46,8 @@ export function JobStats({ jobId }: { jobId: string }) {
   const { icon: StatusIcon, color: statusColor } =
     STATUS_ICON_MAP[progress.status] ?? DEFAULT_STATUS_ICON;
 
+  const canCancel = CANCELLABLE_STATUSES.has(progress.status);
+
   return (
     <div className="p-6 border-b border-slate-100 bg-white shrink-0 space-y-4 shadow-sm relative z-10">
       <div className="flex items-start justify-between">
@@ -55,12 +62,30 @@ export function JobStats({ jobId }: { jobId: string }) {
             Started {new Date(progress.started_at).toLocaleString()}
           </p>
         </div>
-        <Badge
-          variant="secondary"
-          className="font-bold bg-slate-100 text-slate-700"
-        >
-          {progress.total_rows} ROWS
-        </Badge>
+        <div className="flex items-center gap-2">
+          {canCancel && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 px-2.5 text-xs font-bold text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 hover:text-red-700"
+              onClick={() => cancelJob(jobId)}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Ban className="w-3 h-3" />
+              )}
+              {isCancelling ? "Cancelling…" : "Cancel"}
+            </Button>
+          )}
+          <Badge
+            variant="secondary"
+            className="font-bold bg-slate-100 text-slate-700"
+          >
+            {progress.total_rows} ROWS
+          </Badge>
+        </div>
       </div>
 
       <div className="space-y-2 pt-2">

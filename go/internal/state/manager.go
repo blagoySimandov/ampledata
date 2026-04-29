@@ -3,7 +3,6 @@ package state
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -12,23 +11,11 @@ import (
 
 // TODO: use IStateManager interface
 type StateManager struct {
-	store       Store
-	cancelFuncs map[string]context.CancelFunc
-	workflowIDs map[string]workflowIDPair // jobID -> workflow ID and run ID
-	mu          sync.RWMutex
-}
-
-type workflowIDPair struct {
-	WorkflowID string
-	RunID      string
+	store Store
 }
 
 func NewStateManager(store Store) *StateManager {
-	return &StateManager{
-		store:       store,
-		cancelFuncs: make(map[string]context.CancelFunc),
-		workflowIDs: make(map[string]workflowIDPair),
-	}
+	return &StateManager{store: store}
 }
 
 func (m *StateManager) GenerateJobID() string {
@@ -50,30 +37,6 @@ func (m *StateManager) InitializeJob(ctx context.Context, jobID string, rowKeys 
 	}
 
 	return nil
-}
-
-func (m *StateManager) RegisterCancelFunc(jobID string, cancel context.CancelFunc) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.cancelFuncs[jobID] = cancel
-}
-
-func (m *StateManager) RegisterWorkflowID(jobID, workflowID, runID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.workflowIDs[jobID] = workflowIDPair{
-		WorkflowID: workflowID,
-		RunID:      runID,
-	}
-}
-
-func (m *StateManager) GetWorkflowID(jobID string) (string, string) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	if pair, ok := m.workflowIDs[jobID]; ok {
-		return pair.WorkflowID, pair.RunID
-	}
-	return "", ""
 }
 
 func (m *StateManager) Transition(ctx context.Context, jobID, key string, toStage models.RowStage, update *models.StateUpdate) error {
@@ -111,13 +74,11 @@ func (m *StateManager) checkAndHandleCancellation(ctx context.Context, jobID, ke
 		return nil
 	}
 
-	// Best-effort update to cancelled state
 	if state, err := m.store.GetRowState(ctx, jobID, key); err == nil && state != nil {
 		if state.Stage != models.StageCompleted && state.Stage != models.StageFailed {
 			state.Stage = models.StageCancelled
 			state.UpdatedAt = time.Now()
-			err := m.store.SaveRowState(ctx, jobID, state)
-			if err != nil {
+			if err := m.store.SaveRowState(ctx, jobID, state); err != nil {
 				return fmt.Errorf("failed to save row state: %w", err)
 			}
 		}
@@ -143,18 +104,6 @@ func (m *StateManager) GetPendingForStage(ctx context.Context, jobID string, sta
 }
 
 func (m *StateManager) CheckCancelled(ctx context.Context, jobID string) (bool, error) {
-	m.mu.RLock()
-	_, hasCancelFunc := m.cancelFuncs[jobID]
-	m.mu.RUnlock()
-
-	if hasCancelFunc {
-		select {
-		case <-ctx.Done():
-			return true, nil
-		default:
-		}
-	}
-
 	status, err := m.store.GetJobStatus(ctx, jobID)
 	if err != nil {
 		return false, err
@@ -166,22 +115,10 @@ func (m *StateManager) CheckCancelled(ctx context.Context, jobID string) (bool, 
 }
 
 func (m *StateManager) Cancel(ctx context.Context, jobID string) error {
-	m.mu.Lock()
-	if cancel, ok := m.cancelFuncs[jobID]; ok {
-		cancel()
-	}
-	m.mu.Unlock()
-
-	return m.store.SetJobStatus(ctx, jobID, models.JobStatusCancelled)
+	return m.store.CancelJob(ctx, jobID)
 }
 
 func (m *StateManager) Pause(ctx context.Context, jobID string) error {
-	m.mu.Lock()
-	if cancel, ok := m.cancelFuncs[jobID]; ok {
-		cancel()
-	}
-	m.mu.Unlock()
-
 	return m.store.SetJobStatus(ctx, jobID, models.JobStatusPaused)
 }
 

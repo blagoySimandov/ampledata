@@ -2,6 +2,7 @@ package enricher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/blagoySimandov/ampledata/go/internal/models"
@@ -45,14 +46,10 @@ func (e *TemporalEnricher) Enrich(ctx context.Context, jobID, userID, stripeCust
 		MaxRetries:           e.maxRetries,
 	}
 
-	workflowRun, err := e.temporalClient.ExecuteWorkflow(ctx, workflowOptions, workflows.JobWorkflow, input)
+	_, err := e.temporalClient.ExecuteWorkflow(ctx, workflowOptions, workflows.JobWorkflow, input)
 	if err != nil {
 		return fmt.Errorf("failed to start workflow: %w", err)
 	}
-
-	// Register the workflow for cancellation
-	// We store the workflow ID so we can cancel it later
-	e.stateManager.RegisterWorkflowID(jobID, workflowRun.GetID(), workflowRun.GetRunID())
 
 	return nil
 }
@@ -63,18 +60,15 @@ func (e *TemporalEnricher) GetProgress(ctx context.Context, jobID string) (*mode
 }
 
 func (e *TemporalEnricher) Cancel(ctx context.Context, jobID string) error {
-	// Get workflow ID from state manager
-	workflowID, runID := e.stateManager.GetWorkflowID(jobID)
-	if workflowID == "" {
-		return fmt.Errorf("workflow not found for job %s", jobID)
+	workflowID := fmt.Sprintf("job-%s", jobID)
+	var errs []error
+	if err := e.temporalClient.CancelWorkflow(ctx, workflowID, ""); err != nil {
+		errs = append(errs, fmt.Errorf("failed to cancel workflow: %w", err))
 	}
-
-	err := e.temporalClient.CancelWorkflow(ctx, workflowID, runID)
-	if err != nil {
-		return fmt.Errorf("failed to cancel workflow: %w", err)
+	if err := e.stateManager.Cancel(ctx, jobID); err != nil {
+		errs = append(errs, err)
 	}
-
-	return e.stateManager.Cancel(ctx, jobID)
+	return errors.Join(errs...)
 }
 
 func (e *TemporalEnricher) GetResults(ctx context.Context, jobID string, offset, limit int) ([]*models.EnrichmentResult, error) {

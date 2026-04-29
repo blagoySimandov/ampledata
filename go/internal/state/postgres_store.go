@@ -426,6 +426,46 @@ func (s *PostgresStore) GetRowsAtStage(ctx context.Context, jobID string, stage 
 	return states, nil
 }
 
+var cancellableStatuses = []models.JobStatus{
+	models.JobStatusPending,
+	models.JobStatusRunning,
+}
+
+func (s *PostgresStore) CancelJob(ctx context.Context, jobID string) error {
+	return s.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		result, err := tx.NewUpdate().
+			Model((*models.JobDB)(nil)).
+			Set("status = ?", models.JobStatusCancelled).
+			Set("updated_at = ?", time.Now()).
+			Where("job_id = ?", jobID).
+			Where("status IN (?)", bun.In(cancellableStatuses)).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to set job status: %w", err)
+		}
+		if n, _ := result.RowsAffected(); n == 0 {
+			return fmt.Errorf("job %s is not cancellable", jobID)
+		}
+
+		_, err = tx.NewUpdate().
+			Model((*models.RowStateDB)(nil)).
+			Set("stage = ?", models.StageCancelled).
+			Set("updated_at = ?", time.Now()).
+			Where("job_id = ?", jobID).
+			Where("stage NOT IN (?)", bun.In([]models.RowStage{
+				models.StageCompleted,
+				models.StageFailed,
+				models.StageCancelled,
+			})).
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to cancel active rows: %w", err)
+		}
+
+		return nil
+	})
+}
+
 func (s *PostgresStore) SetJobStatus(ctx context.Context, jobID string, status models.JobStatus) error {
 	_, err := s.db.NewUpdate().
 		Model((*models.JobDB)(nil)).
