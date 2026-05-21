@@ -10,7 +10,7 @@ export const Route = createFileRoute("/login")({
   },
   component: LoginPage,
 });
-
+const STAGING_ORG_ID = "org_01KE21C5J2552WY8B64GBXR1NK";
 function LoginPage() {
   const { signIn, getSignInUrl } = useAuth();
 
@@ -23,7 +23,10 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      <LoginLeftSidebar onSignInWith={signInWith} onSignIn={() => signIn()} />
+      <LoginLeftSidebar
+        onSignInWith={signInWith}
+        onSignIn={() => signIn({ organizationId: STAGING_ORG_ID })}
+      />
       <LoginHero />
     </div>
   );

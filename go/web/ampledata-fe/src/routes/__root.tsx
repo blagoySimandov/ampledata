@@ -8,6 +8,7 @@ import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 import { useAuth, type User } from "@workos-inc/authkit-react";
 import { Header } from "../components/layout";
 import { Loader2 } from "lucide-react";
+import "@radix-ui/themes/styles.css";
 
 interface RouterContext {
   auth: {
@@ -16,11 +17,17 @@ interface RouterContext {
   };
 }
 
-const PUBLIC_ROUTES = ["/login", "/auth/callback", "/", "/privacy-policy", "/terms"];
+const PUBLIC_ROUTES = [
+  "/login",
+  "/auth/callback",
+  "/",
+  "/privacy-policy",
+  "/terms",
+];
 
 function isPublicRoute(pathname: string) {
   return PUBLIC_ROUTES.some((r) =>
-    r === "/" ? pathname === "/" : pathname.startsWith(r)
+    r === "/" ? pathname === "/" : pathname.startsWith(r),
   );
 }
 
