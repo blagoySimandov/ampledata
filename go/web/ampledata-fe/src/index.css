@@ -3,6 +3,8 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/figtree";
 @import "@radix-ui/themes/styles.css";
+@import "@workos-inc/widgets/dist/css/base.css";
+@import "@workos-inc/widgets/dist/css/styles.css";
 
 @custom-variant dark (&:is(.dark *));
 

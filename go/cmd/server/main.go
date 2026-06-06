@@ -82,7 +82,7 @@ func main() {
 	}
 	tc, err := temporalClient.NewClient(cfg.TemporalHostPort, cfg.TemporalNamespace)
 	if err != nil {
-		log.Fatalf("Failed to create Temporal client: %v", err)
+		log.Fatalf("Failed to create Temporal client at port %s: %v", cfg.TemporalHostPort, err)
 	}
 	defer tc.Close()
 

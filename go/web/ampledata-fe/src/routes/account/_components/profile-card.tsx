@@ -33,7 +33,6 @@ function UserMeta({ user }: { user: UserResponse }) {
 
 export function ProfileCard({ user, tierName }: Props) {
   if (!user) return null;
-
   return (
     <div className="flex items-center gap-4 px-4 py-4 rounded-lg bg-card ring-1 ring-foreground/10">
       <UserAvatar first={user.first_name} last={user.last_name} />

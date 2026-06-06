@@ -84,7 +84,7 @@ export function AccountPage() {
   const handleManagePortal = () => portal.mutate(window.location.href);
 
   if (me.isLoading || subscription.isLoading || tiers.isLoading) {
-    return <div className="text-xs text-muted-foreground py-4">Loading…</div>;
+    <div className="text-xs text-muted-foreground py-4">Loading…</div>;
   }
 
   const currentTier = tiers.data?.find((t) => t.id === subscription.data?.tier);
