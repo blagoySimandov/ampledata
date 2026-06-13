@@ -10,7 +10,16 @@ export function ApiKeysContent() {
       title="API Keys"
       description="Authenticate with the API using secret keys."
     >
-      <WorkOsWidgets theme={{ accentColor: "orange" }}>
+      <WorkOsWidgets
+        theme={{
+          accentColor: "orange",
+          grayColor: "sand",
+          radius: "large",
+          panelBackground: "solid",
+          scaling: "100%",
+          fontFamily: '"Figtree Variable", sans-serif',
+        }}
+      >
         {authToken && <ApiKeys authToken={authToken} scope="user" />}
       </WorkOsWidgets>
     </SectionCard>

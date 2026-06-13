@@ -3,10 +3,34 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/figtree";
 @import "@radix-ui/themes/styles.css";
-@import "@workos-inc/widgets/dist/css/base.css";
-@import "@workos-inc/widgets/dist/css/styles.css";
+@import "@workos-inc/widgets/base.css";
+@import "@workos-inc/widgets/styles.css";
 
 @custom-variant dark (&:is(.dark *));
+
+body > .radix-themes:where([data-is-root-theme="true"]) {
+  position: static;
+  z-index: auto;
+  min-height: 0;
+}
+
+.rt-BaseDialogContent.woswidgets-dialog {
+  position: absolute;
+}
+/* make the workow api dialog gray blur screen cover the navbar as well */
+
+.rt-BaseDialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.rt-BaseDialogScroll {
+  position: fixed;
+  inset: 0;
+}
+
+/* root theme */
 
 :root {
   --background: oklch(1 0 0);
