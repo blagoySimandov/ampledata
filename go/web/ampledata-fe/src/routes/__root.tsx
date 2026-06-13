@@ -24,6 +24,7 @@ const PUBLIC_ROUTES = [
   "/",
   "/privacy-policy",
   "/terms",
+  "/docs",
 ];
 
 function isPublicRoute(pathname: string) {
@@ -58,9 +59,14 @@ function RootComponent() {
 
   if (isLoading && !isPublic) return <LoadingScreen />;
 
+  const isDocs = pathname.startsWith("/docs");
+  // Scalar manages its own full-height scroll layout; a sticky app header
+  // fights that and leaves a floating bar, so keep the header static on /docs.
+  const showHeader = user && (!isPublic || isDocs);
+
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
-      {!isPublic && user && <Header />}
+      {showHeader && <Header sticky={!isDocs} />}
       <main
         className={
           !isPublic && user ? "flex-1 container mx-auto p-4 py-8" : "flex-1"

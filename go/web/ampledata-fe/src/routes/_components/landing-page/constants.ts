@@ -87,7 +87,7 @@ export const FAQS = [
   },
   {
     q: "Do you have an API?",
-    a: "Not yet, webhook support is coming. If this is blocking you, email us and you'll be first to know.",
+    a: "Yes. Generate an API key from your account settings and drive the full enrichment engine from your own code, same cited, confidence-scored cells you get in the app. Per-cell pricing is identical; calls bill against the same balance.",
   },
 ] as const;
 
@@ -108,6 +108,43 @@ export const LANDING_FEATURES = [
     body: "Pay only for what you enrich. No minimum, no per-seat license, no annual contract. A fraction of what comparable tools charge.",
   },
 ] as const;
+
+export const API_FEATURES = [
+  {
+    title: "Scoped API keys",
+    body: "Generate keys from account settings. Each key is bound to your account and revocable in one click.",
+  },
+  {
+    title: "The full enrichment engine",
+    body: "Upload a list, define columns in plain English, and pull back cited, confidence-scored cells, all over HTTP.",
+  },
+  {
+    title: "Same per-cell pricing",
+    body: "API calls bill against the same balance as the app. No separate plan, no platform fee, no minimums.",
+  },
+] as const;
+
+export const API_CODE_SAMPLE = `# 1. Authenticate with your API key
+export AMPLEDATA_KEY="sk_live_..."
+
+# 2. Kick off an enrichment run for a source
+curl https://api.ampledata.ai/api/v1/sources/$SOURCE_ID/enrich \\
+  -H "Authorization: Bearer $AMPLEDATA_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "key_columns": ["company"],
+    "columns_metadata": [
+      { "name": "industry", "type": "string", "job_type": "enrichment" }
+    ]
+  }'
+
+# 3. Pull back cited, confidence-scored cells
+curl https://api.ampledata.ai/api/v1/jobs/$JOB_ID/results \\
+  -H "Authorization: Bearer $AMPLEDATA_KEY"
+# => [{ "key": "stripe.com",
+#       "extracted_data": { "industry": "Fintech" },
+#       "confidence": { "industry": { "score": 0.9 } },
+#       "sources": ["https://..."] }]`;
 
 export const COMPARISONS = [
   {

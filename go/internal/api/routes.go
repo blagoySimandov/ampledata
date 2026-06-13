@@ -25,7 +25,6 @@ func SetupRoutes(server *Server, jwtVerifier *auth.JWTVerifier, apiKeys auth.API
 	}
 	mainRouter.HandleFunc("/api/v1/webhooks/stripe", webhookWrapper.HandleStripeWebhook).Methods("POST")
 	mainRouter.HandleFunc("/openapi.json", serveOpenAPISpec).Methods("GET")
-	mainRouter.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerUIHandler()))
 
 	protectedRouter := mux.NewRouter()
 	protectedRouter.Use(auth.Middleware(jwtVerifier, apiKeys))
