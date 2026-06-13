@@ -4,6 +4,7 @@ import logo from "../../../../assets/ampledata-logo.png";
 import { Button } from "@/components/ui/button";
 import { ContactFormWidget } from "@/components/widgets";
 import { EnrichmentMockHero } from "./enrichment-mock-hero";
+import { ApiSection } from "./api-section";
 import { PricingSection } from "./pricing-section";
 import { FaqSection } from "./faq-section";
 import { LANDING_FEATURES, COMPARISONS } from "./constants";
@@ -27,11 +28,23 @@ function NavBar() {
         </Link>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => document.getElementById("api")?.scrollIntoView({ behavior: "smooth" })}
+            className="hidden sm:inline-flex px-3 py-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors rounded-md"
+          >
+            API
+          </button>
+          <button
             onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })}
             className="px-3 py-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors rounded-md"
           >
             Pricing
           </button>
+          <Link
+            to="/docs"
+            className="hidden sm:inline-flex px-3 py-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors rounded-md"
+          >
+            Docs
+          </Link>
           <Button asChild className="h-auto px-5 py-2.5 text-sm font-semibold rounded-lg">
             <Link to="/login">Try it out now &rarr;</Link>
           </Button>
@@ -239,6 +252,9 @@ function LandingFooter() {
           Made by a person who got tired of pasting rows into ChatGPT.
         </p>
         <div className="flex gap-4 text-xs text-muted-foreground">
+          <Link to="/docs" className="hover:text-foreground transition-colors">
+            Docs
+          </Link>
           <Link to="/privacy-policy" className="hover:text-foreground transition-colors">
             Privacy
           </Link>
@@ -259,6 +275,7 @@ export function LandingPage() {
       <WhatItDoesSection />
       <DemoSection />
       <FeaturesSection />
+      <ApiSection />
       <ComparisonSection />
       <PricingSection />
       <FaqSection />

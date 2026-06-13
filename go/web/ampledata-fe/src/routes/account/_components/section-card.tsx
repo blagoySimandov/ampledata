@@ -14,9 +14,14 @@ interface Props {
   className?: string;
 }
 
-export function SectionCard({ title, description, children, className }: Props) {
+export function SectionCard({
+  title,
+  description,
+  children,
+  className,
+}: Props) {
   return (
-    <Card className={cn("gap-0", className)}>
+    <Card className={cn("gap-0 h-96", className)}>
       <CardHeader className="border-b">
         <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}

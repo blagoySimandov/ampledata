@@ -14,6 +14,7 @@ require (
 	github.com/uptrace/bun v1.2.16
 	github.com/uptrace/bun/dialect/pgdialect v1.2.16
 	github.com/uptrace/bun/driver/pgdriver v1.2.16
+	github.com/workos/workos-go/v4 v4.46.1
 	go.temporal.io/api v1.60.0
 	go.temporal.io/sdk v1.38.0
 	golang.org/x/sync v0.19.0
@@ -60,6 +61,7 @@ require (
 	github.com/gohugoio/hugo v0.149.1 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.7 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect

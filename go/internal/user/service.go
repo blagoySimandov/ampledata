@@ -11,23 +11,37 @@ import (
 
 type Service interface {
 	GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error)
+	EnsureOrgMembership(ctx context.Context, userID string) error
 }
 
 type billingClient interface {
 	GetOrCreateCustomer(ctx context.Context, userID, email string) (*stripe.Customer, error)
 }
 
-type UserService struct {
-	repo    Repository
-	billing billingClient
-	sf      singleflight.Group
+type membershipClient interface {
+	EnsureMembership(ctx context.Context, userID string) error
 }
 
-func NewUserService(repo Repository, billing billingClient) *UserService {
+type UserService struct {
+	repo       Repository
+	billing    billingClient
+	membership membershipClient
+	sf         singleflight.Group
+}
+
+func NewUserService(repo Repository, billing billingClient, membership membershipClient) *UserService {
 	return &UserService{
-		repo:    repo,
-		billing: billing,
+		repo:       repo,
+		billing:    billing,
+		membership: membership,
 	}
+}
+
+func (s *UserService) EnsureOrgMembership(ctx context.Context, userID string) error {
+	_, err, _ := s.sf.Do("org:"+userID, func() (any, error) {
+		return nil, s.membership.EnsureMembership(ctx, userID)
+	})
+	return err
 }
 
 func (s *UserService) GetOrCreate(ctx context.Context, userID, email, firstName, lastName, profilePictureURL string) (*models.User, error) {

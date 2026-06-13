@@ -23,6 +23,7 @@ import (
 	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/worker"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
+	"github.com/blagoySimandov/ampledata/go/internal/workos"
 )
 
 func main() {
@@ -43,7 +44,9 @@ func main() {
 	}
 
 	billingService := billing.NewBilling(userRepo)
-	userService := user.NewUserService(userRepo, billingService)
+	membershipClient := workos.NewMembershipClient(cfg.WorkOSAPIKey, cfg.WorkOSDefaultOrgID)
+	apiKeyValidator := workos.NewAPIKeyValidator(cfg.WorkOSAPIKey, cfg.WorkOSDefaultOrgID)
+	userService := user.NewUserService(userRepo, billingService, membershipClient)
 
 	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, services.WithStore(store))
 	if err != nil {
@@ -82,7 +85,7 @@ func main() {
 	}
 	tc, err := temporalClient.NewClient(cfg.TemporalHostPort, cfg.TemporalNamespace)
 	if err != nil {
-		log.Fatalf("Failed to create Temporal client: %v", err)
+		log.Fatalf("Failed to create Temporal client at port %s: %v", cfg.TemporalHostPort, err)
 	}
 	defer tc.Close()
 
@@ -114,7 +117,7 @@ func main() {
 	sourcesService := services.NewSourcesService(store, gcsReader, enr, aiClient, promptService)
 	templatesRepo := templates.NewTemplatesRepo(db)
 	server := api.NewServer(enr, gcsReader, store, userRepo, billingService, keySelector, sourcesService, templatesRepo)
-	router := api.SetupRoutes(server, jwtVerifier, userService, cfg.StaticDir)
+	router := api.SetupRoutes(server, jwtVerifier, apiKeyValidator, userService, cfg.StaticDir)
 
 	srv := &http.Server{
 		Addr:         cfg.ServerAddr,

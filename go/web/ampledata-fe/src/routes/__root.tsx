@@ -7,7 +7,9 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 import { useAuth, type User } from "@workos-inc/authkit-react";
 import { Header } from "../components/layout";
+import { useEnsureGlobalOrg } from "@/hooks/use-ensure-org";
 import { Loader2 } from "lucide-react";
+import "@radix-ui/themes/styles.css";
 
 interface RouterContext {
   auth: {
@@ -16,11 +18,18 @@ interface RouterContext {
   };
 }
 
-const PUBLIC_ROUTES = ["/login", "/auth/callback", "/", "/privacy-policy", "/terms"];
+const PUBLIC_ROUTES = [
+  "/login",
+  "/auth/callback",
+  "/",
+  "/privacy-policy",
+  "/terms",
+  "/docs",
+];
 
 function isPublicRoute(pathname: string) {
   return PUBLIC_ROUTES.some((r) =>
-    r === "/" ? pathname === "/" : pathname.startsWith(r)
+    r === "/" ? pathname === "/" : pathname.startsWith(r),
   );
 }
 
@@ -46,12 +55,18 @@ function RootComponent() {
   const { user, isLoading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isPublic = isPublicRoute(pathname);
+  useEnsureGlobalOrg();
 
   if (isLoading && !isPublic) return <LoadingScreen />;
 
+  const isDocs = pathname.startsWith("/docs");
+  // Scalar manages its own full-height scroll layout; a sticky app header
+  // fights that and leaves a floating bar, so keep the header static on /docs.
+  const showHeader = user && (!isPublic || isDocs);
+
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
-      {!isPublic && user && <Header />}
+      {showHeader && <Header sticky={!isDocs} />}
       <main
         className={
           !isPublic && user ? "flex-1 container mx-auto p-4 py-8" : "flex-1"

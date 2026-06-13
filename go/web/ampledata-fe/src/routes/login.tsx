@@ -10,11 +10,14 @@ export const Route = createFileRoute("/login")({
   },
   component: LoginPage,
 });
-
 function LoginPage() {
   const { signIn, getSignInUrl } = useAuth();
 
   async function signInWith(provider: string) {
+    if (provider === "GitHubOAuth") {
+      await signIn();
+      return;
+    }
     const url = await getSignInUrl();
     const parsed = new URL(url);
     parsed.searchParams.set("provider", provider);

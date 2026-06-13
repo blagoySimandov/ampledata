@@ -565,7 +565,7 @@ paths:
       operationId: handleStripeWebhook
       summary: Handle Stripe webhook events
       security: []
-      tags: [billing]
+      tags: [billing, internal]
       requestBody:
         required: true
         content:
@@ -989,7 +989,7 @@ paths:
     post:
       operationId: selectKey
       summary: Use AI to select the best key column from a source's CSV
-      tags: [jobs]
+      tags: [jobs, internal]
       requestBody:
         required: true
         content:
@@ -1038,7 +1038,7 @@ paths:
     post:
       operationId: createSubscriptionCheckout
       summary: Create a Stripe checkout session for a subscription
-      tags: [billing]
+      tags: [billing, internal]
       requestBody:
         required: true
         content:
@@ -1069,7 +1069,7 @@ paths:
     get:
       operationId: getSubscriptionStatus
       summary: Get the current user's subscription status
-      tags: [billing]
+      tags: [billing, internal]
       responses:
         "200":
           description: Subscription status
@@ -1088,7 +1088,7 @@ paths:
     post:
       operationId: upgradeSubscription
       summary: Upgrade the current user's subscription to a higher tier
-      tags: [billing]
+      tags: [billing, internal]
       requestBody:
         required: true
         content:
@@ -1123,7 +1123,7 @@ paths:
     post:
       operationId: cancelSubscription
       summary: Cancel the current user's subscription
-      tags: [billing]
+      tags: [billing, internal]
       responses:
         "200":
           description: Subscription cancelled
@@ -1152,7 +1152,7 @@ paths:
     post:
       operationId: createPortalSession
       summary: Create a Stripe customer portal session
-      tags: [billing]
+      tags: [billing, internal]
       parameters:
         - in: query
           name: return_url

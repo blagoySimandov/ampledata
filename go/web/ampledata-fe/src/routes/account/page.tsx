@@ -6,19 +6,26 @@ import { PersonalInfoSection } from "./_components/personal-info-section";
 import { SubscriptionSummary } from "./_components/billing/subscription-summary";
 import { TierSelector } from "./_components/billing/tier-selector";
 import { UpgradeDialog } from "./_components/billing/upgrade-dialog";
+import { ApiKeysContent } from "./_components/api-keys-content";
 
 function BillingSection({ onManagePortal }: { onManagePortal: () => void }) {
   const { tiers, subscription, subscribe, upgrade } = useBilling();
-  const [pendingUpgradeTierId, setPendingUpgradeTierId] = useState<string | null>(null);
+  const [pendingUpgradeTierId, setPendingUpgradeTierId] = useState<
+    string | null
+  >(null);
 
   const tiersData = tiers.data ?? [];
   const hasActiveSubscription = !!subscription.data?.tier;
   const currentTier = tiersData.find((t) => t.id === subscription.data?.tier);
-  const pendingUpgradeTier = tiersData.find((t) => t.id === pendingUpgradeTierId);
+  const pendingUpgradeTier = tiersData.find(
+    (t) => t.id === pendingUpgradeTierId,
+  );
 
   const handleUpgradeConfirm = () => {
     if (!pendingUpgradeTierId) return;
-    upgrade.mutate(pendingUpgradeTierId, { onSuccess: () => setPendingUpgradeTierId(null) });
+    upgrade.mutate(pendingUpgradeTierId, {
+      onSuccess: () => setPendingUpgradeTierId(null),
+    });
   };
 
   return (
@@ -53,16 +60,19 @@ function BillingSection({ onManagePortal }: { onManagePortal: () => void }) {
         onManagePortal={onManagePortal}
         isPending={subscribe.isPending}
       />
-      {pendingUpgradeTierId && currentTier && pendingUpgradeTier && subscription.data && (
-        <UpgradeDialog
-          currentTier={currentTier}
-          newTier={pendingUpgradeTier}
-          subscription={subscription.data}
-          isPending={upgrade.isPending}
-          onConfirm={handleUpgradeConfirm}
-          onClose={() => setPendingUpgradeTierId(null)}
-        />
-      )}
+      {pendingUpgradeTierId &&
+        currentTier &&
+        pendingUpgradeTier &&
+        subscription.data && (
+          <UpgradeDialog
+            currentTier={currentTier}
+            newTier={pendingUpgradeTier}
+            subscription={subscription.data}
+            isPending={upgrade.isPending}
+            onConfirm={handleUpgradeConfirm}
+            onClose={() => setPendingUpgradeTierId(null)}
+          />
+        )}
     </div>
   );
 }
@@ -74,7 +84,7 @@ export function AccountPage() {
   const handleManagePortal = () => portal.mutate(window.location.href);
 
   if (me.isLoading || subscription.isLoading || tiers.isLoading) {
-    return <div className="text-xs text-muted-foreground py-4">Loading…</div>;
+    <div className="text-xs text-muted-foreground py-4">Loading…</div>;
   }
 
   const currentTier = tiers.data?.find((t) => t.id === subscription.data?.tier);
@@ -87,6 +97,7 @@ export function AccountPage() {
       />
       <PersonalInfoSection user={me.data} />
       <BillingSection onManagePortal={handleManagePortal} />
+      <ApiKeysContent />
       <ContactFormWidget variant="account" user={me.data} />
     </div>
   );

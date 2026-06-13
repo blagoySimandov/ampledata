@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func SetupRoutes(server *Server, jwtVerifier *auth.JWTVerifier, userService user.Service, staticDir string) *mux.Router {
+func SetupRoutes(server *Server, jwtVerifier *auth.JWTVerifier, apiKeys auth.APIKeyValidator, userService user.Service, staticDir string) *mux.Router {
 	mainRouter := mux.NewRouter()
 	mainRouter.Use(CORSMiddleware().Handler)
 	mainRouter.Use(LoggingMiddleware)
@@ -25,10 +25,9 @@ func SetupRoutes(server *Server, jwtVerifier *auth.JWTVerifier, userService user
 	}
 	mainRouter.HandleFunc("/api/v1/webhooks/stripe", webhookWrapper.HandleStripeWebhook).Methods("POST")
 	mainRouter.HandleFunc("/openapi.json", serveOpenAPISpec).Methods("GET")
-	mainRouter.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", swaggerUIHandler()))
 
 	protectedRouter := mux.NewRouter()
-	protectedRouter.Use(auth.Middleware(jwtVerifier))
+	protectedRouter.Use(auth.Middleware(jwtVerifier, apiKeys))
 	protectedRouter.Use(user.UserMiddleware(userService))
 	HandlerFromMuxWithBaseURL(strictHandler, protectedRouter, "/api/v1")
 

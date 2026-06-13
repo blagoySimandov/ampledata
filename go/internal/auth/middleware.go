@@ -26,6 +26,7 @@ type WorkOSUser struct {
 	FirstName         string `json:"first_name"`
 	LastName          string `json:"last_name"`
 	ProfilePictureURL string `json:"profile_picture_url"`
+	OrganizationID    string `json:"organization_id"`
 }
 
 func (w *WorkOSUser) ToUser() *models.User {
@@ -105,57 +106,95 @@ func (v *JWTVerifier) VerifyToken(tokenString string) (jwt.Token, error) {
 	return token, nil
 }
 
-func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
+type APIKeyValidator interface {
+	Validate(ctx context.Context, key string) (userID, organizationID string, err error)
+}
+
+func Middleware(verifier *JWTVerifier, apiKeys APIKeyValidator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var workosUser *WorkOSUser
-
-			if verifier.debugBypass {
-				workosUser = &WorkOSUser{
-					ID:        "debug-user-id",
-					Email:     "debug@localhost.com",
-					FirstName: "Debug",
-					LastName:  "User",
-				}
-			} else {
-				authHeader := r.Header.Get("Authorization")
-				if authHeader == "" {
-					log.Printf("Missing Authorization header")
-					http.Error(w, "Unauthorized: Missing Authorization header", http.StatusUnauthorized)
-					return
-				}
-
-				parts := strings.SplitN(authHeader, " ", 2)
-				if len(parts) != 2 || parts[0] != "Bearer" {
-					log.Printf("Invalid Authorization header format")
-					http.Error(w, "Unauthorized: Invalid Authorization header format", http.StatusUnauthorized)
-					return
-				}
-
-				accessToken := parts[1]
-
-				token, err := verifier.VerifyToken(accessToken)
-				if err != nil {
-					log.Printf("Failed to verify token: %v", err)
-					http.Error(w, "Unauthorized: Invalid or expired token", http.StatusUnauthorized)
-					return
-				}
-
-				claims := token.PrivateClaims()
-
-				workosUser = &WorkOSUser{
-					ID:                token.Subject(),
-					Email:             getStringClaim(claims, "email"),
-					FirstName:         getStringClaim(claims, "firstName"),
-					LastName:          getStringClaim(claims, "lastName"),
-					ProfilePictureURL: getStringClaim(claims, "profilePictureUrl"),
-				}
+			workosUser, ok := authenticate(r, verifier, apiKeys)
+			if !ok {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
 			}
 
 			ctx := context.WithValue(r.Context(), userContextKey, workosUser)
-
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
+	}
+}
+
+func authenticate(r *http.Request, verifier *JWTVerifier, apiKeys APIKeyValidator) (*WorkOSUser, bool) {
+	if verifier.debugBypass {
+		return debugUser(), true
+	}
+
+	credential, ok := bearerToken(r)
+	if !ok {
+		return nil, false
+	}
+
+	if isJWT(credential) {
+		return userFromJWT(verifier, credential)
+	}
+	return userFromAPIKey(r.Context(), apiKeys, credential)
+}
+
+func bearerToken(r *http.Request) (string, bool) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		log.Printf("Missing Authorization header")
+		return "", false
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		log.Printf("Invalid Authorization header format")
+		return "", false
+	}
+	return parts[1], true
+}
+
+func isJWT(token string) bool {
+	return strings.Count(token, ".") == 2
+}
+
+func userFromJWT(verifier *JWTVerifier, accessToken string) (*WorkOSUser, bool) {
+	token, err := verifier.VerifyToken(accessToken)
+	if err != nil {
+		log.Printf("Failed to verify token: %v", err)
+		return nil, false
+	}
+	claims := token.PrivateClaims()
+	return &WorkOSUser{
+		ID:                token.Subject(),
+		Email:             getStringClaim(claims, "email"),
+		FirstName:         getStringClaim(claims, "firstName"),
+		LastName:          getStringClaim(claims, "lastName"),
+		ProfilePictureURL: getStringClaim(claims, "profilePictureUrl"),
+		OrganizationID:    getStringClaim(claims, "org_id"),
+	}, true
+}
+
+func userFromAPIKey(ctx context.Context, apiKeys APIKeyValidator, key string) (*WorkOSUser, bool) {
+	if apiKeys == nil {
+		log.Printf("API key auth attempted but no validator configured")
+		return nil, false
+	}
+	userID, orgID, err := apiKeys.Validate(ctx, key)
+	if err != nil {
+		log.Printf("Failed to validate API key: %v", err)
+		return nil, false
+	}
+	return &WorkOSUser{ID: userID, OrganizationID: orgID}, true
+}
+
+func debugUser() *WorkOSUser {
+	return &WorkOSUser{
+		ID:        "debug-user-id",
+		Email:     "debug@localhost.com",
+		FirstName: "Debug",
+		LastName:  "User",
 	}
 }
 
