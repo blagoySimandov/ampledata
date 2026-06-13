@@ -11,8 +11,9 @@ type Config struct {
 	SerperAPIKey      string
 	Crawl4aiURL       string
 	GeminiAPIKey      string
-	WorkOSAPIKey      string
-	WorkOSClientID    string
+	WorkOSAPIKey       string
+	WorkOSClientID     string
+	WorkOSDefaultOrgID string
 	WorkersPerStage   int
 	ChannelBufferSize int
 	DebugAuthBypass   bool
@@ -64,8 +65,9 @@ var cfg Config = Config{
 	ServerAddr:        getEnv("SERVER_ADDR", ":8080"),
 	SerperAPIKey:      getEnv("SERPER_API_KEY", ""),
 	GeminiAPIKey:      getEnv("GEMINI_API_KEY", ""),
-	WorkOSAPIKey:      getEnv("WORKOS_API_KEY", ""),
-	WorkOSClientID:    getEnv("WORKOS_CLIENT_ID", ""),
+	WorkOSAPIKey:       getEnv("WORKOS_API_KEY", ""),
+	WorkOSClientID:     getEnv("WORKOS_CLIENT_ID", ""),
+	WorkOSDefaultOrgID: getEnv("WORKOS_DEFAULT_ORGANIZATION_ID", ""),
 	Crawl4aiURL:       getEnv("CRAWL4AI_URL", "http://localhost:8000"),
 	WorkersPerStage:   getEnvInt("WORKERS_PER_STAGE", 5),
 	ChannelBufferSize: getEnvInt("CHANNEL_BUFFER_SIZE", 100),

@@ -1,9 +1,11 @@
 import { useAuthToken } from "@/hooks/use-auth-token";
+import { useAuth } from "@workos-inc/authkit-react";
 import { ApiKeys, WorkOsWidgets } from "@workos-inc/widgets";
 import { SectionCard } from "./section-card";
 
 export function ApiKeysContent() {
   const { data: authToken } = useAuthToken();
+  const { organizationId } = useAuth();
 
   return (
     <SectionCard
@@ -20,7 +22,9 @@ export function ApiKeysContent() {
           fontFamily: '"Figtree Variable", sans-serif',
         }}
       >
-        {authToken && <ApiKeys authToken={authToken} scope="user" />}
+        {authToken && organizationId && (
+          <ApiKeys authToken={authToken} scope="user" />
+        )}
       </WorkOsWidgets>
     </SectionCard>
   );

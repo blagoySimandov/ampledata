@@ -10,11 +10,14 @@ export const Route = createFileRoute("/login")({
   },
   component: LoginPage,
 });
-const STAGING_ORG_ID = "org_01KE21C5J2552WY8B64GBXR1NK";
 function LoginPage() {
   const { signIn, getSignInUrl } = useAuth();
 
   async function signInWith(provider: string) {
+    if (provider === "GitHubOAuth") {
+      await signIn();
+      return;
+    }
     const url = await getSignInUrl();
     const parsed = new URL(url);
     parsed.searchParams.set("provider", provider);
@@ -23,10 +26,7 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      <LoginLeftSidebar
-        onSignInWith={signInWith}
-        onSignIn={() => signIn({ organizationId: STAGING_ORG_ID })}
-      />
+      <LoginLeftSidebar onSignInWith={signInWith} onSignIn={() => signIn()} />
       <LoginHero />
     </div>
   );

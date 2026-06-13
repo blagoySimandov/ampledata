@@ -23,6 +23,7 @@ import (
 	temporalClient "github.com/blagoySimandov/ampledata/go/internal/temporal/client"
 	"github.com/blagoySimandov/ampledata/go/internal/temporal/worker"
 	"github.com/blagoySimandov/ampledata/go/internal/user"
+	"github.com/blagoySimandov/ampledata/go/internal/workos"
 )
 
 func main() {
@@ -43,7 +44,8 @@ func main() {
 	}
 
 	billingService := billing.NewBilling(userRepo)
-	userService := user.NewUserService(userRepo, billingService)
+	membershipClient := workos.NewMembershipClient(cfg.WorkOSAPIKey, cfg.WorkOSDefaultOrgID)
+	userService := user.NewUserService(userRepo, billingService, membershipClient)
 
 	costTracker, err := services.NewCostTracker(cfg.TknInCost, cfg.TknOutCost, cfg.SerperCost, services.WithStore(store))
 	if err != nil {

@@ -26,6 +26,7 @@ type WorkOSUser struct {
 	FirstName         string `json:"first_name"`
 	LastName          string `json:"last_name"`
 	ProfilePictureURL string `json:"profile_picture_url"`
+	OrganizationID    string `json:"organization_id"`
 }
 
 func (w *WorkOSUser) ToUser() *models.User {
@@ -149,6 +150,7 @@ func Middleware(verifier *JWTVerifier) func(http.Handler) http.Handler {
 					FirstName:         getStringClaim(claims, "firstName"),
 					LastName:          getStringClaim(claims, "lastName"),
 					ProfilePictureURL: getStringClaim(claims, "profilePictureUrl"),
+					OrganizationID:    getStringClaim(claims, "org_id"),
 				}
 			}
 

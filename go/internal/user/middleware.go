@@ -44,6 +44,14 @@ func UserMiddleware(userService Service) func(http.Handler) http.Handler {
 				return
 			}
 
+			if workosUser.OrganizationID == "" {
+				if err := userService.EnsureOrgMembership(r.Context(), workosUser.ID); err != nil {
+					log.Printf("Failed to ensure org membership: %v", err)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+			}
+
 			ctx := context.WithValue(r.Context(), dbUserContextKey, dbUser)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

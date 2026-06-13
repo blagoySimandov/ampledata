@@ -7,6 +7,7 @@ import {
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 import { useAuth, type User } from "@workos-inc/authkit-react";
 import { Header } from "../components/layout";
+import { useEnsureGlobalOrg } from "@/hooks/use-ensure-org";
 import { Loader2 } from "lucide-react";
 import "@radix-ui/themes/styles.css";
 
@@ -53,6 +54,7 @@ function RootComponent() {
   const { user, isLoading } = useAuth();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isPublic = isPublicRoute(pathname);
+  useEnsureGlobalOrg();
 
   if (isLoading && !isPublic) return <LoadingScreen />;
 
